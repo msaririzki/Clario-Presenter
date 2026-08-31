@@ -21,6 +21,7 @@ public sealed partial class MainPage : Page
     private bool _isPrivacy;
     private bool _isAutoHeld;
     private bool _isSafeMirrorSession;
+    private nint _lastActivePrivateWindow;
     private CaptureSessionService? _capture;
     private OutputWindow? _outputWindow;
 
@@ -314,6 +315,7 @@ public sealed partial class MainPage : Page
         _isPrivacy = false;
         _isAutoHeld = false;
         _isSafeMirrorSession = false;
+        _lastActivePrivateWindow = nint.Zero;
         FreezeButton.IsChecked = false;
         PrivacyButton.IsChecked = false;
 
@@ -344,9 +346,7 @@ public sealed partial class MainPage : Page
     private bool IsForegroundPrivate()
     {
         var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
-        var presenterWindow = App.MainWindow is null
-            ? nint.Zero
-            : WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        var presenterWindow = GetPresenterWindowHandle();
         if (foregroundWindow == presenterWindow) return true;
 
         return _privateWindows.Contains(foregroundWindow)
@@ -355,13 +355,33 @@ public sealed partial class MainPage : Page
 
     private void PrivacyWatchTimer_Tick(object? sender, object e)
     {
-        var autoHeld = _isSafeMirrorSession
-            && (IsForegroundPrivate()
-                || WindowCatalogService.HasVisibleWindow(_privateWindows));
+        if (!_isSafeMirrorSession) return;
+
+        var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
+        var privateWindowActive = _privateWindows.Contains(foregroundWindow)
+            && WindowCatalogService.IsWindowPresentable(foregroundWindow);
+
+        if (privateWindowActive)
+        {
+            _lastActivePrivateWindow = foregroundWindow;
+        }
+        else if (_lastActivePrivateWindow != nint.Zero)
+        {
+            // Keep the private window from becoming visible behind a smaller
+            // public window, then allow the public capture to continue.
+            WindowCatalogService.MinimizeWindow(_lastActivePrivateWindow);
+            _lastActivePrivateWindow = nint.Zero;
+        }
+
+        var autoHeld = foregroundWindow == GetPresenterWindowHandle() || privateWindowActive;
         if (_isAutoHeld == autoHeld) return;
         _isAutoHeld = autoHeld;
         UpdatePresentationState();
     }
+
+    private static nint GetPresenterWindowHandle() => App.MainWindow is null
+        ? nint.Zero
+        : WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
 
     private void Capture_FrameAvailable(object? sender, EventArgs e)
     {

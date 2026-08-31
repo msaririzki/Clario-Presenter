@@ -76,21 +76,14 @@ public static class WindowCatalogService
 
     public static nint GetForegroundWindowHandle() => GetForegroundWindow();
 
-    public static bool HasVisibleWindow(IReadOnlySet<nint> windowHandles)
-    {
-        foreach (var handle in windowHandles)
-        {
-            if (IsWindowPresentable(handle)) return true;
-        }
-        return false;
-    }
-
     public static void MinimizeWindows(IEnumerable<nint> windowHandles)
     {
-        foreach (var handle in windowHandles)
-        {
-            if (IsWindowPresentable(handle)) ShowWindow(handle, SwMinimize);
-        }
+        foreach (var handle in windowHandles) MinimizeWindow(handle);
+    }
+
+    public static void MinimizeWindow(nint handle)
+    {
+        if (IsWindowPresentable(handle)) ShowWindow(handle, SwMinimize);
     }
 
     public static bool IsWindowPresentable(nint handle) =>
