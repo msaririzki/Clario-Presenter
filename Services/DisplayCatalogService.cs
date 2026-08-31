@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace Clario_Presenter.Services;
 
 public readonly record struct DisplayBounds(int Left, int Top, int Width, int Height);
-public sealed record DisplayTarget(nint Handle, string DeviceName, DisplayBounds Bounds, bool IsPrimary, int Index)
+public sealed record DisplayTarget(nint Handle, string DeviceName, DisplayBounds Bounds, bool IsPrimary, int Index, uint Dpi)
 {
     public string DisplayName => $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}";
 }
@@ -25,14 +25,31 @@ public static class DisplayCatalogService
 
         return found.OrderByDescending(item => (item.Info.Flags & MonitorInfoPrimary) != 0)
             .ThenBy(item => item.Info.Monitor.Left)
-            .Select((item, index) => new DisplayTarget(
-                item.Handle,
-                item.Info.DeviceName,
-                new DisplayBounds(item.Info.Monitor.Left, item.Info.Monitor.Top,
-                    item.Info.Monitor.Right - item.Info.Monitor.Left,
-                    item.Info.Monitor.Bottom - item.Info.Monitor.Top),
-                (item.Info.Flags & MonitorInfoPrimary) != 0,
-                index + 1)).ToArray();
+            .Select((item, index) =>
+            {
+                var dpi = GetMonitorDpi(item.Handle);
+                return new DisplayTarget(
+                    item.Handle,
+                    item.Info.DeviceName,
+                    new DisplayBounds(item.Info.Monitor.Left, item.Info.Monitor.Top,
+                        item.Info.Monitor.Right - item.Info.Monitor.Left,
+                        item.Info.Monitor.Bottom - item.Info.Monitor.Top),
+                    (item.Info.Flags & MonitorInfoPrimary) != 0,
+                    index + 1,
+                    dpi);
+            }).ToArray();
+    }
+
+    private static uint GetMonitorDpi(nint monitor)
+    {
+        try
+        {
+            return GetDpiForMonitor(monitor, 0, out var dpiX, out _) == 0 && dpiX > 0 ? dpiX : 96;
+        }
+        catch (DllNotFoundException)
+        {
+            return 96;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -54,4 +71,6 @@ public static class DisplayCatalogService
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfoEx info);
+    [DllImport("Shcore.dll")]
+    private static extern int GetDpiForMonitor(nint monitor, int dpiType, out uint dpiX, out uint dpiY);
 }

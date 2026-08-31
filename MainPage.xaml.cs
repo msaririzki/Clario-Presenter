@@ -120,7 +120,7 @@ public sealed partial class MainPage : Page
         {
             ActiveSourceTitle.Text = "Layar utama · Mirror Aman";
             ActiveSourceSubtitle.Text = "Semua aktivitas tampil, kecuali Clario dan aplikasi privat";
-            BrowserAddressText.Text = "Monitor utama · skala otomatis tanpa distorsi";
+            BrowserAddressText.Text = "Monitor utama · Auto Zoom menyesuaikan layar klien";
             DemoHeadingText.Text = "Mirror Aman";
             MiniOutputTitle.Text = "Layar utama";
         }
@@ -305,7 +305,7 @@ public sealed partial class MainPage : Page
 
         LivePreviewCanvas.Visibility = Visibility.Visible;
         var previewMode = target.IsPrimary && _displays.Count == 1;
-        _outputWindow = new OutputWindow(_capture, target, previewMode);
+        _outputWindow = new OutputWindow(_capture, target, previewMode, _presenterDisplay?.Dpi ?? 96);
         _outputWindow.Closed += OutputWindow_Closed;
         _outputWindow.Activate();
         _outputWindow.ApplyPlacement();
