@@ -14,6 +14,7 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - mode opsional `Isi layar (crop)` memenuhi monitor untuk pengguna yang memang menginginkan pembesaran;
 - pemilih jendela privat per aplikasi;
 - auto-hold menahan frame publik terakhir hanya ketika Clario atau jendela privat sedang berada di depan;
+- Live Terlindungi beralih ke capture jendela publik terakhir sehingga video/web tetap bergerak ketika PDF, catatan, atau Clario dibuka;
 - jendela privat otomatis diminimalkan saat presenter kembali ke aplikasi publik agar mirror segera berjalan tanpa membocorkan jendela di belakang;
 - Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
 - preview sumber berukuran penuh di studio presenter sehingga web tetap nyaman dioperasikan;
@@ -53,7 +54,7 @@ Untuk **Mirror Aman**:
 1. Pilih `Mirror Aman` pada mode presentasi.
 2. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat.
 3. Tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
-4. Ketika Clario/jendela privat dibuka, klien tetap melihat frame aman terakhir.
+4. Ketika Clario/jendela privat dibuka, Clario mempertahankan capture jendela publik terakhir sehingga video atau web tetap berjalan.
 5. Ketika berpindah dari jendela privat ke Canva/web, jendela privat otomatis diminimalkan dan mirror langsung berjalan kembali.
 
 Preview laptop dan output `Pas otomatis` menampilkan keseluruhan sumber. Jika rasio kedua monitor berbeda, bar tipis dapat muncul agar gambar tidak terpotong atau dibuat gepeng. Gunakan `Isi layar (crop)` hanya ketika tepi yang terpotong memang dapat diterima.

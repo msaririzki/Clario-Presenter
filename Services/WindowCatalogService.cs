@@ -128,6 +128,13 @@ public static class WindowCatalogService
     public static bool IsWindowPresentable(nint handle) =>
         IsWindow(handle) && IsWindowVisible(handle) && !IsIconic(handle);
 
+    public static bool IsWindowCapturable(nint handle)
+    {
+        if (!IsWindowPresentable(handle) || GetWindowTextLength(handle) == 0) return false;
+        GetWindowThreadProcessId(handle, out var processId);
+        return processId != 0 && processId != Environment.ProcessId;
+    }
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);

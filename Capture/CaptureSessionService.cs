@@ -48,14 +48,16 @@ public sealed class CaptureSessionService : IDisposable
         set => _isFrozen = value;
     }
 
-    public void Start(nint windowHandle) => StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle));
+    public void Start(nint windowHandle, bool keepLastFrame = false) =>
+        StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle), keepLastFrame);
 
-    public void StartMonitor(nint monitorHandle) => StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle));
+    public void StartMonitor(nint monitorHandle, bool keepLastFrame = false) =>
+        StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle), keepLastFrame);
 
-    private void StartItem(GraphicsCaptureItem captureItem)
+    private void StartItem(GraphicsCaptureItem captureItem, bool keepLastFrame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        StopCaptureObjects(keepLastFrame: false);
+        StopCaptureObjects(keepLastFrame);
 
         _item = captureItem;
         if (_item.Size.Width <= 0 || _item.Size.Height <= 0)
