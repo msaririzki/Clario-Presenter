@@ -13,6 +13,12 @@ public sealed record WindowSource(nint Handle, string Title, string ProcessName)
 public static class WindowCatalogService
 {
     private const int SwMinimize = 6;
+    private const int SwRestore = 9;
+    private const int SwMaximize = 3;
+    private const uint MonitorDefaultToNull = 0;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpAsyncWindowPos = 0x4000;
     private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
     public static IReadOnlyList<WindowSource> GetPresentableWindows()
@@ -86,6 +92,39 @@ public static class WindowCatalogService
         if (IsWindowPresentable(handle)) ShowWindow(handle, SwMinimize);
     }
 
+    public static int MoveWindowsToDisplay(nint sourceMonitor, DisplayBounds destination)
+    {
+        var moved = 0;
+        foreach (var window in GetPresentableWindows())
+        {
+            if (MonitorFromWindow(window.Handle, MonitorDefaultToNull) != sourceMonitor
+                || !GetWindowRect(window.Handle, out var currentBounds))
+            {
+                continue;
+            }
+
+            var wasMaximized = IsZoomed(window.Handle);
+            if (wasMaximized) ShowWindow(window.Handle, SwRestore);
+
+            var availableWidth = Math.Max(640, destination.Width - 96);
+            var availableHeight = Math.Max(480, destination.Height - 112);
+            var width = Math.Clamp(currentBounds.Right - currentBounds.Left, 640, availableWidth);
+            var height = Math.Clamp(currentBounds.Bottom - currentBounds.Top, 480, availableHeight);
+            var cascade = (moved % 6) * 24;
+            var left = destination.Left + 48 + cascade;
+            var top = destination.Top + 48 + cascade;
+
+            if (SetWindowPos(window.Handle, nint.Zero, left, top, width, height,
+                    SwpNoActivate | SwpNoZOrder | SwpAsyncWindowPos))
+            {
+                moved++;
+                if (wasMaximized) ShowWindow(window.Handle, SwMaximize);
+            }
+        }
+
+        return moved;
+    }
+
     public static bool IsWindowPresentable(nint handle) =>
         IsWindow(handle) && IsWindowVisible(handle) && !IsIconic(handle);
 
@@ -103,7 +142,19 @@ public static class WindowCatalogService
     private static extern bool IsWindow(nint hWnd);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsZoomed(nint hWnd);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ShowWindow(nint hWnd, int command);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(nint hWnd, out Rect rect);
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint hWnd, uint flags);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y,
+        int width, int height, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(nint hWnd, StringBuilder text, int maxCount);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -112,4 +163,13 @@ public static class WindowCatalogService
     private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 }

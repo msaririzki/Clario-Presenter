@@ -15,6 +15,7 @@ public sealed partial class MainPage : Page
     private readonly HashSet<nint> _privateWindows = [];
     private readonly DispatcherTimer _sessionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _privacyWatchTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer _windowRescueTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private TimeSpan _elapsed;
     private bool _isLive;
     private bool _isFrozen;
@@ -22,6 +23,8 @@ public sealed partial class MainPage : Page
     private bool _isAutoHeld;
     private bool _isSafeMirrorSession;
     private nint _lastActivePrivateWindow;
+    private DisplayTarget? _clientDisplay;
+    private DisplayTarget? _presenterDisplay;
     private CaptureSessionService? _capture;
     private OutputWindow? _outputWindow;
 
@@ -37,6 +40,7 @@ public sealed partial class MainPage : Page
         DisplayComboBox.ItemsSource = _displays;
         _sessionTimer.Tick += SessionTimer_Tick;
         _privacyWatchTimer.Tick += PrivacyWatchTimer_Tick;
+        _windowRescueTimer.Tick += WindowRescueTimer_Tick;
         Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
     }
@@ -273,10 +277,18 @@ public sealed partial class MainPage : Page
         _capture.SourceClosed += Capture_SourceClosed;
         _capture.CaptureFailed += Capture_CaptureFailed;
         _isSafeMirrorSession = IsSafeMirrorMode;
+        _presenterDisplay = _displays.FirstOrDefault(display => display.IsPrimary);
+        _clientDisplay = !target.IsPrimary && _presenterDisplay is not null ? target : null;
+
+        if (_clientDisplay is not null)
+        {
+            WindowCatalogService.MoveWindowsToDisplay(_clientDisplay.Handle, _presenterDisplay!.Bounds);
+            _windowRescueTimer.Start();
+        }
 
         if (_isSafeMirrorSession)
         {
-            var primaryDisplay = _displays.FirstOrDefault(display => display.IsPrimary)
+            var primaryDisplay = _presenterDisplay
                 ?? throw new InvalidOperationException("Monitor utama tidak ditemukan.");
             // Begin from a known-safe desktop. Selected private windows are still
             // available from the taskbar and will trigger auto-hold when restored.
@@ -309,6 +321,7 @@ public sealed partial class MainPage : Page
     {
         _sessionTimer.Stop();
         _privacyWatchTimer.Stop();
+        _windowRescueTimer.Stop();
         if (App.MainWindow is MainWindow mirrorWindow) mirrorWindow.AutoMinimizeOnDeactivate = false;
         _isLive = false;
         _isFrozen = false;
@@ -316,6 +329,8 @@ public sealed partial class MainPage : Page
         _isAutoHeld = false;
         _isSafeMirrorSession = false;
         _lastActivePrivateWindow = nint.Zero;
+        _clientDisplay = null;
+        _presenterDisplay = null;
         FreezeButton.IsChecked = false;
         PrivacyButton.IsChecked = false;
 
@@ -382,6 +397,12 @@ public sealed partial class MainPage : Page
     private static nint GetPresenterWindowHandle() => App.MainWindow is null
         ? nint.Zero
         : WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+
+    private void WindowRescueTimer_Tick(object? sender, object e)
+    {
+        if (!_isLive || _clientDisplay is null || _presenterDisplay is null) return;
+        WindowCatalogService.MoveWindowsToDisplay(_clientDisplay.Handle, _presenterDisplay.Bounds);
+    }
 
     private void Capture_FrameAvailable(object? sender, EventArgs e)
     {

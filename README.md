@@ -17,6 +17,7 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
 - preview sumber berukuran penuh di studio presenter sehingga web tetap nyaman dioperasikan;
 - output fullscreen bersih pada monitor eksternal;
+- jendela aplikasi yang terbuka atau mengingat posisi di monitor klien otomatis dikembalikan ke layar laptop selama sesi aktif;
 - panel catatan privat dan checklist;
 - timer sesi;
 - state Ready, Live, Freeze, dan Privacy;
