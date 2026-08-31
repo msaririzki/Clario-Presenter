@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Clario.Presenter (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Clario.Presenter (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

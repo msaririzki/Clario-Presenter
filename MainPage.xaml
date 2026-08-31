@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Clario_Presenter.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Background="{StaticResource ClarioCanvasBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="34" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Padding="16,12" Background="{StaticResource ClarioSurfaceBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.35*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Margin="0,0,10,0" Spacing="5">
+                <TextBlock Text="MODE &amp; SUMBER" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="178" /><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="CaptureModeComboBox" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Mode presentasi" SelectionChanged="CaptureModeComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Aplikasi tunggal" Tag="Window" />
+                        <ComboBoxItem Content="Mirror Aman" Tag="SafeMirror" />
+                    </ComboBox>
+                    <ComboBox x:Name="SourceComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Jendela sumber" SelectionChanged="SourceComboBox_SelectionChanged" />
+                    <Button Grid.Column="2" Margin="6,0,0,0" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Muat ulang daftar jendela" ToolTipService.ToolTip="Muat ulang daftar jendela" Click="RefreshSources_Click">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,0,12,0" Spacing="5">
+                <TextBlock Text="OUTPUT KLIEN" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                <Button x:Name="PrivateAppsButton" Style="{StaticResource ClarioButtonStyle}" AutomationProperties.Name="Pilih aplikasi privat" Click="PrivateAppsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72E;" FontSize="13" /><TextBlock x:Name="PrivateAppsButtonText" Text="Privat 0" /></StackPanel>
+                </Button>
+                <ToggleButton x:Name="FreezeButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Freeze output" Click="FreezeButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE768;" FontSize="13" /><TextBlock Text="Freeze" /></StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="PrivacyButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Aktifkan Privacy" Click="PrivacyButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE890;" FontSize="13" /><TextBlock Text="Privacy" /></StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="NotesButton" IsChecked="True" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tampilkan catatan" Click="NotesButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE70B;" FontSize="13" /><TextBlock Text="Catatan" /></StackPanel>
+                </ToggleButton>
+                <Button x:Name="LiveButton" MinWidth="104" Style="{StaticResource ClarioPrimaryButtonStyle}" AutomationProperties.Name="Mulai atau hentikan Live" Click="LiveButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="LiveButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="LiveButtonText" Text="Mulai Live" /></StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="StudioGrid" Grid.Row="1" Padding="16" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="NotesColumn" Width="320" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource ClarioPanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="52" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Padding="15,0" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock x:Name="ActiveSourceTitle" Text="Pilih jendela untuk mulai" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ActiveSourceSubtitle" Text="Hanya jendela terpilih yang akan dilihat klien" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Padding="9,4" CornerRadius="12" Background="{StaticResource ClarioLiveSoftBrush}" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><Ellipse Width="6" Height="6" Fill="{StaticResource ClarioLiveBrush}" /><TextBlock x:Name="SourcePrivacyBadgeText" Text="JENDELA PRIVAT" FontSize="10" CharacterSpacing="70" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="12" Background="{StaticResource ClarioCanvasBrush}">
+                        <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Padding="10,0" Background="{StaticResource ClarioRaisedBrush}">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="52" /><ColumnDefinition Width="*" /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"><Ellipse Width="7" Height="7" Fill="#505765" /><Ellipse Width="7" Height="7" Fill="#505765" /><Ellipse Width="7" Height="7" Fill="#505765" /></StackPanel>
+                            <Border Grid.Column="1" MaxWidth="500" Height="25" Padding="10,0" CornerRadius="6" Background="{StaticResource ClarioSurfaceBrush}" HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"><FontIcon Glyph="&#xE72E;" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock x:Name="BrowserAddressText" Text="app.nusaflow.id/dashboard" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel>
+                            </Border>
+                            <FontIcon Grid.Column="2" Glyph="&#xE712;" FontSize="13" Foreground="{StaticResource ClarioSecondaryTextBrush}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Padding="0,16" Spacing="16" Background="{StaticResource ClarioSurfaceBrush}" HorizontalAlignment="Stretch">
+                                <Border Width="28" Height="28" CornerRadius="7" Background="{StaticResource ClarioAccentBrush}" HorizontalAlignment="Center"><TextBlock Text="N" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" /></Border>
+                                <Border Width="32" Height="32" CornerRadius="8" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Center"><FontIcon Glyph="&#xE80F;" FontSize="14" Foreground="{StaticResource ClarioAccentBrush}" /></Border>
+                                <FontIcon Glyph="&#xE716;" FontSize="14" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                                <FontIcon Glyph="&#xE9D2;" FontSize="14" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                                <FontIcon Glyph="&#xE713;" FontSize="14" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                            </StackPanel>
+
+                            <Grid Grid.Column="1" Padding="24,20">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="4"><TextBlock Text="RINGKASAN" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBlock x:Name="DemoHeadingText" Text="Selamat pagi, Andi" FontSize="22" FontWeight="SemiBold" /></StackPanel>
+                                    <Button Grid.Column="1" Content="Buat laporan" Style="{StaticResource ClarioButtonStyle}" VerticalAlignment="Bottom" />
+                                </Grid>
+                                <Grid Grid.Row="1" Margin="0,20,0,12" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Padding="15" Style="{StaticResource ClarioPanelStyle}"><StackPanel Spacing="8"><TextBlock Text="Proyek aktif" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock Text="24" FontSize="26" FontWeight="SemiBold" /><TextBlock Text="+4 bulan ini" FontSize="10" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel></Border>
+                                    <Border Grid.Column="1" Padding="15" Style="{StaticResource ClarioPanelStyle}"><StackPanel Spacing="8"><TextBlock Text="Klien baru" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock Text="18" FontSize="26" FontWeight="SemiBold" /><TextBlock Text="+12,5%" FontSize="10" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel></Border>
+                                    <Border Grid.Column="2" Padding="15" Style="{StaticResource ClarioPanelStyle}"><StackPanel Spacing="8"><TextBlock Text="Progress" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock Text="78%" FontSize="26" FontWeight="SemiBold" /><TextBlock Text="Tepat jadwal" FontSize="10" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel></Border>
+                                </Grid>
+                                <Border Grid.Row="2" Padding="16" Style="{StaticResource ClarioPanelStyle}">
+                                    <Grid>
+                                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                        <Grid><TextBlock Text="Aktivitas proyek" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="84 proyek" HorizontalAlignment="Right" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
+                                        <Viewbox Grid.Row="1" Stretch="Fill" Margin="0,16,0,0">
+                                            <Canvas Width="760" Height="190">
+                                                <Line X1="0" Y1="45" X2="760" Y2="45" Stroke="{StaticResource ClarioBorderBrush}" /><Line X1="0" Y1="95" X2="760" Y2="95" Stroke="{StaticResource ClarioBorderBrush}" /><Line X1="0" Y1="145" X2="760" Y2="145" Stroke="{StaticResource ClarioBorderBrush}" />
+                                                <Polyline Points="0,160 85,145 160,128 245,116 330,92 410,102 500,65 590,72 675,35 760,28" Stroke="{StaticResource ClarioAccentBrush}" StrokeThickness="3" StrokeLineJoin="Round" Fill="Transparent" />
+                                                <Ellipse Canvas.Left="752" Canvas.Top="20" Width="16" Height="16" Fill="{StaticResource ClarioSurfaceBrush}" Stroke="{StaticResource ClarioAccentBrush}" StrokeThickness="3" />
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+
+                        <canvas:CanvasControl x:Name="LivePreviewCanvas" Grid.RowSpan="2" Visibility="Collapsed" UseSharedDevice="True" ClearColor="#0E1116" Draw="LivePreviewCanvas_Draw" />
+
+                        <Border Grid.RowSpan="2" Width="214" Height="132" Margin="18" Padding="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="10" Background="{StaticResource ClarioRaisedBrush}" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="25" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <Grid><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7F4;" FontSize="11" /><TextBlock Text="Yang dilihat klien" FontSize="10" /></StackPanel><TextBlock x:Name="ClientStatusText" Text="SIAP" HorizontalAlignment="Right" FontSize="9" CharacterSpacing="80" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
+                                <Border Grid.Row="1" Background="{StaticResource ClarioCanvasBrush}" CornerRadius="5">
+                                    <Grid>
+                                        <Grid x:Name="MiniOutputContent" Margin="10">
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="8" /><RowDefinition Height="8" /><RowDefinition Height="8" /></Grid.RowDefinitions>
+                                            <TextBlock x:Name="MiniOutputTitle" Text="Selamat pagi, Andi" FontSize="9" FontWeight="SemiBold" /><Border Grid.Row="1" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" /><Border Grid.Row="2" Width="120" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Left" /><Border Grid.Row="3" Width="80" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Left" />
+                                        </Grid>
+                                        <Grid x:Name="ClientStateOverlay" Visibility="Collapsed" Background="#E6111419">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="3"><FontIcon x:Name="ClientStateIcon" Glyph="&#xE890;" FontSize="15" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateTitle" Text="Privacy Mode" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateSubtitle" Text="Output disembunyikan" FontSize="8" Foreground="{StaticResource ClarioSecondaryTextBrush}" HorizontalAlignment="Center" /></StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border x:Name="NotesPanel" Grid.Column="1" Padding="16" Style="{StaticResource ClarioPanelStyle}">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Grid Grid.Row="0">
+                        <StackPanel Spacing="5"><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE890;" FontSize="11" Foreground="{StaticResource ClarioAccentBrush}" /><TextBlock Text="PRIVAT · TIDAK MASUK OUTPUT" Style="{StaticResource ClarioSectionLabelStyle}" Foreground="{StaticResource ClarioAccentBrush}" /></StackPanel><TextBlock Text="Catatan presenter" Style="{StaticResource ClarioHeadingStyle}" /></StackPanel>
+                        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Sembunyikan catatan" Click="CollapseNotes_Click" ToolTipService.ToolTip="Sembunyikan catatan"><FontIcon Glyph="&#xE76B;" FontSize="13" /></Button>
+                    </Grid>
+                    <Grid Grid.Row="1" Margin="0,18,0,14" Padding="0,12" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,1,0,1" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="1.4*" /></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4"><TextBlock Text="DURASI" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBlock x:Name="TimerText" Text="00:00" FontSize="17" FontWeight="SemiBold" /></StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="BAGIAN" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBlock Text="Demo utama" FontSize="13" FontWeight="SemiBold" /></StackPanel>
+                    </Grid>
+                    <Border Grid.Row="2" Padding="13" CornerRadius="9" Background="{StaticResource ClarioAccentSoftBrush}">
+                        <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border Width="28" Height="28" CornerRadius="7" BorderBrush="{StaticResource ClarioAccentBrush}" BorderThickness="1"><TextBlock Text="03" FontSize="10" Foreground="{StaticResource ClarioAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Tunjukkan alur laporan" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="Tekankan bahwa laporan dibuat otomatis dan dapat diekspor tanpa proses manual." TextWrapping="Wrap" FontSize="11" LineHeight="17" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel></Grid>
+                    </Border>
+                    <Grid Grid.Row="3" Margin="0,15,0,12">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <TextBlock Text="CHECKLIST" Style="{StaticResource ClarioSectionLabelStyle}" />
+                        <StackPanel Grid.Row="1" Margin="0,10,0,12" Spacing="9"><CheckBox Content="Jelaskan masalah klien" IsChecked="True" /><CheckBox Content="Demo proses login" IsChecked="True" /><CheckBox Content="Buat laporan baru" /><CheckBox Content="Tunjukkan ekspor PDF" /></StackPanel>
+                        <StackPanel Grid.Row="2" Spacing="6"><TextBlock Text="CATATAN BEBAS" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBox x:Name="FreeNotesTextBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Tulis poin yang tidak boleh terlupakan..." /></StackPanel>
+                    </Grid>
+                    <StackPanel Grid.Row="4" Spacing="9">
+                        <Button Style="{StaticResource ClarioButtonStyle}" HorizontalAlignment="Stretch"><StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="7"><FontIcon Glyph="&#xE8A5;" FontSize="13" /><TextBlock Text="Buka PDF referensi" /></StackPanel></Button>
+                        <TextBlock Text="Catatan ini hanya tampil di laptop Anda." FontSize="10" TextAlignment="Center" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" Padding="16,0" Background="{StaticResource ClarioSurfaceBrush}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"><FontIcon x:Name="FooterStatusIcon" Glyph="&#xE930;" FontSize="11" Foreground="{StaticResource ClarioLiveBrush}" /><TextBlock x:Name="FooterStatusText" Text="Siap · pilih sumber dan monitor output" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><TextBlock Text="Ctrl + Alt + F" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock Text="Freeze" FontSize="10" /><TextBlock Text="Ctrl + Alt + N" Margin="10,0,0,0" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock Text="Catatan" FontSize="10" /></StackPanel>
+        </Grid>
+    </Grid>
+</Page>

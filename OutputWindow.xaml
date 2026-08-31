@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Clario_Presenter.OutputWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    Title="Clario Client Output">
+
+    <Grid x:Name="OutputRoot" Background="{StaticResource ClarioCanvasBrush}" KeyDown="OutputRoot_KeyDown">
+        <canvas:CanvasControl x:Name="OutputCanvas" UseSharedDevice="True" ClearColor="#0E1116" Draw="OutputCanvas_Draw" />
+        <Grid x:Name="PrivacySlate" Visibility="Collapsed" Background="{StaticResource ClarioCanvasBrush}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <Border Width="48" Height="48" CornerRadius="14" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE890;" FontSize="20" Foreground="{StaticResource ClarioAccentBrush}" />
+                </Border>
+                <TextBlock x:Name="SlateTitle" Text="Presentasi dijeda" FontFamily="Segoe UI Variable Display" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock x:Name="SlateSubtitle" Text="Mohon tunggu sebentar" FontSize="14" Foreground="{StaticResource ClarioSecondaryTextBrush}" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
