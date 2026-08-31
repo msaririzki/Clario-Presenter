@@ -37,6 +37,11 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         if (!AutoMinimizeOnDeactivate || args.WindowActivationState != WindowActivationState.Deactivated) return;
+        MinimizeForPresentation();
+    }
+
+    public void MinimizeForPresentation()
+    {
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Minimize();
     }
 

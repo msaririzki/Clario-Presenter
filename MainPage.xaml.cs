@@ -277,6 +277,10 @@ public sealed partial class MainPage : Page
         {
             var primaryDisplay = _displays.FirstOrDefault(display => display.IsPrimary)
                 ?? throw new InvalidOperationException("Monitor utama tidak ditemukan.");
+            // Begin from a known-safe desktop. Selected private windows are still
+            // available from the taskbar and will trigger auto-hold when restored.
+            _isAutoHeld = true;
+            WindowCatalogService.MinimizeWindows(_privateWindows);
             _capture.FrameHoldPredicate = () => _isAutoHeld || IsForegroundPrivate();
             _capture.StartMonitor(primaryDisplay.Handle);
             _privacyWatchTimer.Start();
@@ -296,6 +300,7 @@ public sealed partial class MainPage : Page
         if (_isSafeMirrorSession && App.MainWindow is MainWindow mirrorWindow)
         {
             mirrorWindow.AutoMinimizeOnDeactivate = true;
+            mirrorWindow.MinimizeForPresentation();
         }
     }
 

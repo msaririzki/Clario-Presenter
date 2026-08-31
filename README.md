@@ -49,7 +49,7 @@ Untuk **Mirror Aman**:
 
 1. Pilih `Mirror Aman` pada mode presentasi.
 2. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat.
-3. Mulai Live, lalu pindah ke Canva, browser, atau aplikasi publik.
+3. Tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
 4. Ketika Clario/jendela privat dibuka, klien tetap melihat frame aman terakhir.
 5. Minimalkan jendela privat untuk melanjutkan mirror secara otomatis.
 

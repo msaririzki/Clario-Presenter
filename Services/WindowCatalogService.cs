@@ -12,6 +12,7 @@ public sealed record WindowSource(nint Handle, string Title, string ProcessName)
 
 public static class WindowCatalogService
 {
+    private const int SwMinimize = 6;
     private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
     public static IReadOnlyList<WindowSource> GetPresentableWindows()
@@ -84,6 +85,14 @@ public static class WindowCatalogService
         return false;
     }
 
+    public static void MinimizeWindows(IEnumerable<nint> windowHandles)
+    {
+        foreach (var handle in windowHandles)
+        {
+            if (IsWindowPresentable(handle)) ShowWindow(handle, SwMinimize);
+        }
+    }
+
     public static bool IsWindowPresentable(nint handle) =>
         IsWindow(handle) && IsWindowVisible(handle) && !IsIconic(handle);
 
@@ -99,6 +108,9 @@ public static class WindowCatalogService
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindow(nint hWnd);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(nint hWnd, int command);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(nint hWnd, StringBuilder text, int maxCount);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
