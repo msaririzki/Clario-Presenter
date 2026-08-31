@@ -120,7 +120,7 @@ public sealed partial class MainPage : Page
         {
             ActiveSourceTitle.Text = "Layar utama · Mirror Aman";
             ActiveSourceSubtitle.Text = "Semua aktivitas tampil, kecuali Clario dan aplikasi privat";
-            BrowserAddressText.Text = "Monitor utama · Auto Zoom menyesuaikan layar klien";
+            BrowserAddressText.Text = "Monitor utama · Pas Otomatis menampilkan seluruh layar";
             DemoHeadingText.Text = "Mirror Aman";
             MiniOutputTitle.Text = "Layar utama";
         }
@@ -206,6 +206,7 @@ public sealed partial class MainPage : Page
             CaptureModeComboBox.IsEnabled = false;
             SourceComboBox.IsEnabled = false;
             DisplayComboBox.IsEnabled = false;
+            OutputScaleComboBox.IsEnabled = false;
         }
         else
         {
@@ -218,6 +219,7 @@ public sealed partial class MainPage : Page
         {
             CaptureModeComboBox.IsEnabled = true;
             DisplayComboBox.IsEnabled = true;
+            OutputScaleComboBox.IsEnabled = true;
             UpdateCaptureModeUi();
         }
         UpdatePresentationState();
@@ -305,7 +307,10 @@ public sealed partial class MainPage : Page
 
         LivePreviewCanvas.Visibility = Visibility.Visible;
         var previewMode = target.IsPrimary && _displays.Count == 1;
-        _outputWindow = new OutputWindow(_capture, target, previewMode, _presenterDisplay?.Dpi ?? 96);
+        var outputScaleMode = OutputScaleComboBox.SelectedIndex == 1
+            ? CaptureScaleMode.Fill
+            : CaptureScaleMode.Fit;
+        _outputWindow = new OutputWindow(_capture, target, previewMode, outputScaleMode);
         _outputWindow.Closed += OutputWindow_Closed;
         _outputWindow.Activate();
         _outputWindow.ApplyPlacement();
@@ -355,6 +360,7 @@ public sealed partial class MainPage : Page
         PrivacyButton.IsEnabled = false;
         CaptureModeComboBox.IsEnabled = true;
         DisplayComboBox.IsEnabled = true;
+        OutputScaleComboBox.IsEnabled = true;
         UpdateCaptureModeUi();
     }
 

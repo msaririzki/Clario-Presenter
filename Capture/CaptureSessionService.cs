@@ -79,7 +79,7 @@ public sealed class CaptureSessionService : IDisposable
     }
 
     public void Draw(CanvasControl sender, CanvasDrawEventArgs args,
-        CaptureScaleMode scaleMode = CaptureScaleMode.Fit, double densityRatio = 1)
+        CaptureScaleMode scaleMode = CaptureScaleMode.Fit)
     {
         var width = (float)sender.ActualWidth;
         var height = (float)sender.ActualHeight;
@@ -95,26 +95,9 @@ public sealed class CaptureSessionService : IDisposable
             var sourceHeight = bitmap.SizeInPixels.Height;
             if (sourceWidth <= 0 || sourceHeight <= 0) return;
 
-            var fitScale = Math.Min(width / sourceWidth, height / sourceHeight);
-            var scale = fitScale;
-            if (scaleMode == CaptureScaleMode.AutoZoom)
-            {
-                var fillScale = Math.Max(width / sourceWidth, height / sourceHeight);
-                var rasterScale = (float)(sender.XamlRoot?.RasterizationScale ?? 1);
-                var targetPixelWidth = Math.Max(1, width * rasterScale);
-                var targetPixelHeight = Math.Max(1, height * rasterScale);
-                var resolutionRatio = Math.Max(sourceWidth / targetPixelWidth, sourceHeight / targetPixelHeight);
-                var zoomPressure = Math.Max(1, Math.Max(resolutionRatio, densityRatio));
-                var extraZoom = Math.Clamp(Math.Sqrt(zoomPressure), 1, 1.15);
-
-                // Allow a small centered crop so content remains readable on a
-                // smaller client display, without losing large parts of the UI.
-                const double visibleFraction = 0.87;
-                var cropLimitedScale = Math.Min(
-                    width / (sourceWidth * visibleFraction),
-                    height / (sourceHeight * visibleFraction));
-                scale = (float)Math.Max(fillScale, Math.Min(fillScale * extraZoom, cropLimitedScale));
-            }
+            var scale = scaleMode == CaptureScaleMode.Fill
+                ? Math.Max(width / sourceWidth, height / sourceHeight)
+                : Math.Min(width / sourceWidth, height / sourceHeight);
             var drawWidth = sourceWidth * scale;
             var drawHeight = sourceHeight * scale;
             var destination = new Rect((width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
@@ -269,7 +252,7 @@ public sealed class CaptureSessionService : IDisposable
 public enum CaptureScaleMode
 {
     Fit,
-    AutoZoom
+    Fill
 }
 
 public sealed class CaptureFailureEventArgs(string message, Exception exception) : EventArgs

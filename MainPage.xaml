@@ -37,7 +37,14 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="0,0,12,0" Spacing="5">
                 <TextBlock Text="OUTPUT KLIEN" Style="{StaticResource ClarioSectionLabelStyle}" />
-                <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" />
+                <Grid ColumnSpacing="6">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="148" /></Grid.ColumnDefinitions>
+                    <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" />
+                    <ComboBox x:Name="OutputScaleComboBox" Grid.Column="1" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Skala output">
+                        <ComboBoxItem Content="Pas otomatis" Tag="Fit" />
+                        <ComboBoxItem Content="Isi layar (crop)" Tag="Fill" />
+                    </ComboBox>
+                </Grid>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                 <Button x:Name="PrivateAppsButton" Style="{StaticResource ClarioButtonStyle}" AutomationProperties.Name="Pilih aplikasi privat" Click="PrivateAppsButton_Click">

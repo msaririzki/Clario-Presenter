@@ -14,16 +14,17 @@ public sealed partial class OutputWindow : Window
     private readonly CaptureSessionService _capture;
     private readonly DisplayTarget _target;
     private readonly bool _previewMode;
-    private readonly double _densityRatio;
+    private readonly CaptureScaleMode _scaleMode;
     private bool _closed;
 
-    public OutputWindow(CaptureSessionService capture, DisplayTarget target, bool previewMode, uint sourceDpi)
+    public OutputWindow(CaptureSessionService capture, DisplayTarget target, bool previewMode,
+        CaptureScaleMode scaleMode)
     {
         InitializeComponent();
         _capture = capture;
         _target = target;
         _previewMode = previewMode;
-        _densityRatio = sourceDpi == 0 ? 1 : (double)target.Dpi / sourceDpi;
+        _scaleMode = previewMode ? CaptureScaleMode.Fit : scaleMode;
         _capture.FrameAvailable += Capture_FrameAvailable;
         Closed += OutputWindow_Closed;
         ConfigureWindow(target, previewMode);
@@ -77,9 +78,7 @@ public sealed partial class OutputWindow : Window
     }
 
     private void OutputCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) =>
-        _capture.Draw(sender, args,
-            _previewMode ? CaptureScaleMode.Fit : CaptureScaleMode.AutoZoom,
-            _densityRatio);
+        _capture.Draw(sender, args, _scaleMode);
 
     private void OutputRoot_KeyDown(object sender, KeyRoutedEventArgs e)
     {

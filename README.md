@@ -10,7 +10,8 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
 - mode **Mirror Aman** untuk mencerminkan seluruh monitor utama;
-- Auto Zoom menyesuaikan resolusi dan DPI monitor klien, memperbesar isi secara proporsional dengan crop minimal agar tidak terlihat kekecilan;
+- mode `Pas otomatis` menampilkan seluruh sumber tanpa crop atau distorsi dan menjadi pilihan default;
+- mode opsional `Isi layar (crop)` memenuhi monitor untuk pengguna yang memang menginginkan pembesaran;
 - pemilih jendela privat per aplikasi;
 - auto-hold menahan frame publik terakhir hanya ketika Clario atau jendela privat sedang berada di depan;
 - jendela privat otomatis diminimalkan saat presenter kembali ke aplikasi publik agar mirror segera berjalan tanpa membocorkan jendela di belakang;
@@ -55,7 +56,7 @@ Untuk **Mirror Aman**:
 4. Ketika Clario/jendela privat dibuka, klien tetap melihat frame aman terakhir.
 5. Ketika berpindah dari jendela privat ke Canva/web, jendela privat otomatis diminimalkan dan mirror langsung berjalan kembali.
 
-Preview laptop tetap menampilkan keseluruhan sumber. Output klien memakai Auto Zoom: gambar tidak dibuat gepeng, sedangkan crop tengah dibatasi agar isi tetap terbaca pada monitor yang lebih kecil.
+Preview laptop dan output `Pas otomatis` menampilkan keseluruhan sumber. Jika rasio kedua monitor berbeda, bar tipis dapat muncul agar gambar tidak terpotong atau dibuat gepeng. Gunakan `Isi layar (crop)` hanya ketika tepi yang terpotong memang dapat diterima.
 
 ## Prinsip desain
 
