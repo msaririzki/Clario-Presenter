@@ -13,6 +13,7 @@ public sealed record WindowSource(nint Handle, string Title, string ProcessName)
 public static class WindowCatalogService
 {
     private const int SwMinimize = 6;
+    private const int SwShowNoActivate = 4;
     private const int SwRestore = 9;
     private const int SwMaximize = 3;
     private const uint MonitorDefaultToNull = 0;
@@ -133,6 +134,16 @@ public static class WindowCatalogService
         if (!IsWindowPresentable(handle) || GetWindowTextLength(handle) == 0) return false;
         GetWindowThreadProcessId(handle, out var processId);
         return processId != 0 && processId != Environment.ProcessId;
+    }
+
+    public static bool PrepareWindowForBackgroundCapture(nint handle)
+    {
+        if (!IsWindow(handle) || !IsWindowVisible(handle) || GetWindowTextLength(handle) == 0) return false;
+        GetWindowThreadProcessId(handle, out var processId);
+        if (processId == 0 || processId == Environment.ProcessId) return false;
+
+        if (IsIconic(handle)) ShowWindow(handle, SwShowNoActivate);
+        return IsWindowPresentable(handle);
     }
 
     [DllImport("user32.dll")]

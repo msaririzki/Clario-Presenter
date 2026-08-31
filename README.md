@@ -15,6 +15,7 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - pemilih jendela privat per aplikasi;
 - auto-hold menahan frame publik terakhir hanya ketika Clario atau jendela privat sedang berada di depan;
 - Live Terlindungi beralih ke capture jendela publik terakhir sehingga video/web tetap bergerak ketika PDF, catatan, atau Clario dibuka;
+- jika jendela publik sempat diminimalkan, Clario memulihkannya tanpa mengambil fokus agar video tetap mengirim frame di belakang aplikasi privat;
 - jendela privat otomatis diminimalkan saat presenter kembali ke aplikasi publik agar mirror segera berjalan tanpa membocorkan jendela di belakang;
 - Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
 - preview sumber berukuran penuh di studio presenter sehingga web tetap nyaman dioperasikan;

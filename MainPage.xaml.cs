@@ -447,7 +447,8 @@ public sealed partial class MainPage : Page
 
     private bool TrySwitchToPublicWindow()
     {
-        if (_capture is null || !WindowCatalogService.IsWindowCapturable(_lastPublicWindow)) return false;
+        if (_capture is null
+            || !WindowCatalogService.PrepareWindowForBackgroundCapture(_lastPublicWindow)) return false;
 
         try
         {
