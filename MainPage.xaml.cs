@@ -1,10 +1,13 @@
 using Clario_Presenter.Capture;
+using Clario_Presenter.Recording;
 using Clario_Presenter.Services;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System.Collections.ObjectModel;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 
 namespace Clario_Presenter;
 
@@ -30,6 +33,10 @@ public sealed partial class MainPage : Page
     private DisplayTarget? _presenterDisplay;
     private CaptureSessionService? _capture;
     private OutputWindow? _outputWindow;
+    private OutputRecordingService? _recorder;
+    private StorageFile? _recordingFile;
+    private DateTimeOffset _recordingStartedAt;
+    private bool _recordingTransition;
 
     private SolidColorBrush LiveBrush => ResourceBrush("ClarioLiveBrush");
     private SolidColorBrush FreezeBrush => ResourceBrush("ClarioFreezeBrush");
@@ -172,7 +179,7 @@ public sealed partial class MainPage : Page
         PrivateAppsButtonText.Text = $"Privat {_privateWindows.Count}";
     }
 
-    private void LiveButton_Click(object sender, RoutedEventArgs e)
+    private async void LiveButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_isLive && (DisplayComboBox.SelectedItem is null
             || (!IsSafeMirrorMode && SourceComboBox.SelectedItem is null)))
@@ -213,11 +220,13 @@ public sealed partial class MainPage : Page
         }
         else
         {
+            await StopRecordingAsync();
             StopPresentation();
         }
 
         FreezeButton.IsEnabled = _isLive;
         PrivacyButton.IsEnabled = _isLive;
+        RecordButton.IsEnabled = _isLive;
         if (!_isLive)
         {
             CaptureModeComboBox.IsEnabled = true;
@@ -273,6 +282,153 @@ public sealed partial class MainPage : Page
     {
         _elapsed = _elapsed.Add(TimeSpan.FromSeconds(1));
         TimerText.Text = _elapsed.ToString(@"mm\:ss");
+        if (_recorder?.IsRecording == true)
+        {
+            var recordingElapsed = DateTimeOffset.Now - _recordingStartedAt;
+            RecordButtonText.Text = $"REC {recordingElapsed:mm\\:ss}";
+        }
+    }
+
+    private async void RecordButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_recordingTransition)
+        {
+            RecordButton.IsChecked = _recorder?.IsRecording == true;
+            return;
+        }
+
+        _recordingTransition = true;
+        RecordButton.IsEnabled = false;
+        try
+        {
+            if (_recorder?.IsRecording == true)
+            {
+                await StopRecordingAsync();
+                return;
+            }
+
+            if (!_isLive || _outputWindow is null)
+            {
+                RecordButton.IsChecked = false;
+                FooterStatusText.Text = "Mulai Live sebelum merekam";
+                return;
+            }
+
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.VideosLibrary,
+                SuggestedFileName = $"Clario-{DateTime.Now:yyyyMMdd-HHmmss}"
+            };
+            picker.FileTypeChoices.Add("Video MP4", [".mp4"]);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, GetPresenterWindowHandle());
+
+            var file = await picker.PickSaveFileAsync();
+            if (file is null)
+            {
+                RecordButton.IsChecked = false;
+                return;
+            }
+
+            var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
+            var recorder = new OutputRecordingService();
+            try
+            {
+                await recorder.StartAsync(_outputWindow.WindowHandle, stream);
+            }
+            catch
+            {
+                await recorder.DisposeAsync();
+                throw;
+            }
+
+            _recorder = recorder;
+            _recordingFile = file;
+            _recordingStartedAt = DateTimeOffset.Now;
+            RecordButton.IsChecked = true;
+            RecordButtonText.Text = "REC 00:00";
+            RecordButtonDot.Fill = PrivacyBrush;
+            FooterStatusText.Text = "Merekam output klien · 1080p 60 fps · H.264";
+            _ = WatchRecordingAsync(recorder);
+        }
+        catch (Exception exception)
+        {
+            RecordButton.IsChecked = false;
+            RecordButtonText.Text = "Rekam";
+            FooterStatusText.Text = $"Rekaman gagal dimulai · {exception.Message}";
+        }
+        finally
+        {
+            _recordingTransition = false;
+            RecordButton.IsEnabled = _isLive;
+        }
+    }
+
+    private async Task StopRecordingAsync()
+    {
+        var recorder = _recorder;
+        var file = _recordingFile;
+        _recorder = null;
+        _recordingFile = null;
+        RecordButton.IsEnabled = false;
+        RecordButtonText.Text = "Menyimpan…";
+
+        if (recorder is not null)
+        {
+            try
+            {
+                await recorder.StopAsync();
+                FooterStatusText.Text = file is null
+                    ? "Rekaman selesai"
+                    : $"Rekaman tersimpan · {file.Name}";
+            }
+            catch (Exception exception)
+            {
+                FooterStatusText.Text = $"Finalisasi rekaman gagal · {exception.Message}";
+            }
+            finally
+            {
+                await recorder.DisposeAsync();
+            }
+        }
+
+        RecordButton.IsChecked = false;
+        RecordButtonText.Text = "Rekam";
+        RecordButton.IsEnabled = _isLive;
+    }
+
+    private async Task WatchRecordingAsync(OutputRecordingService recorder)
+    {
+        Exception? failure = null;
+        try
+        {
+            await recorder.Completion;
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+
+        // A normal StopRecordingAsync clears _recorder before signalling the
+        // media pipeline. Only handle completion here when the encoder ended
+        // on its own (for example after a driver/device failure).
+        if (!ReferenceEquals(_recorder, recorder)) return;
+
+        _recorder = null;
+        _recordingFile = null;
+        try
+        {
+            await recorder.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            failure ??= exception;
+        }
+        RecordButton.IsChecked = false;
+        RecordButtonText.Text = "Rekam";
+        RecordButton.IsEnabled = _isLive;
+        FooterStatusText.Text = failure is null
+            ? "Rekaman berhenti lebih awal · silakan mulai ulang REC"
+            : $"Encoder berhenti · {failure.Message}";
     }
 
     private void StartPresentation(WindowSource? source, DisplayTarget target)
@@ -366,6 +522,7 @@ public sealed partial class MainPage : Page
         LivePreviewCanvas.Visibility = Visibility.Collapsed;
         FreezeButton.IsEnabled = false;
         PrivacyButton.IsEnabled = false;
+        RecordButton.IsEnabled = false;
         CaptureModeComboBox.IsEnabled = true;
         DisplayComboBox.IsEnabled = true;
         OutputScaleComboBox.IsEnabled = true;
@@ -533,17 +690,19 @@ public sealed partial class MainPage : Page
         FooterStatusText.Text = $"Sumber terputus · {detail}";
     }
 
-    private void OutputWindow_Closed(object sender, WindowEventArgs args)
+    private async void OutputWindow_Closed(object sender, WindowEventArgs args)
     {
         _outputWindow = null;
+        await StopRecordingAsync();
         StopPresentation();
         UpdatePresentationState();
     }
 
     private void LivePreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) => _capture?.Draw(sender, args);
 
-    private void MainPage_Unloaded(object sender, RoutedEventArgs e)
+    private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
+        await StopRecordingAsync();
         StopPresentation();
         LivePreviewCanvas.RemoveFromVisualTree();
     }

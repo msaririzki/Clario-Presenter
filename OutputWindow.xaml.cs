@@ -17,6 +17,8 @@ public sealed partial class OutputWindow : Window
     private readonly CaptureScaleMode _scaleMode;
     private bool _closed;
 
+    public nint WindowHandle => WinRT.Interop.WindowNative.GetWindowHandle(this);
+
     public OutputWindow(CaptureSessionService capture, DisplayTarget target, bool previewMode,
         CaptureScaleMode scaleMode)
     {

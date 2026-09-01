@@ -59,6 +59,9 @@
                 <ToggleButton x:Name="NotesButton" IsChecked="True" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tampilkan catatan" Click="NotesButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE70B;" FontSize="13" /><TextBlock Text="Catatan" /></StackPanel>
                 </ToggleButton>
+                <ToggleButton x:Name="RecordButton" MinWidth="112" IsEnabled="False" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Mulai atau hentikan rekaman 1080p 60 fps" Click="RecordButton_Click" ToolTipService.ToolTip="Rekam persis layar klien ke MP4 · 1080p 60 fps">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse x:Name="RecordButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="RecordButtonText" Text="Rekam" /></StackPanel>
+                </ToggleButton>
                 <Button x:Name="LiveButton" MinWidth="104" Style="{StaticResource ClarioPrimaryButtonStyle}" AutomationProperties.Name="Mulai atau hentikan Live" Click="LiveButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="LiveButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="LiveButtonText" Text="Mulai Live" /></StackPanel>
                 </Button>

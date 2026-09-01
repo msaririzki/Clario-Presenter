@@ -23,6 +23,9 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - jendela aplikasi yang terbuka atau mengingat posisi di monitor klien otomatis dikembalikan ke layar laptop selama sesi aktif;
 - panel catatan privat dan checklist;
 - timer sesi;
+- perekam output klien ke MP4 H.264 1920×1080 dengan profil 60 fps dan akselerasi hardware;
+- pembatas frame berbasis waktu menjaga rekaman tetap 60 fps pada monitor 120/144/165 Hz tanpa membebani encoder dengan frame berlebih;
+- rekaman mengambil jendela output klien, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
 - state Ready, Live, Freeze, dan Privacy;
 - Freeze menahan frame terakhir tanpa menghentikan kontrol presenter;
 - Privacy mengganti output klien dengan layar jeda yang netral;
@@ -60,6 +63,8 @@ Untuk **Mirror Aman**:
 
 Preview laptop dan output `Pas otomatis` menampilkan keseluruhan sumber. Jika rasio kedua monitor berbeda, bar tipis dapat muncul agar gambar tidak terpotong atau dibuat gepeng. Gunakan `Isi layar (crop)` hanya ketika tepi yang terpotong memang dapat diterima.
 
+Untuk merekam, mulai sesi Live lalu tekan `Rekam`, pilih lokasi file MP4, dan lanjutkan presentasi seperti biasa. Tekan `REC` sekali lagi untuk menghentikan dan memfinalisasi video. Jangan menutup aplikasi sebelum teks tombol kembali menjadi `Rekam`. Versi saat ini merekam video output klien; audio mikrofon dan audio sistem belum disertakan.
+
 ## Prinsip desain
 
 - permukaan graphite dengan kontras tenang;
@@ -76,6 +81,7 @@ Preview laptop dan output `Pas otomatis` menampilkan keseluruhan sumber. Jika ra
 - WinUI 3 / Windows App SDK 1.8;
 - Windows Graphics Capture untuk menangkap satu jendela atau monitor utama;
 - Win2D di atas Direct3D 11 untuk preview dan output GPU;
+- MediaStreamSource dan MediaTranscoder untuk encoding H.264 1080p60 berbasis hardware;
 - Win32 interop untuk enumerasi jendela dan monitor;
 - AppWindow fullscreen presenter untuk monitor klien.
 
@@ -92,6 +98,8 @@ Clario.Presenter
 ├── Capture
 │   ├── CaptureSessionService.cs     frame pool, freeze, dan rendering
 │   └── GraphicsCaptureItemFactory.cs interop capture berdasarkan HWND
+├── Recording
+│   └── OutputRecordingService.cs    capture output, pembatas 60 fps, dan encoder MP4
 └── Services
     ├── WindowCatalogService.cs      enumerasi jendela Win32
     └── DisplayCatalogService.cs     enumerasi monitor Win32
@@ -104,3 +112,4 @@ Clario.Presenter
 3. Penyimpanan sesi catatan per klien/proyek.
 4. Installer MSIX bertanda tangan dan alur pembaruan aplikasi.
 5. Telemetri performa lokal untuk mendeteksi frame drop tanpa merekam isi layar.
+6. Pilihan audio mikrofon dan audio sistem untuk rekaman presentasi.
