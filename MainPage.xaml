@@ -39,7 +39,7 @@
                 <TextBlock Text="OUTPUT KLIEN" Style="{StaticResource ClarioSectionLabelStyle}" />
                 <Grid ColumnSpacing="6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="148" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" />
+                    <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" DropDownOpened="DisplayComboBox_DropDownOpened" />
                     <ComboBox x:Name="OutputScaleComboBox" Grid.Column="1" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Skala output" ToolTipService.ToolTip="Adaptif memperbesar konten agar lebih terbaca pada monitor kecil">
                         <ComboBoxItem Content="Adaptif nyaman" Tag="Adaptive" />
                         <ComboBoxItem Content="Seluruh layar" Tag="Fit" />

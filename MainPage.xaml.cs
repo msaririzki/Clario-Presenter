@@ -88,10 +88,18 @@ public sealed partial class MainPage : Page
 
     private void RefreshDisplays()
     {
+        var selectedDeviceName = (DisplayComboBox.SelectedItem as DisplayTarget)?.DeviceName;
         _displays.Clear();
         foreach (var display in DisplayCatalogService.GetDisplays()) _displays.Add(display);
-        DisplayComboBox.SelectedItem = _displays.FirstOrDefault(display => !display.IsPrimary)
+        DisplayComboBox.SelectedItem = _displays.FirstOrDefault(display =>
+                                           display.DeviceName.Equals(selectedDeviceName, StringComparison.OrdinalIgnoreCase))
+                                       ?? _displays.FirstOrDefault(display => !display.IsPrimary)
                                        ?? _displays.FirstOrDefault();
+    }
+
+    private void DisplayComboBox_DropDownOpened(object sender, object e)
+    {
+        if (!_isLive) RefreshDisplays();
     }
 
     private void SourceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -709,8 +717,21 @@ public sealed partial class MainPage : Page
             * (source.Bounds.Height * 96d / Math.Max(96u, source.DpiY));
         var targetLogicalArea = target.Bounds.Width * 96d / Math.Max(96u, target.DpiX)
             * (target.Bounds.Height * 96d / Math.Max(96u, target.DpiY));
-        var resolutionRatio = Math.Sqrt(sourceLogicalArea / targetLogicalArea);
-        return (float)Math.Clamp(1.12 + Math.Max(0, resolutionRatio - 1) * 0.08, 1.12, 1.28);
+        var logicalAreaRatio = Math.Sqrt(sourceLogicalArea / targetLogicalArea);
+        var physicalSizeRatio = source.EstimatedDiagonalInches is double sourceDiagonal
+            && target.EstimatedDiagonalInches is double targetDiagonal
+            && targetDiagonal > 0
+                ? sourceDiagonal / targetDiagonal
+                : 1d;
+
+        // Raw DPI distinguishes a physically small laptop display from a large
+        // external monitor even when both use the same Windows scale setting.
+        // Keep the zoom conservative so useful edges are not cropped too much.
+        var readabilityPressure = Math.Max(logicalAreaRatio, physicalSizeRatio);
+        return (float)Math.Clamp(
+            1 + Math.Max(0, readabilityPressure - 1) * 0.3,
+            1,
+            1.32);
     }
 
     private void WindowRescueTimer_Tick(object? sender, object e)

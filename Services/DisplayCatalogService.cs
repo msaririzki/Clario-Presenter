@@ -9,11 +9,34 @@ public sealed record DisplayTarget(
     DisplayBounds Bounds,
     uint DpiX,
     uint DpiY,
+    uint RawDpiX,
+    uint RawDpiY,
     bool IsPrimary,
     int Index)
 {
     public int ScalePercent => (int)Math.Round(DpiX / 96d * 100);
-    public string DisplayName => $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}  ·  {ScalePercent}%";
+    public double? EstimatedDiagonalInches
+    {
+        get
+        {
+            if (RawDpiX is < 40 or > 500 || RawDpiY is < 40 or > 500) return null;
+            var widthInches = Bounds.Width / (double)RawDpiX;
+            var heightInches = Bounds.Height / (double)RawDpiY;
+            var diagonal = Math.Sqrt(widthInches * widthInches + heightInches * heightInches);
+            return diagonal is >= 8 and <= 100 ? diagonal : null;
+        }
+    }
+
+    public string DisplayName
+    {
+        get
+        {
+            var physicalSize = EstimatedDiagonalInches is double diagonal
+                ? $"  ·  ≈{diagonal:0.#}″"
+                : string.Empty;
+            return $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}  ·  {ScalePercent}%{physicalSize}";
+        }
+    }
 }
 
 public static class DisplayCatalogService
@@ -35,7 +58,8 @@ public static class DisplayCatalogService
             .ThenBy(item => item.Info.Monitor.Left)
             .Select((item, index) =>
             {
-                var (dpiX, dpiY) = GetEffectiveDpi(item.Handle);
+                var (dpiX, dpiY) = GetMonitorDpi(item.Handle, MonitorDpiType.Effective, (96, 96));
+                var (rawDpiX, rawDpiY) = GetMonitorDpi(item.Handle, MonitorDpiType.Raw, (0, 0));
                 return new DisplayTarget(
                     item.Handle,
                     item.Info.DeviceName,
@@ -44,26 +68,31 @@ public static class DisplayCatalogService
                         item.Info.Monitor.Bottom - item.Info.Monitor.Top),
                     dpiX,
                     dpiY,
+                    rawDpiX,
+                    rawDpiY,
                     (item.Info.Flags & MonitorInfoPrimary) != 0,
                     index + 1);
             }).ToArray();
     }
 
-    private static (uint X, uint Y) GetEffectiveDpi(nint monitor)
+    private static (uint X, uint Y) GetMonitorDpi(
+        nint monitor,
+        MonitorDpiType type,
+        (uint X, uint Y) fallback)
     {
         try
         {
-            return GetDpiForMonitor(monitor, MonitorDpiType.Effective, out var dpiX, out var dpiY) >= 0
+            return GetDpiForMonitor(monitor, type, out var dpiX, out var dpiY) >= 0
                 ? (dpiX, dpiY)
-                : (96, 96);
+                : fallback;
         }
         catch (DllNotFoundException)
         {
-            return (96, 96);
+            return fallback;
         }
         catch (EntryPointNotFoundException)
         {
-            return (96, 96);
+            return fallback;
         }
     }
 
@@ -82,7 +111,8 @@ public static class DisplayCatalogService
 
     private enum MonitorDpiType
     {
-        Effective = 0
+        Effective = 0,
+        Raw = 2
     }
 
     [DllImport("user32.dll")]

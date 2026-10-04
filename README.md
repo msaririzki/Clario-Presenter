@@ -10,7 +10,7 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
 - mode **Mirror Aman** untuk mencerminkan seluruh monitor utama;
-- mode default `Adaptif nyaman` memperhitungkan resolusi dan skala DPI monitor tujuan, lalu memberi zoom ringan agar konten dari monitor besar tetap terbaca;
+- mode default `Adaptif nyaman` memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan agar konten dari monitor besar tetap terbaca;
 - mode `Seluruh layar` menampilkan semua area tanpa crop dan mode `Isi layar (crop)` memenuhi monitor semaksimal mungkin;
 - pemilih jendela privat per aplikasi;
 - auto-hold menahan frame publik terakhir hanya ketika Clario atau jendela privat sedang berada di depan;
@@ -25,6 +25,7 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - timer sesi;
 - perekam output klien ke MP4 H.264 1920×1080 dengan pilihan 30 atau 60 fps dan akselerasi hardware;
 - buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
+- backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
 - rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
 - menu Settings untuk frame rate, bitrate, folder rekaman, dan opsi `Save As` setiap mulai merekam;
 - penyimpanan otomatis yang rapi ke `Videos\Clario Presenter` dengan nama file bertimestamp;
@@ -63,7 +64,7 @@ Untuk **Mirror Aman**:
 4. Ketika Clario/jendela privat dibuka, Clario mempertahankan capture jendela publik terakhir sehingga video atau web tetap berjalan.
 5. Ketika berpindah dari jendela privat ke Canva/web, jendela privat otomatis diminimalkan dan mirror langsung berjalan kembali.
 
-Gunakan `Adaptif nyaman` ketika monitor klien lebih kecil: Clario menghitung zoom dari resolusi efektif dan skala DPI kedua layar, lalu memotong sedikit bagian tepi agar teks lebih terbaca. Gunakan `Seluruh layar` bila semua sisi wajib terlihat; konsekuensinya isi dari monitor 27 inci memang akan tampak lebih kecil pada layar 15 inci. `Isi layar (crop)` memberi pembesaran maksimum dan cocok bila tepi sumber tidak penting.
+Gunakan `Adaptif nyaman` ketika monitor klien lebih kecil: Clario menghitung zoom dari resolusi efektif, skala Windows, dan perkiraan ukuran fisik kedua layar, lalu memotong sedikit bagian tepi agar teks lebih terbaca. Jika monitor menyediakan data raw DPI, ukuran perkiraannya juga tampil di pemilih monitor. Gunakan `Seluruh layar` bila semua sisi wajib terlihat; konsekuensinya isi dari monitor 27 inci memang akan tampak lebih kecil pada layar 15 inci. `Isi layar (crop)` memberi pembesaran maksimum dan cocok bila tepi sumber tidak penting.
 
 Untuk merekam, mulai sesi Live lalu tekan `Rekam` dan lanjutkan presentasi seperti biasa. Secara default video langsung disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui tombol roda gigi. Aktifkan `Tanya lokasi setiap mulai merekam` jika ingin memakai dialog `Save As`. Tekan `REC` sekali lagi untuk menghentikan dan memfinalisasi video. Jangan menutup aplikasi sebelum teks tombol kembali menjadi `Rekam`. Versi saat ini merekam video output klien; audio mikrofon dan audio sistem belum disertakan.
 

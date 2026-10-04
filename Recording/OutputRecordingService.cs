@@ -173,7 +173,18 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                RenderFrame(nextFrameIndex++);
+                // Keep timestamps tied to real elapsed time. When a slower GPU
+                // misses a 60 fps slot, skip that timestamp instead of making
+                // the final recording run faster than the live presentation.
+                var elapsedFrameIndex = clock.Elapsed.Ticks / _frameDuration.Ticks;
+                var frameIndex = Math.Max(nextFrameIndex, elapsedFrameIndex);
+
+                if (!RefreshPendingFrameTimestamp(frameIndex))
+                {
+                    RenderFrame(frameIndex);
+                }
+
+                nextFrameIndex = frameIndex + 1;
 
                 var nextFrameTime = TimeSpan.FromTicks(nextFrameIndex * _frameDuration.Ticks);
                 var delay = nextFrameTime - clock.Elapsed;
@@ -195,6 +206,20 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             Failure = exception;
             SignalEndOfStream();
+        }
+    }
+
+    private bool RefreshPendingFrameTimestamp(long frameIndex)
+    {
+        lock (_frameGate)
+        {
+            if (_pendingFrame is null) return false;
+
+            // Media Foundation has not requested the previous frame yet. Do not
+            // waste another GPU render/readback; keep that sample aligned with
+            // the newest real-time slot and let the encoder consume it first.
+            _pendingFrame.Timestamp = TimeSpan.FromTicks(frameIndex * _frameDuration.Ticks);
+            return true;
         }
     }
 
@@ -238,8 +263,16 @@ public sealed class OutputRecordingService : IAsyncDisposable
                     return;
                 }
 
-                RecycleFrame(_pendingFrame);
-                _pendingFrame = frame;
+                if (_pendingFrame is null)
+                {
+                    _pendingFrame = frame;
+                }
+                else
+                {
+                    // Defensive fallback for a rare producer/request race.
+                    _pendingFrame.Timestamp = frame.Timestamp;
+                    RecycleFrame(frame);
+                }
                 Monitor.Pulse(_frameGate);
             }
         }
