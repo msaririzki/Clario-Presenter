@@ -1,105 +1,101 @@
+using Clario_Presenter.Capture;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Text;
 using System.Collections.Concurrent;
-using Windows.Graphics.Capture;
-using Windows.Graphics.DirectX;
+using System.Diagnostics;
+using System.Numerics;
+using Windows.Foundation;
 using Windows.Media.Core;
 using Windows.Media.MediaProperties;
 using Windows.Media.Transcoding;
 using Windows.Storage.Streams;
+using Windows.UI;
 
 namespace Clario_Presenter.Recording;
 
 /// <summary>
-/// Records the client output window itself. This keeps presenter notes and
-/// private desktop applications outside the recording by design.
+/// Records the same retained frame that Clario draws to the client output.
+/// Each sample owns an independent BGRA buffer until Media Foundation has
+/// finished with it, preventing partially rendered or reused GPU surfaces
+/// from appearing as one-frame black flashes in the resulting video.
 /// </summary>
 public sealed class OutputRecordingService : IAsyncDisposable
 {
     public const uint OutputWidth = 1920;
     public const uint OutputHeight = 1080;
-    public const uint OutputFrameRate = 60;
-    public const uint OutputBitrate = 18_000_000;
 
-    private static readonly TimeSpan FrameDuration = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / OutputFrameRate);
+    private const int MaximumFrameCount = 12;
+    private const uint BytesPerPixel = 4;
 
     private readonly object _frameGate = new();
-    private readonly ConcurrentDictionary<Direct3D11CaptureFrame, byte> _outstandingFrames = new();
-    private readonly CanvasDevice _device = CanvasDevice.GetSharedDevice();
+    private readonly ConcurrentBag<StableCpuFrame> _availableFrames = [];
+    private readonly ConcurrentDictionary<StableCpuFrame, byte> _outstandingFrames = new();
+    private readonly CanvasDevice _canvasDevice = CanvasDevice.GetSharedDevice();
+    private readonly CancellationTokenSource _producerCancellation = new();
     private readonly SemaphoreSlim _stopGate = new(1, 1);
 
-    private GraphicsCaptureItem? _captureItem;
-    private Direct3D11CaptureFramePool? _framePool;
-    private GraphicsCaptureSession? _captureSession;
-    private Direct3D11CaptureFrame? _pendingFrame;
+    private CaptureSessionService? _capture;
+    private CaptureScaleMode _scaleMode;
+    private float _adaptiveZoom;
+    private Func<ClientOutputMode>? _modeProvider;
+    private StableCpuFrame? _pendingFrame;
     private MediaStreamSource? _mediaSource;
     private IRandomAccessStream? _outputStream;
+    private Task? _producerTask;
     private Task? _transcodeTask;
-    private TimeSpan? _firstFrameTime;
-    private long _lastFrameSlot = -1;
+    private TimeSpan _frameDuration;
+    private uint _frameRate;
+    private int _allocatedFrameCount;
     private volatile bool _stopping;
     private bool _stopCompleted;
     private bool _disposed;
 
     public bool IsRecording => _transcodeTask is { IsCompleted: false } && !_stopping;
     public Task Completion => _transcodeTask ?? Task.CompletedTask;
+    public Exception? Failure { get; private set; }
 
-    public async Task StartAsync(nint outputWindowHandle, IRandomAccessStream outputStream)
+    public async Task StartAsync(
+        CaptureSessionService capture,
+        CaptureScaleMode scaleMode,
+        float adaptiveZoom,
+        Func<ClientOutputMode> modeProvider,
+        IRandomAccessStream outputStream,
+        RecordingOptions? options = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_transcodeTask is not null)
-        {
-            throw new InvalidOperationException("Perekam sudah digunakan.");
-        }
+        if (_transcodeTask is not null) throw new InvalidOperationException("Perekam sudah digunakan.");
 
+        options ??= RecordingOptions.HighQuality60Fps;
+        _capture = capture;
+        _scaleMode = scaleMode;
+        _adaptiveZoom = adaptiveZoom;
+        _modeProvider = modeProvider;
+        _frameRate = (uint)Math.Clamp(options.FrameRate, 30, 60);
+        _frameDuration = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / _frameRate);
         _outputStream = outputStream;
-        // A save picker can return an existing file after the user confirms
-        // replacement. Truncate it first so an older, larger MP4 cannot leave
-        // stale bytes after the newly finalized movie.
         _outputStream.Size = 0;
         _outputStream.Seek(0);
-        _captureItem = Capture.GraphicsCaptureItemFactory.CreateForWindow(outputWindowHandle);
-        _captureItem.Closed += CaptureItem_Closed;
-        var sourceSize = _captureItem.Size;
-        if (sourceSize.Width <= 0 || sourceSize.Height <= 0)
-        {
-            throw new InvalidOperationException("Output klien belum memiliki ukuran yang valid.");
-        }
 
         var inputProperties = VideoEncodingProperties.CreateUncompressed(
             MediaEncodingSubtypes.Bgra8,
-            (uint)sourceSize.Width,
-            (uint)sourceSize.Height);
-        inputProperties.FrameRate.Numerator = OutputFrameRate;
+            OutputWidth,
+            OutputHeight);
+        inputProperties.FrameRate.Numerator = _frameRate;
         inputProperties.FrameRate.Denominator = 1;
         inputProperties.PixelAspectRatio.Numerator = 1;
         inputProperties.PixelAspectRatio.Denominator = 1;
 
         var descriptor = new VideoStreamDescriptor(inputProperties);
-        _mediaSource = new MediaStreamSource(descriptor)
-        {
-            BufferTime = TimeSpan.Zero
-        };
+        _mediaSource = new MediaStreamSource(descriptor) { BufferTime = TimeSpan.Zero };
         _mediaSource.Starting += MediaSource_Starting;
         _mediaSource.SampleRequested += MediaSource_SampleRequested;
-
-        _framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
-            _device,
-            DirectXPixelFormat.B8G8R8A8UIntNormalized,
-            8,
-            sourceSize);
-        _framePool.FrameArrived += FramePool_FrameArrived;
-        _captureSession = _framePool.CreateCaptureSession(_captureItem);
-        // The source capture has already drawn the presenter cursor into the
-        // output. Do not add a second cursor from the client monitor itself.
-        _captureSession.IsCursorCaptureEnabled = false;
-        _captureSession.StartCapture();
 
         var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
         profile.Audio = null;
         profile.Video.Width = OutputWidth;
         profile.Video.Height = OutputHeight;
-        profile.Video.Bitrate = OutputBitrate;
-        profile.Video.FrameRate.Numerator = OutputFrameRate;
+        profile.Video.Bitrate = (uint)Math.Clamp(options.BitrateMbps, 8, 32) * 1_000_000;
+        profile.Video.FrameRate.Numerator = _frameRate;
         profile.Video.FrameRate.Denominator = 1;
         profile.Video.PixelAspectRatio.Numerator = 1;
         profile.Video.PixelAspectRatio.Denominator = 1;
@@ -116,10 +112,10 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
         if (!preparation.CanTranscode)
         {
-            StopCapture();
-            throw new InvalidOperationException($"Encoder 1080p60 tidak tersedia ({preparation.FailureReason}).");
+            throw new InvalidOperationException($"Encoder 1080p{_frameRate} tidak tersedia ({preparation.FailureReason}).");
         }
 
+        _producerTask = Task.Run(() => ProduceFramesAsync(_producerCancellation.Token));
         _transcodeTask = preparation.TranscodeAsync().AsTask();
     }
 
@@ -130,27 +126,31 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             if (_stopCompleted) return;
 
+            _stopping = true;
+            _producerCancellation.Cancel();
             lock (_frameGate)
             {
-                _stopping = true;
-                _pendingFrame?.Dispose();
+                RecycleFrame(_pendingFrame);
                 _pendingFrame = null;
                 Monitor.PulseAll(_frameGate);
             }
 
-            StopCapture();
+            if (_producerTask is not null)
+            {
+                try
+                {
+                    await _producerTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected when recording is stopped normally.
+                }
+            }
 
             try
             {
-                if (_transcodeTask is not null)
-                {
-                    await _transcodeTask;
-                }
-
-                if (_outputStream is not null)
-                {
-                    await _outputStream.FlushAsync();
-                }
+                if (_transcodeTask is not null) await _transcodeTask;
+                if (_outputStream is not null) await _outputStream.FlushAsync();
             }
             finally
             {
@@ -164,104 +164,191 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private void FramePool_FrameArrived(Direct3D11CaptureFramePool sender, object args)
+    private async Task ProduceFramesAsync(CancellationToken cancellationToken)
     {
-        Direct3D11CaptureFrame? newestFrame = null;
+        var clock = Stopwatch.StartNew();
+        long nextFrameIndex = 0;
+
         try
         {
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var frame = sender.TryGetNextFrame();
-                if (frame is null) break;
-                newestFrame?.Dispose();
-                newestFrame = frame;
+                RenderFrame(nextFrameIndex++);
+
+                var nextFrameTime = TimeSpan.FromTicks(nextFrameIndex * _frameDuration.Ticks);
+                var delay = nextFrameTime - clock.Elapsed;
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+                else
+                {
+                    await Task.Yield();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Normal stop.
+        }
+        catch (Exception exception)
+        {
+            Failure = exception;
+            SignalEndOfStream();
+        }
+    }
+
+    private void RenderFrame(long frameIndex)
+    {
+        var frame = RentFrame();
+        try
+        {
+            using (var drawingSession = frame.RenderTarget.CreateDrawingSession())
+            {
+                // Media Foundation interprets packed RGB rows bottom-up. Render
+                // the intermediate target upside-down so the encoded MP4 is upright.
+                drawingSession.Transform = Matrix3x2.CreateScale(1, -1)
+                    * Matrix3x2.CreateTranslation(0, OutputHeight);
+                var mode = _modeProvider?.Invoke() ?? ClientOutputMode.SourceLost;
+                if (_capture is not { HasFrame: true }
+                    || mode is ClientOutputMode.Privacy or ClientOutputMode.SourceLost)
+                {
+                    DrawPrivacySlate(drawingSession, mode);
+                }
+                else
+                {
+                    _capture.DrawRecordingFrame(
+                        drawingSession,
+                        OutputWidth,
+                        OutputHeight,
+                        _scaleMode,
+                        _adaptiveZoom);
+                }
             }
 
-            if (newestFrame is null) return;
+            frame.Buffer.Length = frame.Buffer.Capacity;
+            frame.RenderTarget.GetPixelBytes(frame.Buffer);
+            frame.Timestamp = TimeSpan.FromTicks(frameIndex * _frameDuration.Ticks);
 
             lock (_frameGate)
             {
                 if (_stopping)
                 {
-                    newestFrame.Dispose();
+                    RecycleFrame(frame);
                     return;
                 }
 
-                _pendingFrame?.Dispose();
-                _pendingFrame = newestFrame;
-                newestFrame = null;
+                RecycleFrame(_pendingFrame);
+                _pendingFrame = frame;
                 Monitor.Pulse(_frameGate);
             }
         }
-        finally
+        catch
         {
-            newestFrame?.Dispose();
+            RecycleFrame(frame);
+            throw;
         }
     }
 
-    private void MediaSource_Starting(MediaStreamSource sender, MediaStreamSourceStartingEventArgs args)
+    private StableCpuFrame RentFrame()
     {
-        args.Request.SetActualStartPosition(TimeSpan.Zero);
-    }
-
-    private void MediaSource_SampleRequested(MediaStreamSource sender, MediaStreamSourceSampleRequestedEventArgs args)
-    {
-        Direct3D11CaptureFrame? frame;
-        TimeSpan timestamp;
-
-        while (true)
+        if (_availableFrames.TryTake(out var reusable)) return reusable;
+        if (Interlocked.Increment(ref _allocatedFrameCount) > MaximumFrameCount)
         {
-            frame = TakeNextFrame();
-            if (frame is null)
-            {
-                args.Request.Sample = null;
-                return;
-            }
-
-            var sourceTime = frame.SystemRelativeTime;
-            _firstFrameTime ??= sourceTime;
-            var elapsedTicks = Math.Max(0, (sourceTime - _firstFrameTime.Value).Ticks);
-            var frameSlot = elapsedTicks / FrameDuration.Ticks;
-
-            // Windows Graphics Capture follows the monitor refresh rate. On a
-            // 120/144/165 Hz display it can therefore deliver far more frames
-            // than the requested recording profile. Keep only one frame per
-            // 1/60-second slot so the MP4 is genuinely 60 fps.
-            if (frameSlot <= _lastFrameSlot)
-            {
-                frame.Dispose();
-                continue;
-            }
-
-            _lastFrameSlot = frameSlot;
-            timestamp = TimeSpan.FromTicks(frameSlot * FrameDuration.Ticks);
-            break;
+            Interlocked.Decrement(ref _allocatedFrameCount);
+            throw new InvalidOperationException("Encoder tidak mengembalikan buffer tepat waktu.");
         }
 
         try
         {
-            var sample = MediaStreamSample.CreateFromDirect3D11Surface(frame.Surface, timestamp);
-            sample.Duration = FrameDuration;
-            _outstandingFrames.TryAdd(frame, 0);
-            sample.Processed += (_, _) => ReleaseFrame(frame);
-            args.Request.Sample = sample;
+            var renderTarget = new CanvasRenderTarget(
+                _canvasDevice,
+                OutputWidth,
+                OutputHeight,
+                96,
+                Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                CanvasAlphaMode.Ignore);
+            var buffer = new Windows.Storage.Streams.Buffer(OutputWidth * OutputHeight * BytesPerPixel)
+            {
+                Length = OutputWidth * OutputHeight * BytesPerPixel
+            };
+            return new StableCpuFrame(renderTarget, buffer);
         }
         catch
         {
-            frame.Dispose();
+            Interlocked.Decrement(ref _allocatedFrameCount);
+            throw;
+        }
+    }
+
+    private static void DrawPrivacySlate(CanvasDrawingSession drawingSession, ClientOutputMode mode)
+    {
+        drawingSession.Clear(Color.FromArgb(255, 14, 17, 22));
+        var title = mode == ClientOutputMode.SourceLost ? "Sumber terputus" : "Presentasi dijeda";
+        var subtitle = mode == ClientOutputMode.SourceLost
+            ? "Pilih ulang sumber di laptop presenter"
+            : "Mohon tunggu sebentar";
+
+        using var titleFormat = new CanvasTextFormat
+        {
+            FontFamily = "Segoe UI Variable Display",
+            FontSize = 38,
+            HorizontalAlignment = CanvasHorizontalAlignment.Center,
+            VerticalAlignment = CanvasVerticalAlignment.Center
+        };
+        using var subtitleFormat = new CanvasTextFormat
+        {
+            FontFamily = "Segoe UI Variable Text",
+            FontSize = 20,
+            HorizontalAlignment = CanvasHorizontalAlignment.Center,
+            VerticalAlignment = CanvasVerticalAlignment.Center
+        };
+
+        drawingSession.DrawText(
+            title,
+            new Rect(0, 455, OutputWidth, 75),
+            Color.FromArgb(255, 245, 247, 250),
+            titleFormat);
+        drawingSession.DrawText(
+            subtitle,
+            new Rect(0, 530, OutputWidth, 48),
+            Color.FromArgb(255, 150, 158, 174),
+            subtitleFormat);
+    }
+
+    private void MediaSource_Starting(MediaStreamSource sender, MediaStreamSourceStartingEventArgs args) =>
+        args.Request.SetActualStartPosition(TimeSpan.Zero);
+
+    private void MediaSource_SampleRequested(MediaStreamSource sender, MediaStreamSourceSampleRequestedEventArgs args)
+    {
+        var frame = TakeNextFrame();
+        if (frame is null)
+        {
+            args.Request.Sample = null;
+            return;
+        }
+
+        try
+        {
+            var sample = MediaStreamSample.CreateFromBuffer(frame.Buffer, frame.Timestamp);
+            sample.Duration = _frameDuration;
+            _outstandingFrames.TryAdd(frame, 0);
+            sample.Processed += (_, _) => ReleaseOutstandingFrame(frame);
+            args.Request.Sample = sample;
+        }
+        catch (Exception exception)
+        {
+            Failure = exception;
+            RecycleFrame(frame);
             args.Request.Sample = null;
         }
     }
 
-    private Direct3D11CaptureFrame? TakeNextFrame()
+    private StableCpuFrame? TakeNextFrame()
     {
         lock (_frameGate)
         {
-            while (!_stopping && _pendingFrame is null)
-            {
-                Monitor.Wait(_frameGate);
-            }
-
+            while (!_stopping && _pendingFrame is null) Monitor.Wait(_frameGate);
             if (_stopping) return null;
             var frame = _pendingFrame;
             _pendingFrame = null;
@@ -269,31 +356,26 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private void ReleaseFrame(Direct3D11CaptureFrame frame)
+    private void ReleaseOutstandingFrame(StableCpuFrame frame)
     {
-        if (_outstandingFrames.TryRemove(frame, out _)) frame.Dispose();
+        if (_outstandingFrames.TryRemove(frame, out _)) RecycleFrame(frame);
     }
 
-    private void CaptureItem_Closed(GraphicsCaptureItem sender, object args)
+    private void RecycleFrame(StableCpuFrame? frame)
     {
+        if (frame is not null && !_disposed) _availableFrames.Add(frame);
+    }
+
+    private void SignalEndOfStream()
+    {
+        _stopping = true;
+        _producerCancellation.Cancel();
         lock (_frameGate)
         {
-            _stopping = true;
-            _pendingFrame?.Dispose();
+            RecycleFrame(_pendingFrame);
             _pendingFrame = null;
             Monitor.PulseAll(_frameGate);
         }
-    }
-
-    private void StopCapture()
-    {
-        if (_framePool is not null) _framePool.FrameArrived -= FramePool_FrameArrived;
-        if (_captureItem is not null) _captureItem.Closed -= CaptureItem_Closed;
-        _captureSession?.Dispose();
-        _captureSession = null;
-        _framePool?.Dispose();
-        _framePool = null;
-        _captureItem = null;
     }
 
     private void DisposeMediaObjects()
@@ -305,7 +387,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
         _mediaSource = null;
 
-        foreach (var frame in _outstandingFrames.Keys) ReleaseFrame(frame);
+        foreach (var frame in _outstandingFrames.Keys) ReleaseOutstandingFrame(frame);
+        while (_availableFrames.TryTake(out var availableFrame)) availableFrame.Dispose();
+        _pendingFrame?.Dispose();
+        _pendingFrame = null;
+        _capture = null;
+        _modeProvider = null;
         _outputStream?.Dispose();
         _outputStream = null;
     }
@@ -321,6 +408,23 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             _disposed = true;
             DisposeMediaObjects();
+            _producerCancellation.Dispose();
         }
     }
+
+    private sealed class StableCpuFrame(
+        CanvasRenderTarget renderTarget,
+        Windows.Storage.Streams.Buffer buffer) : IDisposable
+    {
+        public CanvasRenderTarget RenderTarget { get; } = renderTarget;
+        public Windows.Storage.Streams.Buffer Buffer { get; } = buffer;
+        public TimeSpan Timestamp { get; set; }
+
+        public void Dispose() => RenderTarget.Dispose();
+    }
+}
+
+public sealed record RecordingOptions(int FrameRate, int BitrateMbps)
+{
+    public static RecordingOptions HighQuality60Fps { get; } = new(60, 18);
 }

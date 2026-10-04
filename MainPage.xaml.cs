@@ -1,13 +1,13 @@
 using Clario_Presenter.Capture;
 using Clario_Presenter.Recording;
 using Clario_Presenter.Services;
+using Clario_Presenter.Settings;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System.Collections.ObjectModel;
 using Windows.Storage;
-using Windows.Storage.Pickers;
 
 namespace Clario_Presenter;
 
@@ -19,6 +19,7 @@ public sealed partial class MainPage : Page
     private readonly DispatcherTimer _sessionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _privacyWatchTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _windowRescueTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly AppSettingsService _settingsService = new();
     private TimeSpan _elapsed;
     private bool _isLive;
     private bool _isFrozen;
@@ -31,10 +32,13 @@ public sealed partial class MainPage : Page
     private nint _mirrorMonitorHandle;
     private DisplayTarget? _clientDisplay;
     private DisplayTarget? _presenterDisplay;
+    private CaptureScaleMode _outputScaleMode = CaptureScaleMode.Adaptive;
+    private float _outputAdaptiveZoom = 1.15f;
     private CaptureSessionService? _capture;
     private OutputWindow? _outputWindow;
     private OutputRecordingService? _recorder;
     private StorageFile? _recordingFile;
+    private bool _recordingFileWasAutoCreated;
     private DateTimeOffset _recordingStartedAt;
     private bool _recordingTransition;
 
@@ -289,6 +293,20 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SettingsDialog(_settingsService.Current)
+        {
+            XamlRoot = XamlRoot
+        };
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        _settingsService.Save(dialog.GetSettings());
+        var settings = _settingsService.Current;
+        FooterStatusText.Text = $"Settings tersimpan · 1080p {settings.RecordingFrameRate} fps · {settings.RecordingBitrateMbps} Mbps";
+    }
+
     private async void RecordButton_Click(object sender, RoutedEventArgs e)
     {
         if (_recordingTransition)
@@ -299,6 +317,8 @@ public sealed partial class MainPage : Page
 
         _recordingTransition = true;
         RecordButton.IsEnabled = false;
+        StorageFile? pendingFile = null;
+        var pendingFileWasAutoCreated = false;
         try
         {
             if (_recorder?.IsRecording == true)
@@ -307,33 +327,36 @@ public sealed partial class MainPage : Page
                 return;
             }
 
-            if (!_isLive || _outputWindow is null)
+            if (!_isLive || _outputWindow is null || _capture is null)
             {
                 RecordButton.IsChecked = false;
                 FooterStatusText.Text = "Mulai Live sebelum merekam";
                 return;
             }
 
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.VideosLibrary,
-                SuggestedFileName = $"Clario-{DateTime.Now:yyyyMMdd-HHmmss}"
-            };
-            picker.FileTypeChoices.Add("Video MP4", [".mp4"]);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, GetPresenterWindowHandle());
-
-            var file = await picker.PickSaveFileAsync();
+            var settings = _settingsService.Current;
+            pendingFileWasAutoCreated = !settings.AskRecordingLocation;
+            var file = settings.AskRecordingLocation
+                ? await AppSettingsService.PickRecordingFileAsync(GetPresenterWindowHandle())
+                : await _settingsService.CreateRecordingFileAsync();
             if (file is null)
             {
                 RecordButton.IsChecked = false;
                 return;
             }
+            pendingFile = file;
 
             var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
             var recorder = new OutputRecordingService();
             try
             {
-                await recorder.StartAsync(_outputWindow.WindowHandle, stream);
+                await recorder.StartAsync(
+                    _capture,
+                    _outputScaleMode,
+                    _outputAdaptiveZoom,
+                    ResolveClientOutputMode,
+                    stream,
+                    new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps));
             }
             catch
             {
@@ -343,15 +366,17 @@ public sealed partial class MainPage : Page
 
             _recorder = recorder;
             _recordingFile = file;
+            _recordingFileWasAutoCreated = pendingFileWasAutoCreated;
             _recordingStartedAt = DateTimeOffset.Now;
             RecordButton.IsChecked = true;
             RecordButtonText.Text = "REC 00:00";
             RecordButtonDot.Fill = PrivacyBrush;
-            FooterStatusText.Text = "Merekam output klien · 1080p 60 fps · H.264";
+            FooterStatusText.Text = $"Merekam output klien · 1080p {settings.RecordingFrameRate} fps · H.264";
             _ = WatchRecordingAsync(recorder);
         }
         catch (Exception exception)
         {
+            if (pendingFileWasAutoCreated) await DeleteEmptyRecordingAsync(pendingFile);
             RecordButton.IsChecked = false;
             RecordButtonText.Text = "Rekam";
             FooterStatusText.Text = $"Rekaman gagal dimulai · {exception.Message}";
@@ -369,6 +394,7 @@ public sealed partial class MainPage : Page
         var file = _recordingFile;
         _recorder = null;
         _recordingFile = null;
+        _recordingFileWasAutoCreated = false;
         RecordButton.IsEnabled = false;
         RecordButtonText.Text = "Menyimpan…";
 
@@ -405,7 +431,7 @@ public sealed partial class MainPage : Page
         }
         catch (Exception exception)
         {
-            failure = exception;
+            failure = recorder.Failure ?? exception;
         }
 
         // A normal StopRecordingAsync clears _recorder before signalling the
@@ -413,8 +439,11 @@ public sealed partial class MainPage : Page
         // on its own (for example after a driver/device failure).
         if (!ReferenceEquals(_recorder, recorder)) return;
 
+        var file = _recordingFile;
+        var fileWasAutoCreated = _recordingFileWasAutoCreated;
         _recorder = null;
         _recordingFile = null;
+        _recordingFileWasAutoCreated = false;
         try
         {
             await recorder.DisposeAsync();
@@ -423,12 +452,27 @@ public sealed partial class MainPage : Page
         {
             failure ??= exception;
         }
+        if (fileWasAutoCreated) await DeleteEmptyRecordingAsync(file);
         RecordButton.IsChecked = false;
         RecordButtonText.Text = "Rekam";
         RecordButton.IsEnabled = _isLive;
         FooterStatusText.Text = failure is null
             ? "Rekaman berhenti lebih awal · silakan mulai ulang REC"
             : $"Encoder berhenti · {failure.Message}";
+    }
+
+    private static async Task DeleteEmptyRecordingAsync(StorageFile? file)
+    {
+        if (file is null) return;
+        try
+        {
+            var properties = await file.GetBasicPropertiesAsync();
+            if (properties.Size == 0) await file.DeleteAsync(StorageDeleteOption.Default);
+        }
+        catch
+        {
+            // Cleanup is best effort; never hide the original recording error.
+        }
     }
 
     private void StartPresentation(WindowSource? source, DisplayTarget target)
@@ -440,6 +484,8 @@ public sealed partial class MainPage : Page
         _isSafeMirrorSession = IsSafeMirrorMode;
         _presenterDisplay = _displays.FirstOrDefault(display => display.IsPrimary);
         _clientDisplay = !target.IsPrimary && _presenterDisplay is not null ? target : null;
+        _outputScaleMode = ResolveOutputScaleMode();
+        _outputAdaptiveZoom = CalculateAdaptiveZoom(_presenterDisplay, target);
 
         if (_clientDisplay is not null)
         {
@@ -468,10 +514,12 @@ public sealed partial class MainPage : Page
 
         LivePreviewCanvas.Visibility = Visibility.Visible;
         var previewMode = target.IsPrimary && _displays.Count == 1;
-        var outputScaleMode = OutputScaleComboBox.SelectedIndex == 1
-            ? CaptureScaleMode.Fill
-            : CaptureScaleMode.Fit;
-        _outputWindow = new OutputWindow(_capture, target, previewMode, outputScaleMode);
+        _outputWindow = new OutputWindow(
+            _capture,
+            target,
+            previewMode,
+            _outputScaleMode,
+            _outputAdaptiveZoom);
         _outputWindow.Closed += OutputWindow_Closed;
         _outputWindow.Activate();
         _outputWindow.ApplyPlacement();
@@ -642,6 +690,29 @@ public sealed partial class MainPage : Page
         ? nint.Zero
         : WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
 
+    private CaptureScaleMode ResolveOutputScaleMode() => OutputScaleComboBox.SelectedIndex switch
+    {
+        1 => CaptureScaleMode.Fit,
+        2 => CaptureScaleMode.Fill,
+        _ => CaptureScaleMode.Adaptive
+    };
+
+    private static float CalculateAdaptiveZoom(DisplayTarget? source, DisplayTarget target)
+    {
+        if (source is null || source.Bounds.Width <= 0 || source.Bounds.Height <= 0
+            || target.Bounds.Width <= 0 || target.Bounds.Height <= 0)
+        {
+            return 1.15f;
+        }
+
+        var sourceLogicalArea = source.Bounds.Width * 96d / Math.Max(96u, source.DpiX)
+            * (source.Bounds.Height * 96d / Math.Max(96u, source.DpiY));
+        var targetLogicalArea = target.Bounds.Width * 96d / Math.Max(96u, target.DpiX)
+            * (target.Bounds.Height * 96d / Math.Max(96u, target.DpiY));
+        var resolutionRatio = Math.Sqrt(sourceLogicalArea / targetLogicalArea);
+        return (float)Math.Clamp(1.12 + Math.Max(0, resolutionRatio - 1) * 0.08, 1.12, 1.28);
+    }
+
     private void WindowRescueTimer_Tick(object? sender, object e)
     {
         if (!_isLive || _clientDisplay is null || _presenterDisplay is null) return;
@@ -789,6 +860,14 @@ public sealed partial class MainPage : Page
         if (_isFrozen || _isAutoHeld) return PresentationState.Frozen;
         return PresentationState.Live;
     }
+
+    private ClientOutputMode ResolveClientOutputMode() => ResolveState() switch
+    {
+        PresentationState.Live => ClientOutputMode.Live,
+        PresentationState.Frozen => ClientOutputMode.Frozen,
+        PresentationState.Privacy => ClientOutputMode.Privacy,
+        _ => ClientOutputMode.SourceLost
+    };
 
     private void SetWindowStatus(string label, SolidColorBrush brush)
     {

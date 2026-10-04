@@ -81,13 +81,26 @@ public sealed class CaptureSessionService : IDisposable
     }
 
     public void Draw(CanvasControl sender, CanvasDrawEventArgs args,
-        CaptureScaleMode scaleMode = CaptureScaleMode.Fit)
+        CaptureScaleMode scaleMode = CaptureScaleMode.Fit, float adaptiveZoom = 1.15f)
+        => DrawCore(args.DrawingSession, (float)sender.ActualWidth, (float)sender.ActualHeight,
+            scaleMode, adaptiveZoom, CanvasImageInterpolation.HighQualityCubic);
+
+    public void Draw(CanvasDrawingSession drawingSession, float width, float height,
+        CaptureScaleMode scaleMode = CaptureScaleMode.Fit, float adaptiveZoom = 1.15f)
+        => DrawCore(drawingSession, width, height, scaleMode, adaptiveZoom,
+            CanvasImageInterpolation.HighQualityCubic);
+
+    public void DrawRecordingFrame(CanvasDrawingSession drawingSession, float width, float height,
+        CaptureScaleMode scaleMode = CaptureScaleMode.Fit, float adaptiveZoom = 1.15f)
+        => DrawCore(drawingSession, width, height, scaleMode, adaptiveZoom,
+            CanvasImageInterpolation.Linear);
+
+    private void DrawCore(CanvasDrawingSession drawingSession, float width, float height,
+        CaptureScaleMode scaleMode, float adaptiveZoom, CanvasImageInterpolation interpolation)
     {
-        var width = (float)sender.ActualWidth;
-        var height = (float)sender.ActualHeight;
         if (width <= 0 || height <= 0) return;
 
-        args.DrawingSession.Clear(Windows.UI.Color.FromArgb(255, 14, 17, 22));
+        drawingSession.Clear(Windows.UI.Color.FromArgb(255, 14, 17, 22));
         lock (_frameLock)
         {
             var bitmap = _frontBuffer;
@@ -97,15 +110,18 @@ public sealed class CaptureSessionService : IDisposable
             var sourceHeight = bitmap.SizeInPixels.Height;
             if (sourceWidth <= 0 || sourceHeight <= 0) return;
 
-            var scale = scaleMode == CaptureScaleMode.Fill
-                ? Math.Max(width / sourceWidth, height / sourceHeight)
-                : Math.Min(width / sourceWidth, height / sourceHeight);
+            var fitScale = Math.Min(width / sourceWidth, height / sourceHeight);
+            var scale = scaleMode switch
+            {
+                CaptureScaleMode.Fill => Math.Max(width / sourceWidth, height / sourceHeight),
+                CaptureScaleMode.Adaptive => fitScale * Math.Clamp(adaptiveZoom, 1f, 1.35f),
+                _ => fitScale
+            };
             var drawWidth = sourceWidth * scale;
             var drawHeight = sourceHeight * scale;
             var destination = new Rect((width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
             var source = new Rect(0, 0, sourceWidth, sourceHeight);
-            args.DrawingSession.DrawImage(bitmap, destination, source, 1,
-                CanvasImageInterpolation.HighQualityCubic);
+            drawingSession.DrawImage(bitmap, destination, source, 1, interpolation);
         }
     }
 
@@ -253,6 +269,7 @@ public sealed class CaptureSessionService : IDisposable
 
 public enum CaptureScaleMode
 {
+    Adaptive,
     Fit,
     Fill
 }

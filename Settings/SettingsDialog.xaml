@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="Clario_Presenter.SettingsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Settings"
+    PrimaryButtonText="Simpan"
+    CloseButtonText="Batal"
+    DefaultButton="Primary">
+
+    <StackPanel Width="520" Spacing="18">
+        <StackPanel Spacing="4">
+            <TextBlock Text="REKAMAN" Style="{StaticResource ClarioSectionLabelStyle}" />
+            <TextBlock Text="Kualitas output" FontSize="18" FontWeight="SemiBold" />
+            <TextBlock Text="Pengaturan ini berlaku untuk rekaman berikutnya." FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+        </StackPanel>
+
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <StackPanel Spacing="6">
+                <TextBlock Text="FRAME RATE" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <ComboBox x:Name="FrameRateComboBox" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="60 fps · gerakan halus" Tag="60" />
+                    <ComboBoxItem Content="30 fps · lebih ringan" Tag="30" />
+                </ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="6">
+                <TextBlock Text="KUALITAS" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <ComboBox x:Name="BitrateComboBox" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="Hemat · 10 Mbps" Tag="10" />
+                    <ComboBoxItem Content="Tinggi · 18 Mbps" Tag="18" />
+                    <ComboBoxItem Content="Maksimal · 28 Mbps" Tag="28" />
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+
+        <Border Padding="14" Style="{StaticResource ClarioPanelStyle}">
+            <Grid RowSpacing="12">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Folder rekaman" FontSize="13" FontWeight="SemiBold" />
+                        <TextBlock Text="Semua video tersimpan rapi di satu lokasi." FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                        <Button Content="Buka" Style="{StaticResource ClarioButtonStyle}" Click="OpenFolder_Click" />
+                        <Button Content="Pilih folder" Style="{StaticResource ClarioButtonStyle}" Click="ChooseFolder_Click" />
+                    </StackPanel>
+                </Grid>
+                <Border Grid.Row="1" Padding="10,8" CornerRadius="7" Background="{StaticResource ClarioCanvasBrush}">
+                    <TextBlock x:Name="FolderPathText" TextTrimming="CharacterEllipsis" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                </Border>
+                <ToggleSwitch x:Name="AskLocationToggle" Grid.Row="2" Header="Tanya lokasi setiap mulai merekam" OffContent="Gunakan folder di atas" OnContent="Tampilkan Save As" />
+            </Grid>
+        </Border>
+
+        <Border Padding="13" CornerRadius="9" Background="{StaticResource ClarioAccentSoftBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource ClarioAccentBrush}" />
+                <TextBlock Text="Video memakai buffer output internal; catatan dan aplikasi privat tidak masuk rekaman." TextWrapping="Wrap" FontSize="11" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ContentDialog>

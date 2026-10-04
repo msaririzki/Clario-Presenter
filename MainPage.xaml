@@ -40,8 +40,9 @@
                 <Grid ColumnSpacing="6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="148" /></Grid.ColumnDefinitions>
                     <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" />
-                    <ComboBox x:Name="OutputScaleComboBox" Grid.Column="1" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Skala output">
-                        <ComboBoxItem Content="Pas otomatis" Tag="Fit" />
+                    <ComboBox x:Name="OutputScaleComboBox" Grid.Column="1" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Skala output" ToolTipService.ToolTip="Adaptif memperbesar konten agar lebih terbaca pada monitor kecil">
+                        <ComboBoxItem Content="Adaptif nyaman" Tag="Adaptive" />
+                        <ComboBoxItem Content="Seluruh layar" Tag="Fit" />
                         <ComboBoxItem Content="Isi layar (crop)" Tag="Fill" />
                     </ComboBox>
                 </Grid>
@@ -59,7 +60,10 @@
                 <ToggleButton x:Name="NotesButton" IsChecked="True" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tampilkan catatan" Click="NotesButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE70B;" FontSize="13" /><TextBlock Text="Catatan" /></StackPanel>
                 </ToggleButton>
-                <ToggleButton x:Name="RecordButton" MinWidth="112" IsEnabled="False" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Mulai atau hentikan rekaman 1080p 60 fps" Click="RecordButton_Click" ToolTipService.ToolTip="Rekam persis layar klien ke MP4 · 1080p 60 fps">
+                <Button x:Name="SettingsButton" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Buka Settings" Click="SettingsButton_Click" ToolTipService.ToolTip="Settings rekaman dan aplikasi">
+                    <FontIcon Glyph="&#xE713;" FontSize="14" />
+                </Button>
+                <ToggleButton x:Name="RecordButton" MinWidth="112" IsEnabled="False" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Mulai atau hentikan rekaman output" Click="RecordButton_Click" ToolTipService.ToolTip="Rekam persis layar klien ke MP4 sesuai Settings">
                     <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse x:Name="RecordButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="RecordButtonText" Text="Rekam" /></StackPanel>
                 </ToggleButton>
                 <Button x:Name="LiveButton" MinWidth="104" Style="{StaticResource ClarioPrimaryButtonStyle}" AutomationProperties.Name="Mulai atau hentikan Live" Click="LiveButton_Click">

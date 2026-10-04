@@ -3,9 +3,17 @@ using System.Runtime.InteropServices;
 namespace Clario_Presenter.Services;
 
 public readonly record struct DisplayBounds(int Left, int Top, int Width, int Height);
-public sealed record DisplayTarget(nint Handle, string DeviceName, DisplayBounds Bounds, bool IsPrimary, int Index)
+public sealed record DisplayTarget(
+    nint Handle,
+    string DeviceName,
+    DisplayBounds Bounds,
+    uint DpiX,
+    uint DpiY,
+    bool IsPrimary,
+    int Index)
 {
-    public string DisplayName => $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}";
+    public int ScalePercent => (int)Math.Round(DpiX / 96d * 100);
+    public string DisplayName => $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}  ·  {ScalePercent}%";
 }
 
 public static class DisplayCatalogService
@@ -25,14 +33,38 @@ public static class DisplayCatalogService
 
         return found.OrderByDescending(item => (item.Info.Flags & MonitorInfoPrimary) != 0)
             .ThenBy(item => item.Info.Monitor.Left)
-            .Select((item, index) => new DisplayTarget(
-                item.Handle,
-                item.Info.DeviceName,
-                new DisplayBounds(item.Info.Monitor.Left, item.Info.Monitor.Top,
-                    item.Info.Monitor.Right - item.Info.Monitor.Left,
-                    item.Info.Monitor.Bottom - item.Info.Monitor.Top),
-                (item.Info.Flags & MonitorInfoPrimary) != 0,
-                index + 1)).ToArray();
+            .Select((item, index) =>
+            {
+                var (dpiX, dpiY) = GetEffectiveDpi(item.Handle);
+                return new DisplayTarget(
+                    item.Handle,
+                    item.Info.DeviceName,
+                    new DisplayBounds(item.Info.Monitor.Left, item.Info.Monitor.Top,
+                        item.Info.Monitor.Right - item.Info.Monitor.Left,
+                        item.Info.Monitor.Bottom - item.Info.Monitor.Top),
+                    dpiX,
+                    dpiY,
+                    (item.Info.Flags & MonitorInfoPrimary) != 0,
+                    index + 1);
+            }).ToArray();
+    }
+
+    private static (uint X, uint Y) GetEffectiveDpi(nint monitor)
+    {
+        try
+        {
+            return GetDpiForMonitor(monitor, MonitorDpiType.Effective, out var dpiX, out var dpiY) >= 0
+                ? (dpiX, dpiY)
+                : (96, 96);
+        }
+        catch (DllNotFoundException)
+        {
+            return (96, 96);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return (96, 96);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -48,10 +80,21 @@ public static class DisplayCatalogService
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
     }
 
+    private enum MonitorDpiType
+    {
+        Effective = 0
+    }
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnumDisplayMonitors(nint hdc, nint clip, MonitorEnumProc callback, nint data);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfoEx info);
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(
+        nint monitor,
+        MonitorDpiType dpiType,
+        out uint dpiX,
+        out uint dpiY);
 }
