@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Capture\DesktopCompositionLayout.cs" Link="DesktopCompositionLayout.cs" />
+    <Compile Include="..\Services\DisplayCatalogService.cs" Link="DisplayCatalogService.cs" />
+    <Compile Include="..\Services\WindowCatalogService.cs" Link="WindowCatalogService.cs" />
+  </ItemGroup>
+</Project>

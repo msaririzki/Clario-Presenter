@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+    <Compile Remove="Tests\**\*.cs" />
   </ItemGroup>
 
   <!--

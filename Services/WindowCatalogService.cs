@@ -83,6 +83,63 @@ public static class WindowCatalogService
 
     public static nint GetForegroundWindowHandle() => GetForegroundWindow();
 
+    public static nint GetRootOwner(nint handle) => GetAncestor(handle, 3);
+
+    public static bool IsInWindowFamily(nint handle, IEnumerable<nint> selectedWindows)
+    {
+        if (handle == nint.Zero) return false;
+        var root = GetRootOwner(handle);
+        return selectedWindows.Any(selected => selected == handle
+            || (root != nint.Zero && GetRootOwner(selected) == root));
+    }
+
+    public static IReadOnlyList<nint> GetPublicWindowFamily(nint handle, IEnumerable<nint> privateWindows)
+    {
+        if (!IsWindowCapturable(handle) || IsInWindowFamily(handle, privateWindows)) return [];
+        var root = GetRootOwner(handle);
+        GetWindowThreadProcessId(handle, out var publicProcessId);
+        var windows = new List<nint>();
+        // Some apps (including Packet Tracer) use independent top-level windows
+        // for device dialogs, with no Win32 owner relationship. Include public
+        // windows from that process as well, preserving their desktop z-order.
+        EnumWindows((candidate, _) =>
+        {
+            GetWindowThreadProcessId(candidate, out var candidateProcessId);
+            if ((GetRootOwner(candidate) == root || candidateProcessId == publicProcessId)
+                && IsWindowCapturable(candidate)
+                && !IsInWindowFamily(candidate, privateWindows)) windows.Add(candidate);
+            return true;
+        }, nint.Zero);
+        windows.Reverse();
+        return windows;
+    }
+
+    public static bool TryGetCaptureBounds(nint handle, out DisplayBounds bounds)
+    {
+        // GetWindowRect includes invisible resize borders. WGC uses the visible
+        // DWM frame, so use those bounds to preserve the original desktop position.
+        if (DwmGetWindowAttribute(handle, 9, out var rect, Marshal.SizeOf<Rect>()) < 0
+            && !GetWindowRect(handle, out rect))
+        {
+            bounds = default;
+            return false;
+        }
+        bounds = new DisplayBounds(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+        return bounds.Width > 0 && bounds.Height > 0;
+    }
+
+    public static bool IsRegionCoveredByForeground(DisplayBounds region)
+    {
+        if (!TryGetCaptureBounds(GetForegroundWindow(), out var foreground)) return false;
+        var overlapWidth = Math.Max(0, Math.Min(foreground.Left + foreground.Width, region.Left + region.Width)
+            - Math.Max(foreground.Left, region.Left));
+        var overlapHeight = Math.Max(0, Math.Min(foreground.Top + foreground.Height, region.Top + region.Height)
+            - Math.Max(foreground.Top, region.Top));
+        // Maximized resize borders can overlap the taskbar by a few pixels.
+        // Only a fullscreen-sized overlap means its safe snapshot must be held.
+        return (long)overlapWidth * overlapHeight > (long)region.Width * region.Height * 0.9;
+    }
+
     public static void MinimizeWindows(IEnumerable<nint> windowHandles)
     {
         foreach (var handle in windowHandles) MinimizeWindow(handle);
@@ -181,6 +238,10 @@ public static class WindowCatalogService
     private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")]
+    private static extern nint GetAncestor(nint hWnd, uint flags);
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(nint hWnd, uint attribute, out Rect rect, int size);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect

@@ -27,12 +27,11 @@ public sealed partial class MainPage : Page
     private bool _isAutoHeld;
     private bool _isSafeMirrorSession;
     private bool _isProtectedPublicCapture;
-    private nint _lastActivePrivateWindow;
+    private long _lastPrivateViewTick;
     private nint _lastPublicWindow;
-    private nint _mirrorMonitorHandle;
     private DisplayTarget? _clientDisplay;
     private DisplayTarget? _presenterDisplay;
-    private CaptureScaleMode _outputScaleMode = CaptureScaleMode.Adaptive;
+    private CaptureScaleMode _outputScaleMode = CaptureScaleMode.Fit;
     private float _outputAdaptiveZoom = 1.15f;
     private CaptureSessionService? _capture;
     private OutputWindow? _outputWindow;
@@ -136,13 +135,15 @@ public sealed partial class MainPage : Page
         var safeMirror = IsSafeMirrorMode;
         SourceComboBox.IsEnabled = !safeMirror && !_isLive;
         PrivateAppsButton.IsEnabled = safeMirror;
+        OutputScaleComboBox.IsEnabled = !safeMirror && !_isLive;
+        if (safeMirror) OutputScaleComboBox.SelectedIndex = 1;
         SourcePrivacyBadgeText.Text = safeMirror ? "MIRROR AMAN" : "JENDELA PRIVAT";
 
         if (safeMirror)
         {
             ActiveSourceTitle.Text = "Layar utama · Mirror Aman";
             ActiveSourceSubtitle.Text = "Semua aktivitas tampil, kecuali Clario dan aplikasi privat";
-            BrowserAddressText.Text = "Monitor utama · Pas Otomatis menampilkan seluruh layar";
+            BrowserAddressText.Text = "Desktop utuh · tanpa crop · taskbar tetap tampil";
             DemoHeadingText.Text = "Mirror Aman";
             MiniOutputTitle.Text = "Layar utama";
         }
@@ -492,7 +493,7 @@ public sealed partial class MainPage : Page
         _isSafeMirrorSession = IsSafeMirrorMode;
         _presenterDisplay = _displays.FirstOrDefault(display => display.IsPrimary);
         _clientDisplay = !target.IsPrimary && _presenterDisplay is not null ? target : null;
-        _outputScaleMode = ResolveOutputScaleMode();
+        _outputScaleMode = _isSafeMirrorSession ? CaptureScaleMode.Fit : ResolveOutputScaleMode();
         _outputAdaptiveZoom = CalculateAdaptiveZoom(_presenterDisplay, target);
 
         if (_clientDisplay is not null)
@@ -508,10 +509,10 @@ public sealed partial class MainPage : Page
             // Begin from a known-safe desktop. Selected private windows are still
             // available from the taskbar and will trigger auto-hold when restored.
             _isAutoHeld = true;
-            _mirrorMonitorHandle = primaryDisplay.Handle;
             WindowCatalogService.MinimizeWindows(_privateWindows);
-            _capture.FrameHoldPredicate = () => !_isProtectedPublicCapture
-                && (_isAutoHeld || IsForegroundPrivate());
+            _lastPrivateViewTick = Environment.TickCount64;
+            _capture.ConfigureDesktop(primaryDisplay.Bounds, primaryDisplay.WorkArea);
+            _capture.FrameHoldPredicate = () => _isAutoHeld || HasPrivateView();
             _capture.StartMonitor(primaryDisplay.Handle);
             _privacyWatchTimer.Start();
         }
@@ -551,9 +552,7 @@ public sealed partial class MainPage : Page
         _isAutoHeld = false;
         _isSafeMirrorSession = false;
         _isProtectedPublicCapture = false;
-        _lastActivePrivateWindow = nint.Zero;
         _lastPublicWindow = nint.Zero;
-        _mirrorMonitorHandle = nint.Zero;
         _clientDisplay = null;
         _presenterDisplay = null;
         FreezeButton.IsChecked = false;
@@ -591,105 +590,72 @@ public sealed partial class MainPage : Page
         var presenterWindow = GetPresenterWindowHandle();
         if (foregroundWindow == presenterWindow) return true;
 
-        return _privateWindows.Contains(foregroundWindow)
+        return WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
             && WindowCatalogService.IsWindowPresentable(foregroundWindow);
+    }
+
+    private bool HasPrivateView()
+    {
+        if (IsForegroundPrivate() || _privateWindows.Any(WindowCatalogService.IsWindowPresentable))
+        {
+            _lastPrivateViewTick = Environment.TickCount64;
+            return true;
+        }
+        // Do not capture the last few frames of a private window's minimize
+        // animation after Windows has already marked its HWND as minimized.
+        return Environment.TickCount64 - _lastPrivateViewTick < 300;
     }
 
     private void PrivacyWatchTimer_Tick(object? sender, object e)
     {
-        if (!_isSafeMirrorSession) return;
+        if (!_isSafeMirrorSession || _isFrozen) return;
 
         var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
         var presenterActive = foregroundWindow == GetPresenterWindowHandle();
-        var privateWindowActive = _privateWindows.Contains(foregroundWindow)
+        var privateWindowActive = WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
             && WindowCatalogService.IsWindowPresentable(foregroundWindow);
-        var protectedViewNeeded = presenterActive || privateWindowActive;
+        var protectedViewNeeded = HasPrivateView();
 
-        if (privateWindowActive)
-        {
-            _lastActivePrivateWindow = foregroundWindow;
-        }
-        else if (_lastActivePrivateWindow != nint.Zero)
-        {
-            // Keep the private window from becoming visible behind a smaller
-            // public window, then allow the public capture to continue.
-            WindowCatalogService.MinimizeWindow(_lastActivePrivateWindow);
-            _lastActivePrivateWindow = nint.Zero;
-        }
-
-        if (!protectedViewNeeded && WindowCatalogService.IsWindowCapturable(foregroundWindow))
+        if (!presenterActive && !privateWindowActive
+            && WindowCatalogService.IsWindowCapturable(foregroundWindow))
         {
             _lastPublicWindow = foregroundWindow;
         }
 
-        var stateChanged = false;
+        var wasProtected = _isProtectedPublicCapture;
+        var wasHeld = _isAutoHeld;
         if (protectedViewNeeded)
         {
-            if (!_isProtectedPublicCapture)
-            {
-                if (!_isAutoHeld)
-                {
-                    _isAutoHeld = true;
-                    stateChanged = true;
-                }
-                if (TrySwitchToPublicWindow())
-                {
-                    _isAutoHeld = false;
-                    stateChanged = true;
-                }
-            }
+            // Hold the monitor before preparing occlusion-independent public
+            // layers. Its desktop size and safe taskbar never change sources.
+            _isAutoHeld = true;
+            _isProtectedPublicCapture = TryUpdateProtectedDesktop();
+            _isAutoHeld = !_isProtectedPublicCapture || !(_capture?.HasFrame ?? false);
         }
         else
         {
-            if (_isProtectedPublicCapture)
-            {
-                _isAutoHeld = true;
-                stateChanged = true;
-                TrySwitchBackToMirror();
-            }
-
-            if (_isAutoHeld)
-            {
-                _isAutoHeld = false;
-                stateChanged = true;
-            }
+            _capture?.ClearProtectedWindows();
+            _isProtectedPublicCapture = false;
+            _isAutoHeld = false;
         }
 
-        if (stateChanged) UpdatePresentationState();
+        if (wasProtected != _isProtectedPublicCapture || wasHeld != _isAutoHeld)
+            UpdatePresentationState();
     }
 
-    private bool TrySwitchToPublicWindow()
+    private bool TryUpdateProtectedDesktop()
     {
         if (_capture is null
             || !WindowCatalogService.PrepareWindowForBackgroundCapture(_lastPublicWindow)) return false;
 
         try
         {
-            // The monitor remains held until the safe window capture is ready.
-            _capture.Start(_lastPublicWindow, keepLastFrame: true);
-            _isProtectedPublicCapture = true;
-            return true;
+            var publicWindows = WindowCatalogService.GetPublicWindowFamily(_lastPublicWindow, _privateWindows);
+            return _capture.SetProtectedWindows(publicWindows);
         }
         catch
         {
-            _isProtectedPublicCapture = false;
-            TrySwitchBackToMirror();
-            return false;
-        }
-    }
-
-    private bool TrySwitchBackToMirror()
-    {
-        if (_capture is null || _mirrorMonitorHandle == nint.Zero) return false;
-
-        try
-        {
-            _capture.StartMonitor(_mirrorMonitorHandle, keepLastFrame: true);
-            _isProtectedPublicCapture = false;
-            return true;
-        }
-        catch
-        {
+            _capture.ClearProtectedWindows();
             return false;
         }
     }
@@ -747,26 +713,13 @@ public sealed partial class MainPage : Page
 
     private void Capture_SourceClosed(object? sender, EventArgs e)
     {
-        if (RecoverProtectedCapture()) return;
         HandleSourceLost("Jendela sumber telah ditutup.");
     }
 
     private void Capture_CaptureFailed(object? sender, CaptureFailureEventArgs e)
     {
-        if (RecoverProtectedCapture()) return;
         var detail = $"{e.Message} {e.Exception.Message}";
         HandleSourceLost(detail);
-    }
-
-    private bool RecoverProtectedCapture()
-    {
-        if (!_isSafeMirrorSession || !_isProtectedPublicCapture) return false;
-        _isProtectedPublicCapture = false;
-        _lastPublicWindow = nint.Zero;
-        _isAutoHeld = true;
-        var recovered = TrySwitchBackToMirror();
-        UpdatePresentationState();
-        return recovered;
     }
 
     private void HandleSourceLost(string detail)
@@ -822,9 +775,9 @@ public sealed partial class MainPage : Page
                 ClientStatusText.Text = _isProtectedPublicCapture ? "LIVE AMAN" : "LIVE";
                 ClientStateOverlay.Visibility = Visibility.Collapsed;
                 FooterStatusText.Text = _isProtectedPublicCapture
-                    ? "Live Terlindungi · aplikasi publik tetap berjalan saat catatan privat dibuka"
+                    ? "Live Terlindungi · posisi desktop dan taskbar tetap, aplikasi privat tersembunyi"
                     : _isSafeMirrorSession
-                        ? "Mirror Aman · layar utama menyesuaikan monitor klien secara otomatis"
+                        ? "Mirror Aman · seluruh desktop tanpa crop, taskbar tetap tampil"
                         : "Live · monitor klien hanya menerima jendela terpilih";
                 SetWindowStatus(
                     _isProtectedPublicCapture ? "Live terlindungi" : "Live ke monitor klien",
@@ -867,7 +820,7 @@ public sealed partial class MainPage : Page
                 ClientStateTitle.Text = "Belum Live";
                 ClientStateSubtitle.Text = "Pilih sumber lalu mulai";
                 FooterStatusText.Text = IsSafeMirrorMode
-                    ? "Siap · Mirror Aman akan menyalin layar utama dengan skala otomatis"
+                    ? "Siap · Mirror Aman menampilkan desktop utuh dan taskbar tanpa crop"
                     : "Siap · pilih sumber dan monitor output";
                 SetWindowStatus("Siap", MutedBrush);
                 break;

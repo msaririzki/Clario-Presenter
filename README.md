@@ -10,13 +10,15 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
 - mode **Mirror Aman** untuk mencerminkan seluruh monitor utama;
-- mode default `Adaptif nyaman` memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan agar konten dari monitor besar tetap terbaca;
+- mode default `Seluruh layar` mempertahankan desktop utuh tanpa crop; Mirror Aman selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi privat;
+- pilihan `Adaptif nyaman` pada mode aplikasi tunggal memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
 - mode `Seluruh layar` menampilkan semua area tanpa crop dan mode `Isi layar (crop)` memenuhi monitor semaksimal mungkin;
 - pemilih jendela privat per aplikasi;
-- auto-hold menahan frame publik terakhir hanya ketika Clario atau jendela privat sedang berada di depan;
-- Live Terlindungi beralih ke capture jendela publik terakhir sehingga video/web tetap bergerak ketika PDF, catatan, atau Clario dibuka;
+- Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
+- jendela publik dan dialog perangkat dari proses yang sama disusun sesuai urutan desktop, termasuk dialog Cisco Packet Tracer yang tidak memiliki Win32 owner;
+- taskbar aman disimpan terpisah dan selalu digambar di posisi tetap di atas jendela publik;
 - jika jendela publik sempat diminimalkan, Clario memulihkannya tanpa mengambil fokus agar video tetap mengirim frame di belakang aplikasi privat;
-- jendela privat otomatis diminimalkan saat presenter kembali ke aplikasi publik agar mirror segera berjalan tanpa membocorkan jendela di belakang;
+- jendela privat dapat tetap terbuka berdampingan dengan aplikasi publik; mirror desktop hanya dilanjutkan ketika jendela privat sudah diminimalkan atau ditutup;
 - Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
 - preview sumber berukuran penuh di studio presenter sehingga web tetap nyaman dioperasikan;
 - output fullscreen bersih pada monitor eksternal;
@@ -61,10 +63,10 @@ Untuk **Mirror Aman**:
 1. Pilih `Mirror Aman` pada mode presentasi.
 2. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat.
 3. Tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
-4. Ketika Clario/jendela privat dibuka, Clario mempertahankan capture jendela publik terakhir sehingga video atau web tetap berjalan.
-5. Ketika berpindah dari jendela privat ke Canva/web, jendela privat otomatis diminimalkan dan mirror langsung berjalan kembali.
+4. Ketika Clario/jendela privat dibuka, Clario memperbarui jendela publik di atas desktop aman terakhir. Ukuran desktop, posisi dialog, dan taskbar tetap sama.
+5. Aplikasi privat boleh tetap terbuka di samping Cisco/Canva/web pada laptop; output klien hanya memperbarui jendela publik. Minimalkan atau tutup aplikasi privat untuk kembali ke mirror desktop langsung.
 
-Gunakan `Adaptif nyaman` ketika monitor klien lebih kecil: Clario menghitung zoom dari resolusi efektif, skala Windows, dan perkiraan ukuran fisik kedua layar, lalu memotong sedikit bagian tepi agar teks lebih terbaca. Jika monitor menyediakan data raw DPI, ukuran perkiraannya juga tampil di pemilih monitor. Gunakan `Seluruh layar` bila semua sisi wajib terlihat; konsekuensinya isi dari monitor 27 inci memang akan tampak lebih kecil pada layar 15 inci. `Isi layar (crop)` memberi pembesaran maksimum dan cocok bila tepi sumber tidak penting.
+Mirror Aman selalu menggunakan `Seluruh layar` tanpa zoom/crop agar perubahan ke Live Terlindungi tidak mengubah tata letak. Untuk mode aplikasi tunggal, `Adaptif nyaman` dan `Isi layar (crop)` tetap tersedia jika pembesaran lebih penting daripada tepi sumber. Monitor dengan rasio berbeda memakai letterbox, bukan memotong isi. Jika monitor menyediakan data raw DPI, ukuran perkiraannya tampil di pemilih monitor. Privasi dipilih per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu dipresentasikan.
 
 Untuk merekam, mulai sesi Live lalu tekan `Rekam` dan lanjutkan presentasi seperti biasa. Secara default video langsung disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui tombol roda gigi. Aktifkan `Tanya lokasi setiap mulai merekam` jika ingin memakai dialog `Save As`. Tekan `REC` sekali lagi untuk menghentikan dan memfinalisasi video. Jangan menutup aplikasi sebelum teks tombol kembali menjadi `Rekam`. Versi saat ini merekam video output klien; audio mikrofon dan audio sistem belum disertakan.
 
@@ -100,6 +102,7 @@ Clario.Presenter
 ├── OutputWindow.xaml.cs             placement monitor dan privacy slate
 ├── Capture
 │   ├── CaptureSessionService.cs     frame pool, freeze, dan rendering
+│   ├── DesktopCompositionLayout.cs  geometri desktop, posisi jendela, dan taskbar
 │   └── GraphicsCaptureItemFactory.cs interop capture berdasarkan HWND
 ├── Recording
 │   └── OutputRecordingService.cs    buffer frame stabil dan encoder MP4
@@ -112,6 +115,14 @@ Clario.Presenter
     ├── WindowCatalogService.cs      enumerasi jendela Win32
     └── DisplayCatalogService.cs     enumerasi monitor Win32
 ```
+
+Pemeriksaan regresi geometri desktop dapat dijalankan tanpa framework tes tambahan:
+
+```powershell
+dotnet run --project Tests/Clario.GeometryTests.csproj
+```
+
+Tambahkan `-- --native` untuk memeriksa bounds dan pemilihan jendela Cisco Packet Tracer yang sedang terbuka.
 
 ## Pengembangan berikutnya
 

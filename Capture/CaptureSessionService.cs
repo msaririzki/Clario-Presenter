@@ -1,5 +1,6 @@
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Clario_Presenter.Services;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.Graphics.Capture;
@@ -17,6 +18,10 @@ public sealed class CaptureSessionService : IDisposable
     private GraphicsCaptureSession? _session;
     private CanvasRenderTarget? _frontBuffer;
     private CanvasRenderTarget? _backBuffer;
+    private CanvasRenderTarget? _taskbarFrontBuffer;
+    private CanvasRenderTarget? _taskbarBackBuffer;
+    private DesktopCompositionLayout? _desktopLayout;
+    private PublicWindowLayer[] _publicLayers = [];
     private SizeInt32 _bufferSize;
     private SizeInt32 _lastSize;
     private volatile bool _isFrozen;
@@ -45,8 +50,77 @@ public sealed class CaptureSessionService : IDisposable
     public bool IsFrozen
     {
         get => _isFrozen;
-        set => _isFrozen = value;
+        set
+        {
+            _isFrozen = value;
+            lock (_frameLock)
+            {
+                foreach (var layer in _publicLayers) layer.Capture.IsFrozen = value;
+            }
+        }
     }
+
+    public void ConfigureDesktop(DisplayBounds bounds, DisplayBounds workArea) =>
+        _desktopLayout = new DesktopCompositionLayout(bounds, workArea);
+
+    public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_desktopLayout is null) throw new InvalidOperationException("Layout desktop belum disiapkan.");
+
+        PublicWindowLayer[] previousLayers;
+        lock (_frameLock) previousLayers = _publicLayers;
+        var nextLayers = new List<PublicWindowLayer>();
+        foreach (var handle in windowHandles)
+        {
+            if (!WindowCatalogService.TryGetCaptureBounds(handle, out var bounds)) continue;
+            var layer = previousLayers.FirstOrDefault(item => item.Handle == handle);
+            if (layer is null)
+            {
+                layer = new PublicWindowLayer(handle, bounds);
+                layer.Capture.FrameAvailable += PublicLayer_FrameAvailable;
+                try
+                {
+                    layer.Capture.Start(handle);
+                    layer.Capture.IsFrozen = _isFrozen;
+                }
+                catch
+                {
+                    layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
+                    layer.Capture.Dispose();
+                    continue;
+                }
+            }
+            lock (_frameLock) layer.Bounds = bounds;
+            nextLayers.Add(layer);
+        }
+
+        lock (_frameLock) _publicLayers = nextLayers.ToArray();
+        foreach (var layer in previousLayers.Except(nextLayers))
+        {
+            layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
+            layer.Capture.Dispose();
+        }
+        return nextLayers.Any(layer => !layer.Faulted);
+    }
+
+    public void ClearProtectedWindows()
+    {
+        PublicWindowLayer[] layers;
+        lock (_frameLock)
+        {
+            layers = _publicLayers;
+            _publicLayers = [];
+        }
+        foreach (var layer in layers)
+        {
+            layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
+            layer.Capture.Dispose();
+        }
+    }
+
+    private void PublicLayer_FrameAvailable(object? sender, EventArgs args) =>
+        FrameAvailable?.Invoke(this, EventArgs.Empty);
 
     public void Start(nint windowHandle, bool keepLastFrame = false) =>
         StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle), keepLastFrame);
@@ -99,6 +173,7 @@ public sealed class CaptureSessionService : IDisposable
         CaptureScaleMode scaleMode, float adaptiveZoom, CanvasImageInterpolation interpolation)
     {
         if (width <= 0 || height <= 0) return;
+        if (_desktopLayout is not null) scaleMode = CaptureScaleMode.Fit;
 
         drawingSession.Clear(Windows.UI.Color.FromArgb(255, 14, 17, 22));
         lock (_frameLock)
@@ -122,10 +197,57 @@ public sealed class CaptureSessionService : IDisposable
             var destination = new Rect((width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
             var source = new Rect(0, 0, sourceWidth, sourceHeight);
             drawingSession.DrawImage(bitmap, destination, source, 1, interpolation);
+
+            if (_desktopLayout is not null)
+            {
+                foreach (var layer in _publicLayers)
+                {
+                    if (!layer.Faulted)
+                        layer.Capture.DrawPlacedWindow(drawingSession, layer.Bounds, _desktopLayout,
+                            destination, interpolation);
+                }
+
+                // Keep the last safe taskbar above every public-window layer,
+                // including applications that cover it in fullscreen mode.
+                var taskbar = _desktopLayout.TaskbarBounds;
+                if (_taskbarFrontBuffer is not null)
+                {
+                    var taskbarDestination = ToOutputRect(taskbar, _desktopLayout, destination);
+                    drawingSession.DrawImage(_taskbarFrontBuffer, taskbarDestination,
+                        new Rect(0, 0, taskbar.Width, taskbar.Height), 1, interpolation);
+                }
+            }
         }
     }
 
-    public void Stop() => StopCaptureObjects(keepLastFrame: false);
+    private void DrawPlacedWindow(CanvasDrawingSession drawingSession, DisplayBounds window,
+        DesktopCompositionLayout layout, Rect desktopDestination, CanvasImageInterpolation interpolation)
+    {
+        var visible = layout.ClipPublicWindow(window);
+        if (visible.Width <= 0 || visible.Height <= 0) return;
+        lock (_frameLock)
+        {
+            if (_frontBuffer is not { } bitmap) return;
+            var ratioX = bitmap.SizeInPixels.Width / (double)window.Width;
+            var ratioY = bitmap.SizeInPixels.Height / (double)window.Height;
+            var source = new Rect((visible.Left - window.Left) * ratioX,
+                (visible.Top - window.Top) * ratioY, visible.Width * ratioX, visible.Height * ratioY);
+            drawingSession.DrawImage(bitmap, ToOutputRect(visible, layout, desktopDestination),
+                source, 1, interpolation);
+        }
+    }
+
+    private static Rect ToOutputRect(DisplayBounds region, DesktopCompositionLayout layout, Rect destination)
+    {
+        var mapped = layout.MapRegion(region, destination.X, destination.Y, destination.Width, destination.Height);
+        return new Rect(mapped.X, mapped.Y, mapped.Width, mapped.Height);
+    }
+
+    public void Stop()
+    {
+        ClearProtectedWindows();
+        StopCaptureObjects(keepLastFrame: false);
+    }
 
     private void FramePool_FrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
@@ -162,8 +284,11 @@ public sealed class CaptureSessionService : IDisposable
                         using var capturedSurface = CanvasBitmap.CreateFromDirect3D11Surface(_canvasDevice, frame.Surface);
                         using (var drawingSession = writeTarget.CreateDrawingSession())
                         {
+                            drawingSession.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
                             drawingSession.DrawImage(capturedSurface);
                         }
+
+                        UpdateSafeTaskbar(capturedSurface);
 
                         lock (_frameLock)
                         {
@@ -194,6 +319,31 @@ public sealed class CaptureSessionService : IDisposable
     }
 
     private void Item_Closed(GraphicsCaptureItem sender, object args) => SourceClosed?.Invoke(this, EventArgs.Empty);
+
+    private void UpdateSafeTaskbar(CanvasBitmap capturedSurface)
+    {
+        if (_desktopLayout is null) return;
+        var taskbar = _desktopLayout.TaskbarBounds;
+        if (taskbar.Width <= 0 || taskbar.Height <= 0
+            || WindowCatalogService.IsRegionCoveredByForeground(taskbar)) return;
+
+        var writeTarget = _taskbarBackBuffer
+            ?? new CanvasRenderTarget(_canvasDevice, taskbar.Width, taskbar.Height, 96);
+        var unusedTarget = _taskbarFrontBuffer
+            ?? new CanvasRenderTarget(_canvasDevice, taskbar.Width, taskbar.Height, 96);
+        using (var session = writeTarget.CreateDrawingSession())
+        {
+            session.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            session.DrawImage(capturedSurface, new Rect(0, 0, taskbar.Width, taskbar.Height),
+                new Rect(taskbar.Left - _desktopLayout.Bounds.Left, taskbar.Top - _desktopLayout.Bounds.Top,
+                    taskbar.Width, taskbar.Height));
+        }
+        lock (_frameLock)
+        {
+            _taskbarFrontBuffer = writeTarget;
+            _taskbarBackBuffer = unusedTarget;
+        }
+    }
 
     private CanvasRenderTarget GetWriteTarget(SizeInt32 size)
     {
@@ -245,14 +395,25 @@ public sealed class CaptureSessionService : IDisposable
 
             if (!keepLastFrame)
             {
+                CanvasRenderTarget? oldFront, oldBack, oldTaskbarFront, oldTaskbarBack;
                 lock (_frameLock)
                 {
-                    _frontBuffer?.Dispose();
-                    _backBuffer?.Dispose();
+                    oldFront = _frontBuffer;
+                    oldBack = _backBuffer;
+                    oldTaskbarFront = _taskbarFrontBuffer;
+                    oldTaskbarBack = _taskbarBackBuffer;
                     _frontBuffer = null;
                     _backBuffer = null;
+                    _taskbarFrontBuffer = null;
+                    _taskbarBackBuffer = null;
                     _bufferSize = default;
                 }
+                // Releasing a Win2D resource may acquire its device lock. Never
+                // do that while holding a frame lock needed by the recorder.
+                oldFront?.Dispose();
+                oldBack?.Dispose();
+                oldTaskbarFront?.Dispose();
+                oldTaskbarBack?.Dispose();
                 _lastSize = default;
             }
         }
@@ -261,9 +422,30 @@ public sealed class CaptureSessionService : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        ClearProtectedWindows();
         StopCaptureObjects(keepLastFrame: false);
         _disposed = true;
         GC.SuppressFinalize(this);
+    }
+
+    private sealed class PublicWindowLayer
+    {
+        public nint Handle { get; }
+        public DisplayBounds Bounds { get; set; }
+        public CaptureSessionService Capture { get; } = new();
+        public bool Faulted { get; private set; }
+
+        public PublicWindowLayer(nint handle, DisplayBounds bounds)
+        {
+            Handle = handle;
+            Bounds = bounds;
+            Capture.SourceClosed += (_, _) => Faulted = true;
+            Capture.CaptureFailed += (_, _) =>
+            {
+                Faulted = true;
+                Capture.IsFrozen = true;
+            };
+        }
     }
 }
 
