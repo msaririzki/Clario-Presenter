@@ -1,4 +1,5 @@
 using Clario_Presenter.Capture;
+using Clario_Presenter.Camera;
 using Clario_Presenter.Services;
 
 var checks = 0;
@@ -45,4 +46,30 @@ if (args.Contains("--native"))
         Console.WriteLine($"Cisco window family: {family.Count} layer(s), bounds {bounds.Width}x{bounds.Height}.");
     }
 }
-Console.WriteLine($"PASS: {checks} desktop composition checks.");
+var cameraOptions = new CameraOverlayOptions { Enabled = true, WidthPercent = 24 };
+var bottomRight = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions);
+Check(Math.Abs(bottomRight.Width - 460.8) < 0.001, "Medium camera uses 24% of video width.");
+Check(bottomRight.Y + bottomRight.Height <= 1016.001, "Camera leaves the taskbar and bottom safe area clear.");
+foreach (var position in Enum.GetValues<CameraOverlayPosition>())
+{
+    var bounds = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { Position = position });
+    Check(bounds.X >= 32 && bounds.Y >= 32 && bounds.X + bounds.Width <= 1888.001
+        && bounds.Y + bounds.Height <= 1016.001, $"{position} stays within safe margins.");
+    Check(Math.Abs(bounds.Width / bounds.Height - 16d / 9) < 0.001,
+        $"{position} preserves the overlay aspect ratio.");
+}
+var small = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = -10 });
+var large = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = 200 });
+Check(small.Width == 288 && large.Width == 672, "Out-of-range camera sizes are clamped.");
+var fourByThree = CameraOverlayLayout.Fit(640, 480, bottomRight);
+Check(Math.Abs(fourByThree.Width / fourByThree.Height - 4d / 3) < 0.001
+    && fourByThree.X > bottomRight.X && fourByThree.Width < bottomRight.Width,
+    "A 4:3 webcam is fitted without stretching or cropping the face.");
+var portrait = CameraOverlayLayout.Fit(1080, 1920, bottomRight);
+Check(Math.Abs(portrait.Width / portrait.Height - 9d / 16) < 0.001
+    && portrait.Width < bottomRight.Width, "A portrait phone camera preserves its full image.");
+Check(CameraOverlayLayout.GetBounds(0, 1080, cameraOptions) == default, "Zero-sized previews do not create invalid rectangles.");
+var scaledCamera = CameraOverlayLayout.GetBounds(960, 540, cameraOptions);
+Check(Math.Abs(scaledCamera.X * 2 - bottomRight.X) < 0.001
+    && Math.Abs(scaledCamera.Y * 2 - bottomRight.Y) < 0.001, "Camera placement scales consistently with the output.");
+Console.WriteLine($"PASS: {checks} desktop and camera composition checks.");

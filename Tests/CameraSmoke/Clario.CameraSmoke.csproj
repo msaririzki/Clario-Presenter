@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishTrimmed>false</PublishTrimmed>
+    <ApplicationManifest>..\..\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <Compile Include="..\..\Camera\*.cs" Link="Camera\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Capture\*.cs" Link="Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Services\*.cs" Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Recording\OutputRecordingService.cs" Link="OutputRecordingService.cs" />
+  </ItemGroup>
+</Project>

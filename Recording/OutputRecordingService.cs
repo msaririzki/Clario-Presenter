@@ -1,4 +1,5 @@
 using Clario_Presenter.Capture;
+using Clario_Presenter.Camera;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Text;
 using System.Collections.Concurrent;
@@ -34,10 +35,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private readonly CancellationTokenSource _producerCancellation = new();
     private readonly SemaphoreSlim _stopGate = new(1, 1);
 
-    private CaptureSessionService? _capture;
+    private IRecordingFrameSource? _capture;
     private CaptureScaleMode _scaleMode;
     private float _adaptiveZoom;
     private Func<ClientOutputMode>? _modeProvider;
+    private CameraCaptureService? _camera;
+    private CameraOverlayOptions? _cameraOptions;
     private StableCpuFrame? _pendingFrame;
     private MediaStreamSource? _mediaSource;
     private IRandomAccessStream? _outputStream;
@@ -53,9 +56,11 @@ public sealed class OutputRecordingService : IAsyncDisposable
     public bool IsRecording => _transcodeTask is { IsCompleted: false } && !_stopping;
     public Task Completion => _transcodeTask ?? Task.CompletedTask;
     public Exception? Failure { get; private set; }
+    public string? CameraWarning => _camera?.Warning;
+    public bool IncludesCamera => _cameraOptions?.Enabled == true;
 
     public async Task StartAsync(
-        CaptureSessionService capture,
+        IRecordingFrameSource capture,
         CaptureScaleMode scaleMode,
         float adaptiveZoom,
         Func<ClientOutputMode> modeProvider,
@@ -75,6 +80,16 @@ public sealed class OutputRecordingService : IAsyncDisposable
         _outputStream = outputStream;
         _outputStream.Size = 0;
         _outputStream.Seek(0);
+
+        _cameraOptions = options.Camera;
+        if (_cameraOptions?.Enabled == true)
+        {
+            _camera = new CameraCaptureService();
+            // Start on the UI thread so Windows can request camera access.
+            // Do not create an apparently successful camera recording without
+            // first receiving a real frame from the selected device.
+            await _camera.StartAsync(_cameraOptions.DeviceId);
+        }
 
         var inputProperties = VideoEncodingProperties.CreateUncompressed(
             MediaEncodingSubtypes.Bgra8,
@@ -154,8 +169,16 @@ public sealed class OutputRecordingService : IAsyncDisposable
             }
             finally
             {
-                DisposeMediaObjects();
-                _stopCompleted = true;
+                try
+                {
+                    if (_camera is not null) await _camera.DisposeAsync();
+                }
+                finally
+                {
+                    _camera = null;
+                    DisposeMediaObjects();
+                    _stopCompleted = true;
+                }
             }
         }
         finally
@@ -248,6 +271,17 @@ public sealed class OutputRecordingService : IAsyncDisposable
                         OutputHeight,
                         _scaleMode,
                         _adaptiveZoom);
+                }
+
+                // The camera is added only to the recording, after the clean
+                // client frame. Privacy/source loss suppress both screen and face.
+                if (_camera is not null && _cameraOptions is { Enabled: true }
+                    && _capture is { HasFrame: true }
+                    && mode is ClientOutputMode.Live or ClientOutputMode.Frozen)
+                {
+                    CameraOverlayRenderer.Draw(drawingSession, _camera,
+                        CameraOverlayLayout.GetBounds(OutputWidth, OutputHeight, _cameraOptions),
+                        _cameraOptions.Mirror);
                 }
             }
 
@@ -457,7 +491,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
     }
 }
 
-public sealed record RecordingOptions(int FrameRate, int BitrateMbps)
+public sealed record RecordingOptions(int FrameRate, int BitrateMbps, CameraOverlayOptions? Camera = null)
 {
     public static RecordingOptions HighQuality60Fps { get; } = new(60, 18);
 }

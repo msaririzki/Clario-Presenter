@@ -26,6 +26,9 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - panel catatan privat dan checklist;
 - timer sesi;
 - perekam output klien ke MP4 H.264 1920×1080 dengan pilihan 30 atau 60 fps dan akselerasi hardware;
+- overlay kamera khusus rekaman: pilihan webcam internal/USB atau kamera virtual yang terdaftar di Windows, pratinjau, empat posisi, tiga ukuran, serta opsi cermin;
+- kamera dimulai hanya saat `Uji kamera` atau REC dengan kamera diaktifkan; kamera dilepas setelah pratinjau ditutup atau rekaman selesai;
+- jika kamera tidak tersedia saat mulai REC, aplikasi menampilkan error; jika kamera terputus di tengah sesi, rekaman layar berlanjut dengan penanda kamera tidak tersedia;
 - buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
 - backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
 - rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
@@ -70,6 +73,18 @@ Mirror Aman selalu menggunakan `Seluruh layar` tanpa zoom/crop agar perubahan ke
 
 Untuk merekam, mulai sesi Live lalu tekan `Rekam` dan lanjutkan presentasi seperti biasa. Secara default video langsung disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui tombol roda gigi. Aktifkan `Tanya lokasi setiap mulai merekam` jika ingin memakai dialog `Save As`. Tekan `REC` sekali lagi untuk menghentikan dan memfinalisasi video. Jangan menutup aplikasi sebelum teks tombol kembali menjadi `Rekam`. Versi saat ini merekam video output klien; audio mikrofon dan audio sistem belum disertakan.
 
+### Rekam layar dan kamera
+
+1. Hubungkan webcam USB, atau jalankan aplikasi kamera pihak ketiga dan aktifkan output kamera virtualnya.
+2. Buka Settings (roda gigi), tekan `Muat ulang`, lalu pilih perangkat pada `Perangkat kamera`.
+3. Tekan `Uji kamera` untuk memeriksa gambar. Jika Windows meminta izin kamera, berikan izin agar perangkat dapat digunakan.
+4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Pratinjau berhenti dan kamera dinyalakan kembali saat REC dimulai.
+5. Mulai Live kemudian tekan `Rekam`. Video MP4 berisi layar bersih ditambah kamera; monitor klien tidak mendapatkan overlay kamera.
+
+Output video tetap 1080p 30/60 fps sesuai Settings; kelancaran kamera mengikuti frame rate yang diberikan perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di dalam area aman agar taskbar tidak tertutup. Saat Privacy atau sumber layar terputus, kamera juga disembunyikan dari video. Freeze membekukan layar; kamera tetap bergerak. Suara belum disertakan.
+
+Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Aplikasi yang hanya menampilkan preview kamera tanpa menyediakan perangkat kamera virtual belum dapat dipilih sebagai input kamera. Bila perangkat tidak muncul, aktifkan output virtualnya terlebih dahulu lalu muat ulang daftar; kompatibilitas perlu diuji pada driver yang dipakai.
+
 ## Prinsip desain
 
 - permukaan graphite dengan kontras tenang;
@@ -106,6 +121,10 @@ Clario.Presenter
 │   └── GraphicsCaptureItemFactory.cs interop capture berdasarkan HWND
 ├── Recording
 │   └── OutputRecordingService.cs    buffer frame stabil dan encoder MP4
+├── Camera
+│   ├── CameraCaptureService.cs      input webcam/virtual camera dan buffer gambar
+│   ├── CameraOverlayLayout.cs       posisi, ukuran, dan proporsi overlay
+│   └── CameraOverlayRenderer.cs     komposisi kamera pada preview/MP4
 ├── Settings
 │   ├── PresenterSettings.cs         model pengaturan persisten
 │   ├── AppSettingsService.cs        penyimpanan setting dan folder rekaman
@@ -123,6 +142,16 @@ dotnet run --project Tests/Clario.GeometryTests.csproj
 ```
 
 Tambahkan `-- --native` untuk memeriksa bounds dan pemilihan jendela Cisco Packet Tracer yang sedang terbuka.
+
+Uji integrasi kamera (opsional, benar-benar menyalakan kamera pertama yang tersedia) ada di `Tests/CameraSmoke`. Harness memakai layar pola uji, bukan merekam desktop pengguna, dan mencoba preview, pelepasan/reopen kamera, encoding 1080p60, serta transisi Privacy. Jalankan dengan konteks paket Clario agar Win2D tersedia:
+
+```powershell
+dotnet build Tests/CameraSmoke/Clario.CameraSmoke.csproj
+# Di Windows PowerShell 5.1, setelah Clario sudah terdaftar pada Windows:
+Invoke-CommandInDesktopPackage -PackageFamilyName '237E57D9-2488-4F07-B595-A20D0BDFEF66_1z32rh13vfry6' -AppId App -Command 'E:\projeck git\Bagikan layar\Tests\CameraSmoke\bin\Debug\net9.0-windows10.0.26100.0\win-x64\Clario.CameraSmoke.exe'
+```
+
+Sesuaikan path repository. Laporan tersimpan di `%TEMP%\Clario-CameraSmoke.json`; lokasi MP4 uji dicantumkan di laporan. Kamera virtual/eksternal perlu diuji ulang setelah drivernya tersedia.
 
 ## Pengembangan berikutnya
 

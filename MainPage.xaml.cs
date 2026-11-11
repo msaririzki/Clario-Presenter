@@ -1,4 +1,5 @@
 using Clario_Presenter.Capture;
+using Clario_Presenter.Camera;
 using Clario_Presenter.Recording;
 using Clario_Presenter.Services;
 using Clario_Presenter.Settings;
@@ -40,6 +41,7 @@ public sealed partial class MainPage : Page
     private bool _recordingFileWasAutoCreated;
     private DateTimeOffset _recordingStartedAt;
     private bool _recordingTransition;
+    private string? _lastCameraWarning;
 
     private SolidColorBrush LiveBrush => ResourceBrush("ClarioLiveBrush");
     private SolidColorBrush FreezeBrush => ResourceBrush("ClarioFreezeBrush");
@@ -299,6 +301,10 @@ public sealed partial class MainPage : Page
         {
             var recordingElapsed = DateTimeOffset.Now - _recordingStartedAt;
             RecordButtonText.Text = $"REC {recordingElapsed:mm\\:ss}";
+            var cameraWarning = _recorder.CameraWarning;
+            if (cameraWarning != _lastCameraWarning && cameraWarning is not null)
+                FooterStatusText.Text = $"{cameraWarning} · rekaman layar tetap berjalan";
+            _lastCameraWarning = cameraWarning;
         }
     }
 
@@ -313,7 +319,8 @@ public sealed partial class MainPage : Page
 
         _settingsService.Save(dialog.GetSettings());
         var settings = _settingsService.Current;
-        FooterStatusText.Text = $"Settings tersimpan · 1080p {settings.RecordingFrameRate} fps · {settings.RecordingBitrateMbps} Mbps";
+        FooterStatusText.Text = $"Settings tersimpan · 1080p {settings.RecordingFrameRate} fps · {settings.RecordingBitrateMbps} Mbps"
+            + (settings.CameraEnabled ? " · kamera aktif untuk rekaman berikutnya" : string.Empty);
     }
 
     private async void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -326,6 +333,8 @@ public sealed partial class MainPage : Page
 
         _recordingTransition = true;
         RecordButton.IsEnabled = false;
+        LiveButton.IsEnabled = false;
+        SettingsButton.IsEnabled = false;
         StorageFile? pendingFile = null;
         var pendingFileWasAutoCreated = false;
         try
@@ -355,6 +364,9 @@ public sealed partial class MainPage : Page
             }
             pendingFile = file;
 
+            if (!_isLive || _capture is null || _outputWindow is null)
+                throw new InvalidOperationException("Sesi Live telah berhenti. Mulai Live kembali sebelum merekam.");
+
             var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
             var recorder = new OutputRecordingService();
             try
@@ -365,7 +377,17 @@ public sealed partial class MainPage : Page
                     _outputAdaptiveZoom,
                     ResolveClientOutputMode,
                     stream,
-                    new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps));
+                    new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps,
+                        new CameraOverlayOptions
+                        {
+                            Enabled = settings.CameraEnabled,
+                            DeviceId = settings.CameraDeviceId,
+                            Position = (CameraOverlayPosition)settings.CameraPosition,
+                            WidthPercent = settings.CameraWidthPercent,
+                            Mirror = settings.CameraMirror
+                        }));
+                if (!_isLive || _capture is null || _outputWindow is null)
+                    throw new InvalidOperationException("Sesi Live berhenti saat kamera disiapkan.");
             }
             catch
             {
@@ -377,10 +399,11 @@ public sealed partial class MainPage : Page
             _recordingFile = file;
             _recordingFileWasAutoCreated = pendingFileWasAutoCreated;
             _recordingStartedAt = DateTimeOffset.Now;
+            _lastCameraWarning = null;
             RecordButton.IsChecked = true;
             RecordButtonText.Text = "REC 00:00";
             RecordButtonDot.Fill = PrivacyBrush;
-            FooterStatusText.Text = $"Merekam output klien · 1080p {settings.RecordingFrameRate} fps · H.264";
+            FooterStatusText.Text = $"Merekam {(recorder.IncludesCamera ? "layar + kamera" : "output klien")} · 1080p {settings.RecordingFrameRate} fps · H.264";
             _ = WatchRecordingAsync(recorder);
         }
         catch (Exception exception)
@@ -394,6 +417,8 @@ public sealed partial class MainPage : Page
         {
             _recordingTransition = false;
             RecordButton.IsEnabled = _isLive;
+            LiveButton.IsEnabled = true;
+            SettingsButton.IsEnabled = true;
         }
     }
 

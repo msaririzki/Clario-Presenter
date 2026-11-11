@@ -21,13 +21,20 @@ public sealed class AppSettingsService
         Current = settings with
         {
             RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
-            RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32)
+            RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
+            CameraPosition = Math.Clamp(settings.CameraPosition, 0, 3),
+            CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, 15, 35)
         };
 
         _localSettings.Values[nameof(PresenterSettings.RecordingFrameRate)] = Current.RecordingFrameRate;
         _localSettings.Values[nameof(PresenterSettings.RecordingBitrateMbps)] = Current.RecordingBitrateMbps;
         _localSettings.Values[nameof(PresenterSettings.AskRecordingLocation)] = Current.AskRecordingLocation;
         _localSettings.Values[nameof(PresenterSettings.RecordingFolderPath)] = Current.RecordingFolderPath;
+        _localSettings.Values[nameof(PresenterSettings.CameraEnabled)] = Current.CameraEnabled;
+        _localSettings.Values[nameof(PresenterSettings.CameraDeviceId)] = Current.CameraDeviceId;
+        _localSettings.Values[nameof(PresenterSettings.CameraPosition)] = Current.CameraPosition;
+        _localSettings.Values[nameof(PresenterSettings.CameraWidthPercent)] = Current.CameraWidthPercent;
+        _localSettings.Values[nameof(PresenterSettings.CameraMirror)] = Current.CameraMirror;
     }
 
     public async Task<StorageFolder> GetRecordingFolderAsync()
@@ -93,7 +100,12 @@ public sealed class AppSettingsService
             RecordingFrameRate = ReadInt(values, nameof(PresenterSettings.RecordingFrameRate), 60),
             RecordingBitrateMbps = ReadInt(values, nameof(PresenterSettings.RecordingBitrateMbps), 18),
             AskRecordingLocation = ReadBool(values, nameof(PresenterSettings.AskRecordingLocation)),
-            RecordingFolderPath = values[nameof(PresenterSettings.RecordingFolderPath)] as string ?? string.Empty
+            RecordingFolderPath = values[nameof(PresenterSettings.RecordingFolderPath)] as string ?? string.Empty,
+            CameraEnabled = ReadBool(values, nameof(PresenterSettings.CameraEnabled)),
+            CameraDeviceId = values[nameof(PresenterSettings.CameraDeviceId)] as string ?? string.Empty,
+            CameraPosition = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraPosition), 0), 0, 3),
+            CameraWidthPercent = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24), 15, 35),
+            CameraMirror = ReadBool(values, nameof(PresenterSettings.CameraMirror))
         };
     }
 

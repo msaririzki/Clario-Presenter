@@ -8,7 +8,7 @@ using Windows.Graphics.DirectX;
 
 namespace Clario_Presenter.Capture;
 
-public sealed class CaptureSessionService : IDisposable
+public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
 {
     private readonly CanvasDevice _canvasDevice = CanvasDevice.GetSharedDevice();
     private readonly object _captureLock = new();
