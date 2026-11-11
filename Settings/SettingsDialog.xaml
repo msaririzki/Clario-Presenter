@@ -49,11 +49,11 @@
                     <Border Height="135" Background="{StaticResource ClarioCanvasBrush}" CornerRadius="8">
                         <Grid>
                             <canvas:CanvasControl x:Name="CameraPreviewCanvas" UseSharedDevice="True" ClearColor="#0E1116" Draw="CameraPreviewCanvas_Draw" />
-                            <TextBlock x:Name="CameraPreviewPlaceholder" Text="Pratinjau kamera" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                            <TextBlock x:Name="CameraPreviewPlaceholder" Text="Preview kamera" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                         </Grid>
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
-                        <Button x:Name="TestCameraButton" Content="Uji kamera" Style="{StaticResource ClarioButtonStyle}" Click="TestCamera_Click" />
+                        <Button x:Name="TestCameraButton" Content="Tes kamera" Style="{StaticResource ClarioButtonStyle}" Click="TestCamera_Click" />
                         <TextBlock x:Name="CameraStatusText" Text="Kamera belum dinyalakan." FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                     </StackPanel>
                 </Grid>

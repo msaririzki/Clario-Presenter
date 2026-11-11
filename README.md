@@ -9,10 +9,10 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - enumerasi jendela aplikasi yang sedang terbuka;
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
-- mode **Layar terlindungi** untuk merekam/menampilkan satu layar yang dipilih, termasuk layar kedua;
+- mode **Bagikan layar** untuk merekam/menampilkan satu layar yang dipilih, termasuk layar kedua;
 - opsi **Rekam saja** menyiapkan sumber rekaman tanpa membuka output fullscreen atau memindahkan aplikasi pada monitor lain;
-- mode default `Seluruh layar` mempertahankan desktop utuh tanpa memotong gambar; Layar terlindungi selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi tersembunyi;
-- pilihan `Perbesar` pada mode Satu aplikasi memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
+- mode default `Seluruh layar` mempertahankan desktop utuh tanpa memotong gambar; Bagikan layar selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi tersembunyi;
+- pilihan `Perbesar` pada mode Bagikan aplikasi memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
 - mode `Seluruh layar` menampilkan semua area tanpa memotong gambar dan mode `Penuhi layar` memenuhi layar tujuan;
 - pemilih jendela privat per aplikasi;
 - Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
@@ -30,17 +30,17 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - panel catatan privat dan checklist;
 - timer sesi;
 - perekam output klien ke MP4 H.264 1920×1080 dengan pilihan 30 atau 60 fps dan akselerasi hardware;
-- overlay kamera khusus rekaman: pilihan webcam internal/USB atau kamera virtual yang terdaftar di Windows, pratinjau, empat posisi, tiga ukuran, serta opsi cermin;
-- kamera dimulai hanya saat `Uji kamera` atau REC dengan kamera diaktifkan; kamera dilepas setelah pratinjau ditutup atau rekaman selesai;
+- overlay kamera khusus rekaman: pilihan webcam internal/USB atau kamera virtual yang terdaftar di Windows, preview, empat posisi, tiga ukuran, serta opsi cermin;
+- kamera dimulai hanya saat `Tes kamera` atau REC dengan kamera diaktifkan; kamera dilepas setelah preview ditutup atau rekaman selesai;
 - jika kamera tidak tersedia saat mulai REC, aplikasi menampilkan error; jika kamera terputus di tengah sesi, rekaman layar berlanjut dengan penanda kamera tidak tersedia;
 - buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
 - backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
 - rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
 - menu Pengaturan untuk kelancaran video, kualitas video, folder rekaman, dan pilihan lokasi setiap kali merekam;
 - penyimpanan otomatis yang rapi ke `Videos\Clario Presenter` dengan nama file bertimestamp;
-- status Siap, Aktif, Gambar ditahan, dan Layar jeda;
-- Tahan gambar mempertahankan gambar terakhir tanpa menghentikan kontrol presenter;
-- Layar jeda mengganti tampilan audiens dengan pesan jeda yang netral;
+- status Siap, Aktif, Gambar ditahan, dan Privasi;
+- Freeze mempertahankan gambar terakhir tanpa menghentikan kontrol presenter;
+- Privasi mengganti tampilan audiens dengan pesan jeda yang netral;
 - fallback aman otomatis ketika jendela sumber ditutup;
 - render event-driven mengikuti kedatangan frame, tanpa polling 30 FPS;
 - reusable double buffer GPU dan pembuangan frame antrean yang sudah usang untuk menjaga latency rendah;
@@ -63,41 +63,41 @@ dotnet build -p:Platform=x64
 dotnet run --no-build -p:Platform=x64
 ```
 
-Untuk mode **Satu aplikasi**, pilih jendela aplikasi dan layar audiens, kemudian tekan **Mulai presentasi**. Aplikasi perlu tetap terbuka dan tidak diminimalkan; Windows tidak mengirim gambar baru dari sebagian aplikasi yang sedang diminimalkan.
+Untuk mode **Bagikan aplikasi**, pilih jendela aplikasi dan layar audiens, kemudian tekan **Mulai presentasi**. Aplikasi perlu tetap terbuka dan tidak diminimalkan; Windows tidak mengirim gambar baru dari sebagian aplikasi yang sedang diminimalkan.
 
-Untuk **Layar terlindungi**:
+Untuk **Bagikan layar**:
 
-1. Pilih `Layar terlindungi` pada jenis tampilan.
+1. Pilih `Bagikan layar` pada jenis tampilan.
 2. Pilih layar yang akan direkam di sebelahnya. Layar ini berbeda dari layar audiens.
-3. Tekan `Sembunyikan` dan centang PDF atau jendela catatan yang tidak boleh terlihat. Pilih sebelum memulai; daftar ini dikunci selama sesi.
+3. Tekan `Sembunyikan aplikasi` dan centang PDF atau jendela catatan yang tidak boleh terlihat. Pilih sebelum memulai; daftar ini dikunci selama sesi.
 4. Untuk presentasi, pilih layar audiens yang berbeda lalu tekan `Mulai presentasi`. Clario dan aplikasi yang disembunyikan otomatis diminimalkan, lalu aplikasi lainnya ditampilkan.
 5. Ketika Clario/jendela privat dibuka, Clario memperbarui jendela publik di atas desktop aman terakhir. Ukuran desktop, posisi dialog, dan taskbar tetap sama; capture publik tidak dimulai ulang.
 6. Aplikasi privat boleh tetap terbuka di samping Cisco/Canva/web pada laptop; output klien hanya memperbarui jendela publik. Minimalkan atau tutup aplikasi privat untuk kembali ke mirror desktop langsung.
 
 ### Merekam satu dari dua monitor sambil membuka aplikasi privat
 
-1. Pilih `Layar terlindungi`, lalu pilih **layar yang direkam**.
-2. Centang **Rekam saja**. Monitor lainnya tetap dapat dipakai untuk catatan/kontrol tanpa dijadikan output fullscreen.
-3. Pilih aplikasi lewat **Sembunyikan**, lalu tekan **Siapkan layar**.
-4. Buka aplikasi yang akan direkam. Tekan **Rekam** setelah pratinjau sudah sesuai.
+1. Centang **Rekam saja**. Layar kedua tetap bebas digunakan.
+2. Pilih **Rekam layar**, lalu pilih layar yang ingin direkam. Pilih **Rekam aplikasi** jika hanya ingin merekam satu jendela.
+3. Pilih aplikasi lewat **Sembunyikan aplikasi**, lalu tekan **Buka preview**.
+4. Buka aplikasi yang akan direkam. Tekan **Rekam** setelah preview sudah sesuai.
 5. Berpindahlah antar aplikasi seperti biasa. Aplikasi yang tidak disembunyikan terus diperbarui; membuka aplikasi tersembunyi tidak mengganti video dengan layar jeda.
-6. Tekan **Selesai** untuk menyimpan video, lalu **Akhiri sesi**.
+6. Tekan **Stop rekam** untuk menyimpan video, lalu **Stop preview**.
 
-Tombol **Layar jeda** sengaja menampilkan pesan jeda. Jika hanya ingin membuka catatan, pilih jendelanya melalui **Sembunyikan** sebelum sesi. Biarkan aplikasi lainnya tetap terbuka; sebagian aplikasi/driver Windows berhenti mengirim gambar saat diminimalkan atau ditutup, sehingga gambar terakhir dipertahankan jika tidak ada pembaruan. Clario mencoba memulihkan aplikasi terakhir yang ditampilkan tanpa mengambil fokus. Komposisi menyimpan hingga delapan jendela aktif dan mempertahankan cache singkat untuk mengurangi beban GPU.
+Tombol **Privasi** sengaja menampilkan pesan jeda. Jika hanya ingin membuka catatan, pilih jendelanya melalui **Sembunyikan aplikasi** sebelum sesi. Biarkan aplikasi lainnya tetap terbuka; sebagian aplikasi/driver Windows berhenti mengirim gambar saat diminimalkan atau ditutup, sehingga gambar terakhir dipertahankan jika tidak ada pembaruan. Clario mencoba memulihkan aplikasi terakhir yang ditampilkan tanpa mengambil fokus. Komposisi menyimpan hingga delapan jendela aktif dan mempertahankan cache singkat untuk mengurangi beban GPU.
 
-Layar terlindungi selalu menggunakan `Seluruh layar` agar tata letaknya tetap sama saat membuka aplikasi tersembunyi. Pada mode Satu aplikasi, `Perbesar` dan `Penuhi layar` tetap tersedia jika pembesaran lebih penting daripada tepi gambar. Layar dengan perbandingan panjang/lebar berbeda menampilkan ruang kosong di tepi agar gambar tetap utuh. Pilihan Sembunyikan berlaku per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu ditampilkan.
+Bagikan layar selalu menggunakan `Seluruh layar` agar tata letaknya tetap sama saat membuka aplikasi tersembunyi. Pada mode Bagikan aplikasi, `Perbesar` dan `Penuhi layar` tetap tersedia jika pembesaran lebih penting daripada tepi gambar. Layar dengan perbandingan panjang/lebar berbeda menampilkan ruang kosong di tepi agar gambar tetap utuh. Pilihan Sembunyikan aplikasi berlaku per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu ditampilkan.
 
-Untuk merekam, tekan `Siapkan layar` atau `Mulai presentasi`, lalu tekan `Rekam`. Video disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui Pengaturan (roda gigi). Aktifkan `Tanyakan lokasi setiap kali merekam` untuk memilih lokasi sebelum mulai. Tekan `Selesai` untuk menyimpan video dan tunggu hingga tombol kembali menjadi `Rekam`. Suara mikrofon dan suara dari komputer belum disertakan.
+Untuk merekam, tekan `Buka preview` atau `Mulai presentasi`, lalu tekan `Rekam`. Video disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui Pengaturan (roda gigi). Aktifkan `Tanyakan lokasi setiap kali merekam` untuk memilih lokasi sebelum mulai. Tekan `Stop rekam` untuk menyimpan video dan tunggu hingga tombol kembali menjadi `Rekam`. Suara mikrofon dan suara dari komputer belum disertakan.
 
 ### Rekam layar dan kamera
 
 1. Hubungkan webcam USB, atau jalankan aplikasi kamera pihak ketiga dan aktifkan output kamera virtualnya.
 2. Buka Pengaturan (roda gigi), tekan `Perbarui daftar`, lalu pilih kamera pada `Pilih kamera`.
-3. Tekan `Uji kamera` untuk memeriksa gambar. Jika Windows meminta izin kamera, berikan izin agar perangkat dapat digunakan.
-4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Pratinjau berhenti dan kamera dinyalakan kembali saat merekam.
-5. Siapkan layar atau mulai menampilkan presentasi, kemudian tekan `Rekam`. Video berisi layar ditambah kamera; layar audiens tidak mendapatkan gambar kamera tambahan.
+3. Tekan `Tes kamera` untuk memeriksa gambar. Jika Windows meminta izin kamera, berikan izin agar perangkat dapat digunakan.
+4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Preview berhenti dan kamera dinyalakan kembali saat merekam.
+5. Buka preview atau mulai menampilkan presentasi, kemudian tekan `Rekam`. Video berisi layar ditambah kamera; layar audiens tidak mendapatkan gambar kamera tambahan.
 
-Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Layar jeda aktif atau tampilan terputus, kamera juga disembunyikan dari video. Tahan gambar mempertahankan gambar layar; kamera tetap bergerak. Suara belum disertakan.
+Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Privasi aktif atau tampilan terputus, kamera juga disembunyikan dari video. Freeze mempertahankan gambar layar; kamera tetap bergerak. Suara belum disertakan.
 
 Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Aplikasi yang hanya menampilkan preview kamera tanpa menyediakan perangkat kamera virtual belum dapat dipilih sebagai input kamera. Bila perangkat tidak muncul, aktifkan output virtualnya terlebih dahulu lalu muat ulang daftar; kompatibilitas perlu diuji pada driver yang dipakai.
 

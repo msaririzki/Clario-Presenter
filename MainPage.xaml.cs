@@ -114,12 +114,12 @@ public sealed partial class MainPage : Page
         if (SourceComboBox.SelectedItem is not WindowSource source)
         {
             ActiveSourceTitle.Text = "Pilih aplikasi untuk memulai";
-            ActiveSourceSubtitle.Text = "Hanya aplikasi yang dipilih yang terlihat oleh audiens dan masuk rekaman";
+            ActiveSourceSubtitle.Text = "Pilih jendela aplikasi yang ingin direkam atau dibagikan";
             return;
         }
 
         ActiveSourceTitle.Text = source.Title;
-        ActiveSourceSubtitle.Text = $"{source.ProcessName} · hanya jendela ini yang ditampilkan dan direkam";
+        ActiveSourceSubtitle.Text = $"{source.ProcessName} · hanya jendela ini yang direkam atau dibagikan";
         BrowserAddressText.Text = source.ProcessName.Equals("msedge", StringComparison.OrdinalIgnoreCase)
             || source.ProcessName.Equals("chrome", StringComparison.OrdinalIgnoreCase)
             ? "Jendela browser yang dipilih"
@@ -164,16 +164,18 @@ public sealed partial class MainPage : Page
         DisplayComboBox.IsEnabled = !IsRecordingOnly && !_isLive;
         OutputScaleComboBox.IsEnabled = !safeMirror && !_isLive;
         if (safeMirror) OutputScaleComboBox.SelectedIndex = 1;
-        SourcePrivacyBadgeText.Text = safeMirror ? "LAYAR TERLINDUNGI" : "SATU APLIKASI";
-        ClientPreviewLabel.Text = IsRecordingOnly ? "Pratinjau rekaman" : "Tampilan audiens";
+        WindowModeChoice.Content = IsRecordingOnly ? "Rekam aplikasi" : "Bagikan aplikasi";
+        ScreenModeChoice.Content = IsRecordingOnly ? "Rekam layar" : "Bagikan layar";
+        SourcePrivacyBadgeText.Text = safeMirror ? "LAYAR" : "APLIKASI";
+        ClientPreviewLabel.Text = IsRecordingOnly ? "Preview rekaman" : "Layar kedua";
 
         if (safeMirror)
         {
             var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
-            ActiveSourceTitle.Text = $"{(monitor is null ? "Pilih layar" : $"Layar {monitor.Index}")} · Layar terlindungi";
-            ActiveSourceSubtitle.Text = "Aplikasi yang dipilih lewat Sembunyikan tidak terlihat oleh audiens atau masuk rekaman";
-            BrowserAddressText.Text = "Seluruh layar ditampilkan tanpa memotong tepi gambar";
-            DemoHeadingText.Text = "Layar terlindungi";
+            ActiveSourceTitle.Text = monitor is null ? "Pilih layar" : $"Layar {monitor.Index}";
+            ActiveSourceSubtitle.Text = "Klik Sembunyikan aplikasi untuk memilih aplikasi yang tidak ikut tampil";
+            BrowserAddressText.Text = "Seluruh layar, tanpa terpotong";
+            DemoHeadingText.Text = "Preview layar";
             MiniOutputTitle.Text = "Layar yang dipilih";
         }
         else
@@ -218,7 +220,7 @@ public sealed partial class MainPage : Page
         var windowHandle = (nint)rawHandle;
         if (item.IsChecked) _privateWindows.Add(windowHandle);
         else _privateWindows.Remove(windowHandle);
-        PrivateAppsButtonText.Text = $"Sembunyikan ({_privateWindows.Count})";
+        PrivateAppsButtonText.Text = $"Sembunyikan aplikasi ({_privateWindows.Count})";
     }
 
     private async void LiveButton_Click(object sender, RoutedEventArgs e)
@@ -333,12 +335,21 @@ public sealed partial class MainPage : Page
         if (_recorder?.IsRecording == true)
         {
             var recordingElapsed = DateTimeOffset.Now - _recordingStartedAt;
-            RecordButtonText.Text = $"Selesai · {recordingElapsed:mm\\:ss}";
+            RecordButtonText.Text = $"Stop rekam · {recordingElapsed:mm\\:ss}";
             var cameraWarning = _recorder.CameraWarning;
             if (cameraWarning != _lastCameraWarning && cameraWarning is not null)
                 FooterStatusText.Text = $"{cameraWarning} · rekaman layar tetap berjalan";
             _lastCameraWarning = cameraWarning;
         }
+        UpdateRecordingStatusLabels();
+    }
+
+    private void UpdateRecordingStatusLabels()
+    {
+        if (ResolveState() != PresentationState.Live) return;
+        var recording = _recorder?.IsRecording == true;
+        ClientStatusText.Text = recording ? "REC" : _isRecordingOnlySession ? "PREVIEW" : "LIVE";
+        SetWindowStatus(recording ? "Sedang merekam" : _isRecordingOnlySession ? "Preview aktif" : "Presentasi aktif", LiveBrush);
     }
 
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -381,7 +392,7 @@ public sealed partial class MainPage : Page
             if (!_isLive || _capture is null)
             {
                 RecordButton.IsChecked = false;
-                FooterStatusText.Text = "Tekan Siapkan layar atau Mulai presentasi terlebih dahulu, lalu tekan Rekam.";
+                FooterStatusText.Text = "Klik Buka preview atau Mulai presentasi, lalu klik Rekam.";
                 return;
             }
 
@@ -398,7 +409,7 @@ public sealed partial class MainPage : Page
             pendingFile = file;
 
             if (!_isLive || _capture is null)
-                throw new InvalidOperationException("Sesi sudah berakhir. Siapkan layar kembali sebelum merekam.");
+                throw new InvalidOperationException("Preview sudah ditutup. Klik Buka preview lagi sebelum merekam.");
 
             var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
             var recorder = new OutputRecordingService();
@@ -420,7 +431,7 @@ public sealed partial class MainPage : Page
                             Mirror = settings.CameraMirror
                         }));
                 if (!_isLive || _capture is null)
-                    throw new InvalidOperationException("Sesi berakhir saat kamera disiapkan. Siapkan layar kembali sebelum merekam.");
+                    throw new InvalidOperationException("Tampilan ditutup saat kamera disiapkan. Buka preview lagi sebelum merekam.");
             }
             catch
             {
@@ -434,9 +445,10 @@ public sealed partial class MainPage : Page
             _recordingStartedAt = DateTimeOffset.Now;
             _lastCameraWarning = null;
             RecordButton.IsChecked = true;
-            RecordButtonText.Text = "Selesai · 00:00";
+            RecordButtonText.Text = "Stop rekam · 00:00";
             RecordButtonDot.Fill = PrivacyBrush;
-            FooterStatusText.Text = $"Merekam {(recorder.IncludesCamera ? "layar dan kamera" : "tampilan yang dipilih")} · 1080p {settings.RecordingFrameRate} fps. Tekan Selesai untuk menyimpan.";
+            FooterStatusText.Text = $"Merekam {(recorder.IncludesCamera ? "layar dan kamera" : "tampilan yang dipilih")} · 1080p {settings.RecordingFrameRate} fps. Klik Stop rekam untuk menyimpan.";
+            UpdateRecordingStatusLabels();
             _ = WatchRecordingAsync(recorder);
         }
         catch (Exception exception)
@@ -487,6 +499,7 @@ public sealed partial class MainPage : Page
         RecordButton.IsChecked = false;
         RecordButtonText.Text = "Rekam";
         RecordButton.IsEnabled = _isLive;
+        UpdateRecordingStatusLabels();
     }
 
     private async Task WatchRecordingAsync(OutputRecordingService recorder)
@@ -523,6 +536,7 @@ public sealed partial class MainPage : Page
         RecordButton.IsChecked = false;
         RecordButtonText.Text = "Rekam";
         RecordButton.IsEnabled = _isLive;
+        UpdateRecordingStatusLabels();
         FooterStatusText.Text = failure is null
             ? "Rekaman terhenti. Tekan Rekam untuk memulai video baru."
             : $"Rekaman terhenti. {failure.Message}";
@@ -831,54 +845,57 @@ public sealed partial class MainPage : Page
         ClientStatusText.Foreground = brush;
         FooterStatusIcon.Foreground = brush;
         LiveButtonDot.Fill = _isLive ? PrivacyBrush : LiveBrush;
-        LiveButtonText.Text = _isLive ? "Akhiri sesi" : IsRecordingOnly ? "Siapkan layar" : "Mulai presentasi";
+        LiveButtonText.Text = _isLive
+            ? (_isRecordingOnlySession ? "Stop preview" : "Stop presentasi")
+            : IsRecordingOnly ? "Buka preview" : "Mulai presentasi";
 
         switch (state)
         {
             case PresentationState.Live:
                 _outputWindow?.SetMode(ClientOutputMode.Live);
-                ClientStatusText.Text = _isRecordingOnlySession ? "REKAMAN" : _isProtectedPublicCapture ? "TERLINDUNGI" : "AKTIF";
+                UpdateRecordingStatusLabels();
                 ClientStateOverlay.Visibility = Visibility.Collapsed;
-                FooterStatusText.Text = _isProtectedPublicCapture
-                    ? "Aplikasi tersembunyi sedang dibuka. Tampilan lain tetap berjalan di rekaman dan layar audiens."
+                FooterStatusText.Text = _recorder?.IsRecording == true
+                    ? (_isProtectedPublicCapture
+                        ? "Sedang merekam. Aplikasi yang disembunyikan tidak ikut tampil."
+                        : "Sedang merekam. Klik Stop rekam untuk menyimpan video.")
+                    : _isProtectedPublicCapture
+                    ? "Aplikasi yang disembunyikan tidak ikut tampil. Aplikasi lain tetap berjalan."
                     : _isRecordingOnlySession
-                        ? "Layar siap. Tekan Rekam untuk mulai menyimpan video. Layar kedua tetap bebas digunakan."
+                        ? "Preview aktif. Klik Rekam untuk mulai menyimpan video."
                     : _isSafeMirrorSession
-                        ? "Layar terlindungi aktif. Seluruh gambar ditampilkan tanpa memotong tepinya."
-                        : "Hanya aplikasi yang dipilih yang ditampilkan kepada audiens dan masuk rekaman.";
-                SetWindowStatus(
-                    _isRecordingOnlySession ? "Sesi rekaman" : _isProtectedPublicCapture ? "Tampilan terlindungi" : "Sedang ditampilkan",
-                    LiveBrush);
+                        ? "Layar sedang dibagikan. Aplikasi yang disembunyikan tidak ikut tampil."
+                        : "Hanya aplikasi yang dipilih yang dibagikan.";
                 break;
             case PresentationState.Frozen:
                 var waitingForPublicApp = _isAutoHeld && !(_capture?.HasFrame ?? false);
                 _outputWindow?.SetMode(
                     waitingForPublicApp ? ClientOutputMode.Privacy : ClientOutputMode.Frozen,
                     waitingForPublicApp ? "Buka aplikasi yang ingin ditampilkan" : null);
-                ClientStatusText.Text = "DITAHAN";
+                ClientStatusText.Text = "FREEZE";
                 ClientStateOverlay.Visibility = Visibility.Visible;
                 ClientStateIcon.Glyph = "\uE768";
                 ClientStateTitle.Text = waitingForPublicApp
                     ? "Menunggu aplikasi"
-                    : _isAutoHeld ? "Aplikasi tersembunyi dibuka" : "Gambar ditahan";
+                    : _isAutoHeld ? "Aplikasi disembunyikan" : "Freeze aktif";
                 ClientStateSubtitle.Text = waitingForPublicApp
                     ? "Buka aplikasi yang ingin ditampilkan"
-                    : "Gambar terakhir tetap ditampilkan";
+                    : "Tampilan terakhir tidak bergerak";
                 FooterStatusText.Text = waitingForPublicApp
                     ? "Buka aplikasi yang ingin ditampilkan untuk melanjutkan."
-                    : _isAutoHeld ? "Aplikasi tersembunyi tidak terlihat oleh audiens atau masuk rekaman."
-                    : "Gambar terakhir ditahan. Klik Tahan gambar lagi untuk melanjutkan.";
-                SetWindowStatus("Gambar ditahan", FreezeBrush);
+                    : _isAutoHeld ? "Aplikasi yang disembunyikan tidak ikut tampil."
+                    : "Freeze aktif. Klik Freeze lagi untuk melanjutkan.";
+                SetWindowStatus("Freeze aktif", FreezeBrush);
                 break;
             case PresentationState.Privacy:
                 _outputWindow?.SetMode(ClientOutputMode.Privacy);
-                ClientStatusText.Text = "JEDA";
+                ClientStatusText.Text = "PRIVASI";
                 ClientStateOverlay.Visibility = Visibility.Visible;
                 ClientStateIcon.Glyph = "\uE890";
-                ClientStateTitle.Text = "Layar jeda aktif";
-                ClientStateSubtitle.Text = "Gambar diganti dengan pesan jeda";
-                FooterStatusText.Text = "Pesan jeda sedang ditampilkan. Rekaman tetap berjalan. Klik Layar jeda lagi untuk kembali.";
-                SetWindowStatus("Layar jeda aktif", PrivacyBrush);
+                ClientStateTitle.Text = "Privasi aktif";
+                ClientStateSubtitle.Text = "Tampilan disembunyikan sementara";
+                FooterStatusText.Text = "Privasi aktif. Klik Privasi lagi untuk menampilkan layar kembali.";
+                SetWindowStatus("Privasi aktif", PrivacyBrush);
                 break;
             default:
                 ClientStatusText.Text = "SIAP";
@@ -887,10 +904,10 @@ public sealed partial class MainPage : Page
                 ClientStateTitle.Text = "Belum dimulai";
                 ClientStateSubtitle.Text = "Pilih layar atau aplikasi";
                 FooterStatusText.Text = IsRecordingOnly
-                    ? "Pilih layar dan aplikasi yang disembunyikan. Tekan Siapkan layar, lalu Rekam."
+                    ? "Pilih layar → Sembunyikan aplikasi → Buka preview → Rekam."
                     : IsSafeMirrorMode
-                    ? "Pilih layar dan aplikasi yang disembunyikan, lalu tekan Mulai presentasi."
-                    : "Pilih aplikasi dan layar audiens, lalu tekan Mulai presentasi.";
+                    ? "Pilih layar → Sembunyikan aplikasi → Mulai presentasi."
+                    : "Pilih aplikasi dan layar kedua, lalu klik Mulai presentasi.";
                 SetWindowStatus("Siap", MutedBrush);
                 break;
         }

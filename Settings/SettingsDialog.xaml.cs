@@ -85,7 +85,7 @@ public sealed partial class SettingsDialog : ContentDialog
                 ? "Kamera belum ditemukan. Hubungkan webcam USB, lalu klik Perbarui daftar."
                 : CameraDeviceComboBox.SelectedItem is null
                     ? "Kamera yang sebelumnya dipilih belum terhubung. Pilih kamera yang tersedia."
-                    : "Tekan Uji kamera untuk memeriksa gambar sebelum merekam.";
+                    : "Klik Tes kamera untuk melihat gambarnya.";
         }
         catch (Exception exception)
         {
@@ -124,7 +124,7 @@ public sealed partial class SettingsDialog : ContentDialog
             await _previewCamera.StartAsync(device.Id, _previewCancellation.Token);
             if (_closing) return;
             CameraPreviewPlaceholder.Visibility = Visibility.Collapsed;
-            TestCameraButton.Content = "Tutup pratinjau";
+            TestCameraButton.Content = "Stop preview";
             CameraStatusText.Text = CameraEnabledToggle.IsOn
                 ? "Kamera siap. Klik Simpan untuk memakai kamera ini saat merekam."
                 : "Kamera siap. Aktifkan Sertakan kamera dalam rekaman, lalu klik Simpan.";
@@ -188,7 +188,7 @@ public sealed partial class SettingsDialog : ContentDialog
             catch (Exception exception) { System.Diagnostics.Debug.WriteLine($"Camera preview cleanup: {exception.Message}"); }
         }
         CameraPreviewPlaceholder.Visibility = Visibility.Visible;
-        TestCameraButton.Content = "Uji kamera";
+        TestCameraButton.Content = "Tes kamera";
         CameraPreviewCanvas.Invalidate();
     }
 

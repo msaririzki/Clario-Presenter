@@ -22,15 +22,15 @@
                 <ColumnDefinition Width="1*" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Margin="0,0,10,0" Spacing="5">
-                <TextBlock Text="PILIH TAMPILAN" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <TextBlock Text="PILIH LAYAR / APLIKASI" Style="{StaticResource ClarioSectionLabelStyle}" />
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="178" /><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="CaptureModeComboBox" MinHeight="38" SelectedIndex="1" AutomationProperties.Name="Jenis tampilan" SelectionChanged="CaptureModeComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Satu aplikasi" Tag="Window" ToolTipService.ToolTip="Tampilkan atau rekam satu jendela aplikasi yang dipilih." />
-                        <ComboBoxItem Content="Layar terlindungi" Tag="SafeMirror" ToolTipService.ToolTip="Tampilkan atau rekam satu layar sambil menyembunyikan aplikasi tertentu." />
+                    <ComboBox x:Name="CaptureModeComboBox" MinHeight="38" SelectedIndex="1" AutomationProperties.Name="Pilih layar atau aplikasi" SelectionChanged="CaptureModeComboBox_SelectionChanged">
+                        <ComboBoxItem x:Name="WindowModeChoice" Content="Bagikan aplikasi" Tag="Window" ToolTipService.ToolTip="Pilih satu jendela aplikasi." />
+                        <ComboBoxItem x:Name="ScreenModeChoice" Content="Bagikan layar" Tag="SafeMirror" ToolTipService.ToolTip="Pilih satu layar. Aplikasi tertentu bisa disembunyikan." />
                     </ComboBox>
                     <ComboBox x:Name="SourceComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Aplikasi yang ditampilkan" SelectionChanged="SourceComboBox_SelectionChanged" />
-                    <ComboBox x:Name="SourceMonitorComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" Visibility="Collapsed" DisplayMemberPath="DisplayName" AutomationProperties.Name="Layar yang direkam" ToolTipService.ToolTip="Pilih layar yang akan direkam atau ditampilkan kepada audiens." DropDownOpened="DisplayComboBox_DropDownOpened" SelectionChanged="SourceMonitorComboBox_SelectionChanged" />
+                    <ComboBox x:Name="SourceMonitorComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" Visibility="Collapsed" DisplayMemberPath="DisplayName" AutomationProperties.Name="Pilih layar" ToolTipService.ToolTip="Pilih layar yang ingin direkam atau dibagikan." DropDownOpened="DisplayComboBox_DropDownOpened" SelectionChanged="SourceMonitorComboBox_SelectionChanged" />
                     <Button Grid.Column="2" Margin="6,0,0,0" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Perbarui daftar aplikasi" ToolTipService.ToolTip="Perbarui daftar aplikasi yang terbuka" Click="RefreshSources_Click">
                         <FontIcon Glyph="&#xE72C;" FontSize="14" />
                     </Button>
@@ -38,12 +38,12 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="0,0,12,0" Spacing="5">
                 <Grid>
-                    <TextBlock Text="LAYAR AUDIENS" Style="{StaticResource ClarioSectionLabelStyle}" VerticalAlignment="Center" />
-                    <CheckBox x:Name="RecordingOnlyCheckBox" Content="Rekam saja" MinHeight="20" FontSize="11" HorizontalAlignment="Right" Checked="RecordingOnly_Changed" Unchecked="RecordingOnly_Changed" ToolTipService.ToolTip="Simpan video tanpa menampilkan presentasi di layar lain. Layar kedua tetap bebas digunakan." />
+                    <TextBlock Text="LAYAR KEDUA" Style="{StaticResource ClarioSectionLabelStyle}" VerticalAlignment="Center" />
+                    <CheckBox x:Name="RecordingOnlyCheckBox" Content="Rekam saja" MinHeight="20" FontSize="11" HorizontalAlignment="Right" Checked="RecordingOnly_Changed" Unchecked="RecordingOnly_Changed" ToolTipService.ToolTip="Hanya simpan video. Layar kedua tidak dipakai untuk presentasi." />
                 </Grid>
                 <Grid ColumnSpacing="6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="148" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Layar untuk audiens" DropDownOpened="DisplayComboBox_DropDownOpened" />
+                    <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Layar untuk presentasi" DropDownOpened="DisplayComboBox_DropDownOpened" />
                     <ComboBox x:Name="OutputScaleComboBox" Grid.Column="1" MinHeight="38" SelectedIndex="1" AutomationProperties.Name="Ukuran tampilan" ToolTipService.ToolTip="Seluruh layar menampilkan semua bagian gambar tanpa memotong tepinya.">
                         <ComboBoxItem Content="Perbesar" Tag="Adaptive" ToolTipService.ToolTip="Perbesar tampilan agar lebih mudah dibaca. Sebagian tepi gambar dapat terpotong." />
                         <ComboBoxItem Content="Seluruh layar" Tag="Fit" ToolTipService.ToolTip="Tampilkan seluruh gambar tanpa memotong bagian mana pun." />
@@ -52,14 +52,14 @@
                 </Grid>
             </StackPanel>
             <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                <Button x:Name="PrivateAppsButton" Style="{StaticResource ClarioButtonStyle}" AutomationProperties.Name="Pilih aplikasi yang disembunyikan" ToolTipService.ToolTip="Pilih jendela aplikasi yang tidak boleh terlihat oleh audiens atau masuk rekaman. Pilih sebelum memulai sesi." Click="PrivateAppsButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72E;" FontSize="13" /><TextBlock x:Name="PrivateAppsButtonText" Text="Sembunyikan (0)" /></StackPanel>
+                <Button x:Name="PrivateAppsButton" Style="{StaticResource ClarioButtonStyle}" AutomationProperties.Name="Sembunyikan aplikasi" ToolTipService.ToolTip="Centang aplikasi yang tidak boleh masuk rekaman atau tampil di layar kedua. Pilih sebelum mulai." Click="PrivateAppsButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72E;" FontSize="13" /><TextBlock x:Name="PrivateAppsButtonText" Text="Sembunyikan aplikasi (0)" /></StackPanel>
                 </Button>
-                <ToggleButton x:Name="FreezeButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tahan gambar terakhir" ToolTipService.ToolTip="Tahan gambar terakhir saat Anda membuka aplikasi lain. Klik lagi untuk melanjutkan gambar." Click="FreezeButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE768;" FontSize="13" /><TextBlock Text="Tahan gambar" /></StackPanel>
+                <ToggleButton x:Name="FreezeButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Freeze" ToolTipService.ToolTip="Tahan tampilan terakhir. Klik lagi untuk melanjutkan." Click="FreezeButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE768;" FontSize="13" /><TextBlock Text="Freeze" /></StackPanel>
                 </ToggleButton>
-                <ToggleButton x:Name="PrivacyButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tampilkan layar jeda" ToolTipService.ToolTip="Ganti gambar dengan pesan Presentasi dijeda. Rekaman tetap berjalan. Klik lagi untuk kembali." Click="PrivacyButton_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE890;" FontSize="13" /><TextBlock Text="Layar jeda" /></StackPanel>
+                <ToggleButton x:Name="PrivacyButton" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Privasi" ToolTipService.ToolTip="Sembunyikan seluruh tampilan sementara. Rekaman tetap berjalan. Klik lagi untuk kembali." Click="PrivacyButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE890;" FontSize="13" /><TextBlock Text="Privasi" /></StackPanel>
                 </ToggleButton>
                 <ToggleButton x:Name="NotesButton" IsChecked="True" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Tampilkan catatan" Click="NotesButton_Click">
                     <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE70B;" FontSize="13" /><TextBlock Text="Catatan" /></StackPanel>
@@ -67,10 +67,10 @@
                 <Button x:Name="SettingsButton" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Buka pengaturan" Click="SettingsButton_Click" ToolTipService.ToolTip="Pengaturan kamera, kualitas video, dan penyimpanan">
                     <FontIcon Glyph="&#xE713;" FontSize="14" />
                 </Button>
-                <ToggleButton x:Name="RecordButton" MinWidth="112" IsEnabled="False" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Mulai atau akhiri rekaman" Click="RecordButton_Click" ToolTipService.ToolTip="Mulai merekam tampilan yang dipilih. Saat merekam, klik Selesai untuk menyimpan video.">
+                <ToggleButton x:Name="RecordButton" MinWidth="112" IsEnabled="False" Style="{StaticResource ClarioToggleStyle}" AutomationProperties.Name="Rekam atau stop rekaman" Click="RecordButton_Click" ToolTipService.ToolTip="Klik Rekam untuk mulai menyimpan video. Klik Stop rekam untuk menyelesaikan dan menyimpan video.">
                     <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse x:Name="RecordButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="RecordButtonText" Text="Rekam" /></StackPanel>
                 </ToggleButton>
-                <Button x:Name="LiveButton" MinWidth="104" Style="{StaticResource ClarioPrimaryButtonStyle}" AutomationProperties.Name="Mulai atau akhiri sesi" Click="LiveButton_Click" ToolTipService.ToolTip="Mulai menampilkan presentasi atau siapkan layar untuk direkam. Tekan Rekam untuk mulai menyimpan video.">
+                <Button x:Name="LiveButton" MinWidth="104" Style="{StaticResource ClarioPrimaryButtonStyle}" AutomationProperties.Name="Mulai atau stop tampilan" Click="LiveButton_Click" ToolTipService.ToolTip="Buka preview atau mulai presentasi. Video baru disimpan setelah Anda klik Rekam.">
                     <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="LiveButtonDot" Width="7" Height="7" Fill="{StaticResource ClarioPrivacyBrush}" /><TextBlock x:Name="LiveButtonText" Text="Mulai presentasi" /></StackPanel>
                 </Button>
             </StackPanel>
@@ -89,10 +89,10 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock x:Name="ActiveSourceTitle" Text="Pilih layar atau aplikasi" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="ActiveSourceSubtitle" Text="Hanya tampilan yang dipilih yang terlihat oleh audiens dan masuk rekaman" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ActiveSourceSubtitle" Text="Tampilan yang dipilih akan muncul di sini" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <Border Grid.Column="1" Padding="9,4" CornerRadius="12" Background="{StaticResource ClarioLiveSoftBrush}" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6"><Ellipse Width="6" Height="6" Fill="{StaticResource ClarioLiveBrush}" /><TextBlock x:Name="SourcePrivacyBadgeText" Text="SATU APLIKASI" FontSize="10" CharacterSpacing="70" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6"><Ellipse Width="6" Height="6" Fill="{StaticResource ClarioLiveBrush}" /><TextBlock x:Name="SourcePrivacyBadgeText" Text="APLIKASI" FontSize="10" CharacterSpacing="70" Foreground="{StaticResource ClarioLiveBrush}" /></StackPanel>
                         </Border>
                     </Grid>
 
@@ -102,7 +102,7 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="52" /><ColumnDefinition Width="*" /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"><Ellipse Width="7" Height="7" Fill="#505765" /><Ellipse Width="7" Height="7" Fill="#505765" /><Ellipse Width="7" Height="7" Fill="#505765" /></StackPanel>
                             <Border Grid.Column="1" MaxWidth="500" Height="25" Padding="10,0" CornerRadius="6" Background="{StaticResource ClarioSurfaceBrush}" HorizontalAlignment="Stretch">
-                                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"><FontIcon Glyph="&#xE72E;" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock x:Name="BrowserAddressText" Text="Pratinjau tampilan" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"><FontIcon Glyph="&#xE72E;" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /><TextBlock x:Name="BrowserAddressText" Text="Preview tampilan" FontSize="10" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel>
                             </Border>
                             <FontIcon Grid.Column="2" Glyph="&#xE712;" FontSize="13" Foreground="{StaticResource ClarioSecondaryTextBrush}" VerticalAlignment="Center" />
                         </Grid>
@@ -151,7 +151,7 @@
                         <Border Grid.RowSpan="2" Width="214" Height="132" Margin="18" Padding="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="10" Background="{StaticResource ClarioRaisedBrush}" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="1">
                             <Grid>
                                 <Grid.RowDefinitions><RowDefinition Height="25" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                                <Grid><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7F4;" FontSize="11" /><TextBlock x:Name="ClientPreviewLabel" Text="Tampilan audiens" FontSize="10" /></StackPanel><TextBlock x:Name="ClientStatusText" Text="SIAP" HorizontalAlignment="Right" FontSize="9" CharacterSpacing="80" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
+                                <Grid><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7F4;" FontSize="11" /><TextBlock x:Name="ClientPreviewLabel" Text="Layar kedua" FontSize="10" /></StackPanel><TextBlock x:Name="ClientStatusText" Text="SIAP" HorizontalAlignment="Right" FontSize="9" CharacterSpacing="80" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
                                 <Border Grid.Row="1" Background="{StaticResource ClarioCanvasBrush}" CornerRadius="5">
                                     <Grid>
                                         <Grid x:Name="MiniOutputContent" Margin="10">
@@ -159,7 +159,7 @@
                                             <TextBlock x:Name="MiniOutputTitle" Text="Selamat pagi, Andi" FontSize="9" FontWeight="SemiBold" /><Border Grid.Row="1" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" /><Border Grid.Row="2" Width="120" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Left" /><Border Grid.Row="3" Width="80" Margin="0,7,0,0" CornerRadius="2" Background="{StaticResource ClarioAccentSoftBrush}" HorizontalAlignment="Left" />
                                         </Grid>
                                         <Grid x:Name="ClientStateOverlay" Visibility="Collapsed" Background="#E6111419">
-                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="3"><FontIcon x:Name="ClientStateIcon" Glyph="&#xE890;" FontSize="15" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateTitle" Text="Layar jeda aktif" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateSubtitle" Text="Gambar tidak ditampilkan" FontSize="8" Foreground="{StaticResource ClarioSecondaryTextBrush}" HorizontalAlignment="Center" /></StackPanel>
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="3"><FontIcon x:Name="ClientStateIcon" Glyph="&#xE890;" FontSize="15" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateTitle" Text="Privasi aktif" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" /><TextBlock x:Name="ClientStateSubtitle" Text="Tampilan disembunyikan" FontSize="8" Foreground="{StaticResource ClarioSecondaryTextBrush}" HorizontalAlignment="Center" /></StackPanel>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -186,7 +186,7 @@
                     </Border>
                     <Grid Grid.Row="3" Margin="0,15,0,12">
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                        <TextBlock Text="DAFTAR PERIKSA" Style="{StaticResource ClarioSectionLabelStyle}" />
+                        <TextBlock Text="CHECKLIST" Style="{StaticResource ClarioSectionLabelStyle}" />
                         <StackPanel Grid.Row="1" Margin="0,10,0,12" Spacing="9"><CheckBox Content="Jelaskan masalah klien" IsChecked="True" /><CheckBox Content="Demo proses login" IsChecked="True" /><CheckBox Content="Buat laporan baru" /><CheckBox Content="Tunjukkan ekspor PDF" /></StackPanel>
                         <StackPanel Grid.Row="2" Spacing="6"><TextBlock Text="CATATAN BEBAS" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBox x:Name="FreeNotesTextBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Tulis poin yang tidak boleh terlupakan..." /></StackPanel>
                     </Grid>
