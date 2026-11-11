@@ -73,3 +73,34 @@ var scaledCamera = CameraOverlayLayout.GetBounds(960, 540, cameraOptions);
 Check(Math.Abs(scaledCamera.X * 2 - bottomRight.X) < 0.001
     && Math.Abs(scaledCamera.Y * 2 - bottomRight.Y) < 0.001, "Camera placement scales consistently with the output.");
 Console.WriteLine($"PASS: {checks} desktop and camera composition checks.");
+var publicScene = DesktopWindowPlan.Select(new[]
+{
+    new DesktopWindowCandidate(1, new(0, 0, 800, 1040)),
+    new DesktopWindowCandidate(2, new(800, 0, 1120, 1040)),
+    new DesktopWindowCandidate(3, new(0, 0, 1920, 1040)),
+    new DesktopWindowCandidate(4, new(2000, 0, 640, 480))
+}, new(0, 0, 1920, 1040));
+Check(publicScene.Select(window => window.Handle).SequenceEqual(new nint[] { 3, 2, 1 }),
+    "Public apps preserve desktop z-order and windows on monitor 2 are excluded.");
+var covered = DesktopWindowPlan.Select(new[]
+{
+    new DesktopWindowCandidate(1, new(0, 0, 1920, 1040)),
+    new DesktopWindowCandidate(2, new(300, 200, 640, 480))
+}, new(0, 0, 1920, 1040));
+Check(covered.Count == 1 && covered[0].Handle == 1, "Fully covered public windows do not create unnecessary GPU captures.");
+var secondMonitorScene = DesktopWindowPlan.Select(new[]
+{
+    new DesktopWindowCandidate(1, new(0, 0, 1920, 1040)),
+    new DesktopWindowCandidate(2, new(-1920, 0, 1920, 1040))
+}, new(-1920, 0, 1920, 1040));
+Check(secondMonitorScene.Count == 1 && secondMonitorScene[0].Handle == 2,
+    "Choosing the left/second monitor does not leak the primary monitor into the recording.");
+Check(DesktopWindowPlan.Intersects(new(1900, 200, 100, 400), new(0, 0, 1920, 1080)),
+    "Private windows spanning monitor edges protect the recorded part.");
+Check(!DesktopWindowPlan.Intersects(new(1920, 0, 100, 400), new(0, 0, 1920, 1080)),
+    "A window wholly on monitor 2 does not pause monitor 1.");
+var boundedScene = DesktopWindowPlan.Select(Enumerable.Range(1, 20)
+    .Select(index => new DesktopWindowCandidate(index, new(index * 10, index * 10, 200, 200))),
+    new(0, 0, 1920, 1040));
+Check(boundedScene.Count == 8, "Many open apps do not allocate unlimited active capture layers.");
+Console.WriteLine($"PASS: {checks} total composition and monitor-isolation checks.");

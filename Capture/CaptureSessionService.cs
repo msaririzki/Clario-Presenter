@@ -22,10 +22,17 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     private CanvasRenderTarget? _taskbarBackBuffer;
     private DesktopCompositionLayout? _desktopLayout;
     private PublicWindowLayer[] _publicLayers = [];
-    private SizeInt32 _bufferSize;
+    private PublicWindowLayer[] _requestedLayers = [];
+    private readonly Dictionary<nint, PublicWindowLayer> _layerCache = [];
+    private SizeInt32 _frontBufferSize;
+    private SizeInt32 _backBufferSize;
     private SizeInt32 _lastSize;
     private volatile bool _isFrozen;
+    private volatile bool _desktopProtected;
+    public bool IsDesktopProtected { get => _desktopProtected; set => _desktopProtected = value; }
     private bool _disposed;
+    public int PublicCaptureStartCount { get; private set; }
+    public int PreparedWindowCount => _layerCache.Count;
 
     public event EventHandler? FrameAvailable;
     public event EventHandler? SourceClosed;
@@ -55,34 +62,53 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
             _isFrozen = value;
             lock (_frameLock)
             {
-                foreach (var layer in _publicLayers) layer.Capture.IsFrozen = value;
+                foreach (var layer in _layerCache.Values) layer.Capture.IsFrozen = value;
             }
         }
     }
 
-    public void ConfigureDesktop(DisplayBounds bounds, DisplayBounds workArea) =>
+    public void ConfigureDesktop(DisplayBounds bounds, DisplayBounds workArea)
+    {
         _desktopLayout = new DesktopCompositionLayout(bounds, workArea);
+        var safeBackground = new CanvasRenderTarget(_canvasDevice, bounds.Width, bounds.Height, 96);
+        using (var session = safeBackground.CreateDrawingSession())
+            session.Clear(Windows.UI.Color.FromArgb(255, 14, 17, 22));
+        CanvasRenderTarget? previous;
+        lock (_frameLock)
+        {
+            previous = _frontBuffer;
+            _frontBuffer = safeBackground;
+            _frontBufferSize = new SizeInt32(bounds.Width, bounds.Height);
+        }
+        previous?.Dispose();
+    }
 
-    public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles)
+    public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles, bool retainSceneIfEmpty = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_desktopLayout is null) throw new InvalidOperationException("Layout desktop belum disiapkan.");
 
-        PublicWindowLayer[] previousLayers;
-        lock (_frameLock) previousLayers = _publicLayers;
         var nextLayers = new List<PublicWindowLayer>();
         foreach (var handle in windowHandles)
         {
             if (!WindowCatalogService.TryGetCaptureBounds(handle, out var bounds)) continue;
-            var layer = previousLayers.FirstOrDefault(item => item.Handle == handle);
+            _layerCache.TryGetValue(handle, out var layer);
+            if (layer is { Faulted: true })
+            {
+                _layerCache.Remove(handle);
+                DisposeLayer(layer);
+                layer = null;
+            }
             if (layer is null)
             {
                 layer = new PublicWindowLayer(handle, bounds);
                 layer.Capture.FrameAvailable += PublicLayer_FrameAvailable;
                 try
                 {
-                    layer.Capture.Start(handle);
+                    layer.Capture.Start(handle, captureCursor: false);
                     layer.Capture.IsFrozen = _isFrozen;
+                    PublicCaptureStartCount++;
+                    _layerCache[handle] = layer;
                 }
                 catch
                 {
@@ -92,16 +118,44 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                 }
             }
             lock (_frameLock) layer.Bounds = bounds;
+            layer.LastRequestedTick = Environment.TickCount64;
             nextLayers.Add(layer);
         }
 
-        lock (_frameLock) _publicLayers = nextLayers.ToArray();
-        foreach (var layer in previousLayers.Except(nextLayers))
+        lock (_frameLock)
         {
-            layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
-            layer.Capture.Dispose();
+            _requestedLayers = nextLayers.ToArray();
+            if (_requestedLayers.Length == 0 && !retainSceneIfEmpty) _publicLayers = [];
+            PublishReadyLayers();
         }
-        return nextLayers.Any(layer => !layer.Faulted);
+        // Keep recently used app captures warm through Alt+Tab/private detours.
+        // Release old inactive captures to bound GPU memory usage.
+        PublicWindowLayer[] active;
+        lock (_frameLock) active = _publicLayers;
+        var removable = _layerCache.Values.Where(layer => !nextLayers.Contains(layer)
+            && !active.Contains(layer)).OrderBy(layer => layer.LastRequestedTick).ToArray();
+        foreach (var layer in removable)
+        {
+            if (_layerCache.Count <= 12 && Environment.TickCount64 - layer.LastRequestedTick < 3000) continue;
+            _layerCache.Remove(layer.Handle);
+            DisposeLayer(layer);
+        }
+        return active.Any(layer => !layer.Faulted && layer.Capture.HasFrame);
+    }
+
+    private void PublishReadyLayers()
+    {
+        // Do not replace the current scene by an empty/partially initialized
+        // capture. Publish the next scene after every new window has a real frame.
+        if (!_isFrozen && _requestedLayers.Length > 0
+            && _requestedLayers.All(layer => layer.Faulted || layer.Capture.HasFrame))
+            _publicLayers = _requestedLayers.Where(layer => !layer.Faulted).ToArray();
+    }
+
+    private void DisposeLayer(PublicWindowLayer layer)
+    {
+        layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
+        layer.Capture.Dispose();
     }
 
     public void ClearProtectedWindows()
@@ -109,26 +163,30 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         PublicWindowLayer[] layers;
         lock (_frameLock)
         {
-            layers = _publicLayers;
+            layers = _layerCache.Values.ToArray();
             _publicLayers = [];
+            _requestedLayers = [];
+            _layerCache.Clear();
         }
         foreach (var layer in layers)
         {
-            layer.Capture.FrameAvailable -= PublicLayer_FrameAvailable;
-            layer.Capture.Dispose();
+            DisposeLayer(layer);
         }
     }
 
-    private void PublicLayer_FrameAvailable(object? sender, EventArgs args) =>
+    private void PublicLayer_FrameAvailable(object? sender, EventArgs args)
+    {
+        lock (_frameLock) PublishReadyLayers();
         FrameAvailable?.Invoke(this, EventArgs.Empty);
+    }
 
-    public void Start(nint windowHandle, bool keepLastFrame = false) =>
-        StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle), keepLastFrame);
+    public void Start(nint windowHandle, bool keepLastFrame = false, bool captureCursor = true) =>
+        StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle), keepLastFrame, captureCursor);
 
     public void StartMonitor(nint monitorHandle, bool keepLastFrame = false) =>
-        StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle), keepLastFrame);
+        StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle), keepLastFrame, captureCursor: true);
 
-    private void StartItem(GraphicsCaptureItem captureItem, bool keepLastFrame)
+    private void StartItem(GraphicsCaptureItem captureItem, bool keepLastFrame, bool captureCursor)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         StopCaptureObjects(keepLastFrame);
@@ -150,7 +208,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
             _lastSize);
         _framePool.FrameArrived += FramePool_FrameArrived;
         _session = _framePool.CreateCaptureSession(_item);
-        _session.IsCursorCaptureEnabled = true;
+        _session.IsCursorCaptureEnabled = captureCursor;
         _session.StartCapture();
     }
 
@@ -200,7 +258,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
 
             if (_desktopLayout is not null)
             {
-                foreach (var layer in _publicLayers)
+                foreach (var layer in IsDesktopProtected ? _publicLayers : [])
                 {
                     if (!layer.Faulted)
                         layer.Capture.DrawPlacedWindow(drawingSession, layer.Bounds, _desktopLayout,
@@ -278,7 +336,13 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                     if (nextSize.Width <= 0 || nextSize.Height <= 0) return;
 
                     sizeChanged = nextSize.Width != _lastSize.Width || nextSize.Height != _lastSize.Height;
-                    if (!_isFrozen && !(FrameHoldPredicate?.Invoke() ?? false))
+                    var holdFrame = FrameHoldPredicate?.Invoke() ?? false;
+                    if (_desktopLayout is not null && !_isFrozen && IsDesktopProtected != holdFrame)
+                    {
+                        IsDesktopProtected = holdFrame;
+                        frameReady = true;
+                    }
+                    if (!_isFrozen && !holdFrame)
                     {
                         var writeTarget = GetWriteTarget(nextSize);
                         using var capturedSurface = CanvasBitmap.CreateFromDirect3D11Surface(_canvasDevice, frame.Surface);
@@ -293,6 +357,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                         lock (_frameLock)
                         {
                             (_frontBuffer, _backBuffer) = (_backBuffer, _frontBuffer);
+                            (_frontBufferSize, _backBufferSize) = (_backBufferSize, _frontBufferSize);
                         }
 
                         frameReady = true;
@@ -349,10 +414,9 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     {
         lock (_frameLock)
         {
-            if (_frontBuffer is not null
-                && _backBuffer is not null
-                && _bufferSize.Width == size.Width
-                && _bufferSize.Height == size.Height)
+            if (_backBuffer is not null
+                && _backBufferSize.Width == size.Width
+                && _backBufferSize.Height == size.Height)
             {
                 return _backBuffer;
             }
@@ -360,21 +424,16 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
 
         // Resource creation can wait on Win2D's device lock. Keep it outside
         // _frameLock so the XAML draw callback never participates in a lock inversion.
-        var newFront = new CanvasRenderTarget(_canvasDevice, size.Width, size.Height, 96);
         var newBack = new CanvasRenderTarget(_canvasDevice, size.Width, size.Height, 96);
-        CanvasRenderTarget? oldFront;
         CanvasRenderTarget? oldBack;
 
         lock (_frameLock)
         {
-            oldFront = _frontBuffer;
             oldBack = _backBuffer;
-            _frontBuffer = newFront;
             _backBuffer = newBack;
-            _bufferSize = size;
+            _backBufferSize = size;
         }
 
-        oldFront?.Dispose();
         oldBack?.Dispose();
         return newBack;
     }
@@ -406,7 +465,8 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                     _backBuffer = null;
                     _taskbarFrontBuffer = null;
                     _taskbarBackBuffer = null;
-                    _bufferSize = default;
+                    _frontBufferSize = default;
+                    _backBufferSize = default;
                 }
                 // Releasing a Win2D resource may acquire its device lock. Never
                 // do that while holding a frame lock needed by the recorder.
@@ -434,6 +494,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         public DisplayBounds Bounds { get; set; }
         public CaptureSessionService Capture { get; } = new();
         public bool Faulted { get; private set; }
+        public long LastRequestedTick { get; set; }
 
         public PublicWindowLayer(nint handle, DisplayBounds bounds)
         {

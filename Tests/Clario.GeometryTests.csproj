@@ -9,6 +9,7 @@
     <Compile Remove="CameraSmoke\**\*.cs" />
     <Compile Include="..\Camera\CameraOverlayLayout.cs" Link="CameraOverlayLayout.cs" />
     <Compile Include="..\Capture\DesktopCompositionLayout.cs" Link="DesktopCompositionLayout.cs" />
+    <Compile Include="..\Capture\DesktopWindowPlan.cs" Link="DesktopWindowPlan.cs" />
     <Compile Include="..\Services\DisplayCatalogService.cs" Link="DisplayCatalogService.cs" />
     <Compile Include="..\Services\WindowCatalogService.cs" Link="WindowCatalogService.cs" />
   </ItemGroup>

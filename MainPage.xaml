@@ -25,18 +25,22 @@
                 <TextBlock Text="MODE &amp; SUMBER" Style="{StaticResource ClarioSectionLabelStyle}" />
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="178" /><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="CaptureModeComboBox" MinHeight="38" SelectedIndex="0" AutomationProperties.Name="Mode presentasi" SelectionChanged="CaptureModeComboBox_SelectionChanged">
+                    <ComboBox x:Name="CaptureModeComboBox" MinHeight="38" SelectedIndex="1" AutomationProperties.Name="Mode presentasi" SelectionChanged="CaptureModeComboBox_SelectionChanged">
                         <ComboBoxItem Content="Aplikasi tunggal" Tag="Window" />
                         <ComboBoxItem Content="Mirror Aman" Tag="SafeMirror" />
                     </ComboBox>
                     <ComboBox x:Name="SourceComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Jendela sumber" SelectionChanged="SourceComboBox_SelectionChanged" />
+                    <ComboBox x:Name="SourceMonitorComboBox" Grid.Column="1" Margin="6,0,0,0" MinHeight="38" HorizontalAlignment="Stretch" Visibility="Collapsed" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor yang direkam" DropDownOpened="DisplayComboBox_DropDownOpened" SelectionChanged="SourceMonitorComboBox_SelectionChanged" />
                     <Button Grid.Column="2" Margin="6,0,0,0" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Muat ulang daftar jendela" ToolTipService.ToolTip="Muat ulang daftar jendela" Click="RefreshSources_Click">
                         <FontIcon Glyph="&#xE72C;" FontSize="14" />
                     </Button>
                 </Grid>
             </StackPanel>
             <StackPanel Grid.Column="1" Margin="0,0,12,0" Spacing="5">
-                <TextBlock Text="OUTPUT KLIEN" Style="{StaticResource ClarioSectionLabelStyle}" />
+                <Grid>
+                    <TextBlock Text="OUTPUT" Style="{StaticResource ClarioSectionLabelStyle}" VerticalAlignment="Center" />
+                    <CheckBox x:Name="RecordingOnlyCheckBox" Content="Rekam saja" MinHeight="20" FontSize="11" HorizontalAlignment="Right" Checked="RecordingOnly_Changed" Unchecked="RecordingOnly_Changed" ToolTipService.ToolTip="Rekam monitor sumber tanpa membuka output atau memindahkan aplikasi di monitor kedua" />
+                </Grid>
                 <Grid ColumnSpacing="6">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="148" /></Grid.ColumnDefinitions>
                     <ComboBox x:Name="DisplayComboBox" MinHeight="38" HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" AutomationProperties.Name="Monitor output" DropDownOpened="DisplayComboBox_DropDownOpened" />
@@ -147,7 +151,7 @@
                         <Border Grid.RowSpan="2" Width="214" Height="132" Margin="18" Padding="8" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="10" Background="{StaticResource ClarioRaisedBrush}" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="1">
                             <Grid>
                                 <Grid.RowDefinitions><RowDefinition Height="25" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                                <Grid><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7F4;" FontSize="11" /><TextBlock Text="Yang dilihat klien" FontSize="10" /></StackPanel><TextBlock x:Name="ClientStatusText" Text="SIAP" HorizontalAlignment="Right" FontSize="9" CharacterSpacing="80" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
+                                <Grid><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE7F4;" FontSize="11" /><TextBlock x:Name="ClientPreviewLabel" Text="Yang dilihat klien" FontSize="10" /></StackPanel><TextBlock x:Name="ClientStatusText" Text="SIAP" HorizontalAlignment="Right" FontSize="9" CharacterSpacing="80" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></Grid>
                                 <Border Grid.Row="1" Background="{StaticResource ClarioCanvasBrush}" CornerRadius="5">
                                     <Grid>
                                         <Grid x:Name="MiniOutputContent" Margin="10">

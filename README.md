@@ -9,12 +9,16 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - enumerasi jendela aplikasi yang sedang terbuka;
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
-- mode **Mirror Aman** untuk mencerminkan seluruh monitor utama;
+- mode **Mirror Aman** untuk merekam/mencerminkan satu monitor sumber yang dipilih, termasuk monitor kedua;
+- opsi **Rekam saja** menyiapkan sumber rekaman tanpa membuka output fullscreen atau memindahkan aplikasi pada monitor lain;
 - mode default `Seluruh layar` mempertahankan desktop utuh tanpa crop; Mirror Aman selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi privat;
 - pilihan `Adaptif nyaman` pada mode aplikasi tunggal memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
 - mode `Seluruh layar` menampilkan semua area tanpa crop dan mode `Isi layar (crop)` memenuhi monitor semaksimal mungkin;
 - pemilih jendela privat per aplikasi;
 - Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
+- capture jendela publik disiapkan sebelum membuka aplikasi privat dan digunakan kembali selama perpindahan; adegan lama baru diganti setelah seluruh jendela baru mengirim frame nyata;
+- snapshot desktop menahan transisi Alt+Tab/preview taskbar; perpindahan ke aplikasi privat tidak mengganti rekaman dengan layar jeda dan tidak mengubah dimensi output;
+- jendela di monitor lain disaring dari komposisi, dan jendela publik yang tertutup penuh tidak membutuhkan capture aktif tambahan;
 - jendela publik dan dialog perangkat dari proses yang sama disusun sesuai urutan desktop, termasuk dialog Cisco Packet Tracer yang tidak memiliki Win32 owner;
 - taskbar aman disimpan terpisah dan selalu digambar di posisi tetap di atas jendela publik;
 - jika jendela publik sempat diminimalkan, Clario memulihkannya tanpa mengambil fokus agar video tetap mengirim frame di belakang aplikasi privat;
@@ -64,10 +68,22 @@ Untuk mode biasa, pilih jendela sumber dan monitor klien, kemudian tekan **Mulai
 Untuk **Mirror Aman**:
 
 1. Pilih `Mirror Aman` pada mode presentasi.
-2. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat.
-3. Tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
-4. Ketika Clario/jendela privat dibuka, Clario memperbarui jendela publik di atas desktop aman terakhir. Ukuran desktop, posisi dialog, dan taskbar tetap sama.
-5. Aplikasi privat boleh tetap terbuka di samping Cisco/Canva/web pada laptop; output klien hanya memperbarui jendela publik. Minimalkan atau tutup aplikasi privat untuk kembali ke mirror desktop langsung.
+2. Pilih monitor yang akan direkam pada pemilih sumber di sebelah mode. Monitor ini berbeda dari monitor output.
+3. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat. Daftar privat dikunci selama sesi; pilih sebelum memulai.
+4. Untuk presentasi, pilih monitor output yang berbeda lalu tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
+5. Ketika Clario/jendela privat dibuka, Clario memperbarui jendela publik di atas desktop aman terakhir. Ukuran desktop, posisi dialog, dan taskbar tetap sama; capture publik tidak dimulai ulang.
+6. Aplikasi privat boleh tetap terbuka di samping Cisco/Canva/web pada laptop; output klien hanya memperbarui jendela publik. Minimalkan atau tutup aplikasi privat untuk kembali ke mirror desktop langsung.
+
+### Merekam satu dari dua monitor sambil membuka aplikasi privat
+
+1. Pilih `Mirror Aman`, lalu pilih **monitor sumber** yang ingin direkam.
+2. Centang **Rekam saja**. Monitor lainnya tetap dapat dipakai untuk catatan/kontrol tanpa dijadikan output fullscreen.
+3. Pilih aplikasi yang disembunyikan lewat **Privat**, lalu tekan **Siapkan rekaman**.
+4. Aktifkan aplikasi publik yang akan direkam. Tekan **Rekam** setelah preview bersih sudah sesuai.
+5. Berpindahlah antar aplikasi publik dan privat seperti biasa. Aplikasi publik yang tersedia terus diperbarui; membuka aplikasi privat tidak mengaktifkan tombol Privacy dan tidak mengganti video dengan layar jeda.
+6. Tekan **REC** untuk menyimpan MP4, lalu **Stop** untuk mengakhiri sesi.
+
+Tombol **Privacy** tetap merupakan tindakan manual yang sengaja menampilkan layar jeda. Saat hanya ingin membuka catatan tersembunyi, cukup pilih catatan itu sebagai **Privat** sebelum sesi. Biarkan aplikasi publik tetap terbuka; sebagian aplikasi/driver Windows berhenti mengirim frame saat diminimalkan atau ditutup, sehingga frame terakhir dipertahankan jika tidak ada pembaruan. Clario mencoba memulihkan aplikasi publik terakhir yang diminimalkan tanpa mengambil fokus. Komposisi menyimpan hingga delapan jendela publik aktif dan mempertahankan cache singkat untuk mengurangi beban GPU.
 
 Mirror Aman selalu menggunakan `Seluruh layar` tanpa zoom/crop agar perubahan ke Live Terlindungi tidak mengubah tata letak. Untuk mode aplikasi tunggal, `Adaptif nyaman` dan `Isi layar (crop)` tetap tersedia jika pembesaran lebih penting daripada tepi sumber. Monitor dengan rasio berbeda memakai letterbox, bukan memotong isi. Jika monitor menyediakan data raw DPI, ukuran perkiraannya tampil di pemilih monitor. Privasi dipilih per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu dipresentasikan.
 
@@ -118,6 +134,7 @@ Clario.Presenter
 ├── Capture
 │   ├── CaptureSessionService.cs     frame pool, freeze, dan rendering
 │   ├── DesktopCompositionLayout.cs  geometri desktop, posisi jendela, dan taskbar
+│   ├── DesktopWindowPlan.cs         pemilihan jendela pada monitor sumber dan urutan layer
 │   └── GraphicsCaptureItemFactory.cs interop capture berdasarkan HWND
 ├── Recording
 │   └── OutputRecordingService.cs    buffer frame stabil dan encoder MP4
@@ -152,6 +169,8 @@ Invoke-CommandInDesktopPackage -PackageFamilyName '237E57D9-2488-4F07-B595-A20D0
 ```
 
 Sesuaikan path repository. Laporan tersimpan di `%TEMP%\Clario-CameraSmoke.json`; lokasi MP4 uji dicantumkan di laporan. Kamera virtual/eksternal perlu diuji ulang setelah drivernya tersedia.
+
+Tambahkan `--desktop-only` pada argumen harness untuk uji perpindahan publik/privat tanpa menyalakan kamera. Uji ini membuat jendela pola sementara, melakukan sepuluh perpindahan, memeriksa frame privat/blank dan pembaruan aplikasi publik, serta memastikan dua capture publik tidak dimulai ulang. Contoh `-Args '--desktop-only C:\Users\msari\AppData\Local\Temp\Clario-DesktopSwitch.json'`.
 
 ## Pengembangan berikutnya
 

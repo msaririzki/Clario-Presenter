@@ -17,7 +17,8 @@ internal static class Program
     private static void Main(string[] args)
     {
         WinRT.ComWrappersSupport.InitializeComWrappers();
-        var reportPath = args.FirstOrDefault() ?? Path.Combine(Path.GetTempPath(), "Clario-CameraSmoke.json");
+        var reportPath = args.FirstOrDefault(arg => !arg.StartsWith("--"))
+            ?? Path.Combine(Path.GetTempPath(), "Clario-CameraSmoke.json");
         try
         {
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -26,7 +27,8 @@ internal static class Program
             {
                 SynchronizationContext.SetSynchronizationContext(
                     new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-                await RunChecksAsync(reportPath);
+                if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
+                else await RunChecksAsync(reportPath);
                 completion.TrySetResult();
             });
             completion.Task.GetAwaiter().GetResult();

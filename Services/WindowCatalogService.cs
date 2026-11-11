@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Clario_Presenter.Capture;
 
 namespace Clario_Presenter.Services;
 
@@ -82,6 +83,48 @@ public static class WindowCatalogService
     }
 
     public static nint GetForegroundWindowHandle() => GetForegroundWindow();
+
+    public static bool IsApplicationSwitcherActive() => GetAsyncKeyState(0x12) < 0
+        || GetAsyncKeyState(0x5B) < 0 || GetAsyncKeyState(0x5C) < 0
+        || IsWindowVisible(FindWindow("TaskListThumbnailWnd", null))
+        || IsWindowVisible(FindWindow("MultitaskingViewFrame", null))
+        || IsShellOverlay(GetForegroundWindow());
+
+    public static IReadOnlyList<nint> GetPublicDesktopWindows(DisplayBounds workArea, IEnumerable<nint> privateWindows)
+    {
+        var candidates = new List<DesktopWindowCandidate>();
+        EnumWindows((handle, _) =>
+        {
+            if (IsWindowCapturable(handle) && !IsShellOverlay(handle)
+                && !IsInWindowFamily(handle, privateWindows)
+                && TryGetCaptureBounds(handle, out var bounds))
+                candidates.Add(new DesktopWindowCandidate(handle, bounds));
+            return true;
+        }, nint.Zero);
+        return DesktopWindowPlan.Select(candidates, workArea).Select(window => window.Handle).ToArray();
+    }
+
+    public static bool HasPrivateWindowOnDisplay(DisplayBounds bounds, IEnumerable<nint> privateWindows)
+    {
+        var found = false;
+        EnumWindows((handle, _) =>
+        {
+            if (IsWindowPresentable(handle) && IsInWindowFamily(handle, privateWindows)
+                && TryGetCaptureBounds(handle, out var windowBounds)
+                && DesktopWindowPlan.Intersects(bounds, windowBounds)) found = true;
+            return !found;
+        }, nint.Zero);
+        return found;
+    }
+
+    private static bool IsShellOverlay(nint handle)
+    {
+        var className = new StringBuilder(256);
+        GetClassName(handle, className, className.Capacity);
+        return className.ToString() is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd" or "Progman"
+            or "WorkerW" or "MultitaskingViewFrame" or "XamlExplorerHostIslandWindow"
+            or "Windows.UI.Core.CoreWindow" or "TaskListThumbnailWnd" or "TaskListOverlayWnd";
+    }
 
     public static nint GetRootOwner(nint handle) => GetAncestor(handle, 3);
 
@@ -184,7 +227,8 @@ public static class WindowCatalogService
     }
 
     public static bool IsWindowPresentable(nint handle) =>
-        IsWindow(handle) && IsWindowVisible(handle) && !IsIconic(handle);
+        IsWindow(handle) && IsWindowVisible(handle) && !IsIconic(handle)
+        && (DwmGetWindowAttributeValue(handle, 14, out var cloaked, sizeof(int)) < 0 || cloaked == 0);
 
     public static bool IsWindowCapturable(nint handle)
     {
@@ -242,6 +286,14 @@ public static class WindowCatalogService
     private static extern nint GetAncestor(nint hWnd, uint flags);
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(nint hWnd, uint attribute, out Rect rect, int size);
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")]
+    private static extern int DwmGetWindowAttributeValue(nint hWnd, uint attribute, out int value, int size);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint hWnd, StringBuilder className, int maxCount);
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindow(string className, string? windowName);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
