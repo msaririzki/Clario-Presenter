@@ -1,6 +1,6 @@
 # Clario Presenter
 
-Clario Presenter adalah aplikasi Windows untuk mempresentasikan satu jendela atau mencerminkan monitor utama ke monitor klien, sementara catatan, checklist, dan kontrol presentasi tetap privat di laptop presenter.
+Clario Presenter adalah aplikasi Windows untuk menampilkan dan merekam satu layar atau aplikasi, sambil menyembunyikan jendela tertentu. Catatan dan kontrol presentasi hanya terlihat oleh presenter.
 
 ## Status saat ini
 
@@ -9,11 +9,11 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - enumerasi jendela aplikasi yang sedang terbuka;
 - deteksi monitor utama dan monitor eksternal;
 - capture jendela nyata melalui `Windows.Graphics.Capture`;
-- mode **Mirror Aman** untuk merekam/mencerminkan satu monitor sumber yang dipilih, termasuk monitor kedua;
+- mode **Layar terlindungi** untuk merekam/menampilkan satu layar yang dipilih, termasuk layar kedua;
 - opsi **Rekam saja** menyiapkan sumber rekaman tanpa membuka output fullscreen atau memindahkan aplikasi pada monitor lain;
-- mode default `Seluruh layar` mempertahankan desktop utuh tanpa crop; Mirror Aman selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi privat;
-- pilihan `Adaptif nyaman` pada mode aplikasi tunggal memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
-- mode `Seluruh layar` menampilkan semua area tanpa crop dan mode `Isi layar (crop)` memenuhi monitor semaksimal mungkin;
+- mode default `Seluruh layar` mempertahankan desktop utuh tanpa memotong gambar; Layar terlindungi selalu memakai mode ini agar tepi layar dan taskbar tidak berubah saat membuka aplikasi tersembunyi;
+- pilihan `Perbesar` pada mode Satu aplikasi memperhitungkan resolusi, skala Windows, dan perkiraan ukuran fisik monitor dari raw DPI, lalu memberi zoom ringan;
+- mode `Seluruh layar` menampilkan semua area tanpa memotong gambar dan mode `Penuhi layar` memenuhi layar tujuan;
 - pemilih jendela privat per aplikasi;
 - Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
 - capture jendela publik disiapkan sebelum membuka aplikasi privat dan digunakan kembali selama perpindahan; adegan lama baru diganti setelah seluruh jendela baru mengirim frame nyata;
@@ -36,11 +36,11 @@ Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
 - buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
 - backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
 - rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
-- menu Settings untuk frame rate, bitrate, folder rekaman, dan opsi `Save As` setiap mulai merekam;
+- menu Pengaturan untuk kelancaran video, kualitas video, folder rekaman, dan pilihan lokasi setiap kali merekam;
 - penyimpanan otomatis yang rapi ke `Videos\Clario Presenter` dengan nama file bertimestamp;
-- state Ready, Live, Freeze, dan Privacy;
-- Freeze menahan frame terakhir tanpa menghentikan kontrol presenter;
-- Privacy mengganti output klien dengan layar jeda yang netral;
+- status Siap, Aktif, Gambar ditahan, dan Layar jeda;
+- Tahan gambar mempertahankan gambar terakhir tanpa menghentikan kontrol presenter;
+- Layar jeda mengganti tampilan audiens dengan pesan jeda yang netral;
 - fallback aman otomatis ketika jendela sumber ditutup;
 - render event-driven mengikuti kedatangan frame, tanpa polling 30 FPS;
 - reusable double buffer GPU dan pembuangan frame antrean yang sudah usang untuk menjaga latency rendah;
@@ -63,41 +63,41 @@ dotnet build -p:Platform=x64
 dotnet run --no-build -p:Platform=x64
 ```
 
-Untuk mode biasa, pilih jendela sumber dan monitor klien, kemudian tekan **Mulai Live**. Jendela sumber perlu tetap terbuka dan tidak diminimalkan; Windows tidak mengirim frame baru dari sebagian aplikasi yang sedang diminimalkan.
+Untuk mode **Satu aplikasi**, pilih jendela aplikasi dan layar audiens, kemudian tekan **Mulai presentasi**. Aplikasi perlu tetap terbuka dan tidak diminimalkan; Windows tidak mengirim gambar baru dari sebagian aplikasi yang sedang diminimalkan.
 
-Untuk **Mirror Aman**:
+Untuk **Layar terlindungi**:
 
-1. Pilih `Mirror Aman` pada mode presentasi.
-2. Pilih monitor yang akan direkam pada pemilih sumber di sebelah mode. Monitor ini berbeda dari monitor output.
-3. Tekan `Privat` dan centang PDF atau jendela catatan yang tidak boleh terlihat. Daftar privat dikunci selama sesi; pilih sebelum memulai.
-4. Untuk presentasi, pilih monitor output yang berbeda lalu tekan `Mulai Live`. Clario dan jendela privat yang sedang terbuka otomatis diminimalkan, lalu aplikasi publik langsung diteruskan.
+1. Pilih `Layar terlindungi` pada jenis tampilan.
+2. Pilih layar yang akan direkam di sebelahnya. Layar ini berbeda dari layar audiens.
+3. Tekan `Sembunyikan` dan centang PDF atau jendela catatan yang tidak boleh terlihat. Pilih sebelum memulai; daftar ini dikunci selama sesi.
+4. Untuk presentasi, pilih layar audiens yang berbeda lalu tekan `Mulai presentasi`. Clario dan aplikasi yang disembunyikan otomatis diminimalkan, lalu aplikasi lainnya ditampilkan.
 5. Ketika Clario/jendela privat dibuka, Clario memperbarui jendela publik di atas desktop aman terakhir. Ukuran desktop, posisi dialog, dan taskbar tetap sama; capture publik tidak dimulai ulang.
 6. Aplikasi privat boleh tetap terbuka di samping Cisco/Canva/web pada laptop; output klien hanya memperbarui jendela publik. Minimalkan atau tutup aplikasi privat untuk kembali ke mirror desktop langsung.
 
 ### Merekam satu dari dua monitor sambil membuka aplikasi privat
 
-1. Pilih `Mirror Aman`, lalu pilih **monitor sumber** yang ingin direkam.
+1. Pilih `Layar terlindungi`, lalu pilih **layar yang direkam**.
 2. Centang **Rekam saja**. Monitor lainnya tetap dapat dipakai untuk catatan/kontrol tanpa dijadikan output fullscreen.
-3. Pilih aplikasi yang disembunyikan lewat **Privat**, lalu tekan **Siapkan rekaman**.
-4. Aktifkan aplikasi publik yang akan direkam. Tekan **Rekam** setelah preview bersih sudah sesuai.
-5. Berpindahlah antar aplikasi publik dan privat seperti biasa. Aplikasi publik yang tersedia terus diperbarui; membuka aplikasi privat tidak mengaktifkan tombol Privacy dan tidak mengganti video dengan layar jeda.
-6. Tekan **REC** untuk menyimpan MP4, lalu **Stop** untuk mengakhiri sesi.
+3. Pilih aplikasi lewat **Sembunyikan**, lalu tekan **Siapkan layar**.
+4. Buka aplikasi yang akan direkam. Tekan **Rekam** setelah pratinjau sudah sesuai.
+5. Berpindahlah antar aplikasi seperti biasa. Aplikasi yang tidak disembunyikan terus diperbarui; membuka aplikasi tersembunyi tidak mengganti video dengan layar jeda.
+6. Tekan **Selesai** untuk menyimpan video, lalu **Akhiri sesi**.
 
-Tombol **Privacy** tetap merupakan tindakan manual yang sengaja menampilkan layar jeda. Saat hanya ingin membuka catatan tersembunyi, cukup pilih catatan itu sebagai **Privat** sebelum sesi. Biarkan aplikasi publik tetap terbuka; sebagian aplikasi/driver Windows berhenti mengirim frame saat diminimalkan atau ditutup, sehingga frame terakhir dipertahankan jika tidak ada pembaruan. Clario mencoba memulihkan aplikasi publik terakhir yang diminimalkan tanpa mengambil fokus. Komposisi menyimpan hingga delapan jendela publik aktif dan mempertahankan cache singkat untuk mengurangi beban GPU.
+Tombol **Layar jeda** sengaja menampilkan pesan jeda. Jika hanya ingin membuka catatan, pilih jendelanya melalui **Sembunyikan** sebelum sesi. Biarkan aplikasi lainnya tetap terbuka; sebagian aplikasi/driver Windows berhenti mengirim gambar saat diminimalkan atau ditutup, sehingga gambar terakhir dipertahankan jika tidak ada pembaruan. Clario mencoba memulihkan aplikasi terakhir yang ditampilkan tanpa mengambil fokus. Komposisi menyimpan hingga delapan jendela aktif dan mempertahankan cache singkat untuk mengurangi beban GPU.
 
-Mirror Aman selalu menggunakan `Seluruh layar` tanpa zoom/crop agar perubahan ke Live Terlindungi tidak mengubah tata letak. Untuk mode aplikasi tunggal, `Adaptif nyaman` dan `Isi layar (crop)` tetap tersedia jika pembesaran lebih penting daripada tepi sumber. Monitor dengan rasio berbeda memakai letterbox, bukan memotong isi. Jika monitor menyediakan data raw DPI, ukuran perkiraannya tampil di pemilih monitor. Privasi dipilih per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu dipresentasikan.
+Layar terlindungi selalu menggunakan `Seluruh layar` agar tata letaknya tetap sama saat membuka aplikasi tersembunyi. Pada mode Satu aplikasi, `Perbesar` dan `Penuhi layar` tetap tersedia jika pembesaran lebih penting daripada tepi gambar. Layar dengan perbandingan panjang/lebar berbeda menampilkan ruang kosong di tepi agar gambar tetap utuh. Pilihan Sembunyikan berlaku per jendela, bukan per tab Chrome; tempatkan tab catatan di jendela Chrome tersendiri jika tab lain perlu ditampilkan.
 
-Untuk merekam, mulai sesi Live lalu tekan `Rekam` dan lanjutkan presentasi seperti biasa. Secara default video langsung disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui tombol roda gigi. Aktifkan `Tanya lokasi setiap mulai merekam` jika ingin memakai dialog `Save As`. Tekan `REC` sekali lagi untuk menghentikan dan memfinalisasi video. Jangan menutup aplikasi sebelum teks tombol kembali menjadi `Rekam`. Versi saat ini merekam video output klien; audio mikrofon dan audio sistem belum disertakan.
+Untuk merekam, tekan `Siapkan layar` atau `Mulai presentasi`, lalu tekan `Rekam`. Video disimpan ke `Videos\Clario Presenter`; lokasi ini dapat dibuka atau diganti melalui Pengaturan (roda gigi). Aktifkan `Tanyakan lokasi setiap kali merekam` untuk memilih lokasi sebelum mulai. Tekan `Selesai` untuk menyimpan video dan tunggu hingga tombol kembali menjadi `Rekam`. Suara mikrofon dan suara dari komputer belum disertakan.
 
 ### Rekam layar dan kamera
 
 1. Hubungkan webcam USB, atau jalankan aplikasi kamera pihak ketiga dan aktifkan output kamera virtualnya.
-2. Buka Settings (roda gigi), tekan `Muat ulang`, lalu pilih perangkat pada `Perangkat kamera`.
+2. Buka Pengaturan (roda gigi), tekan `Perbarui daftar`, lalu pilih kamera pada `Pilih kamera`.
 3. Tekan `Uji kamera` untuk memeriksa gambar. Jika Windows meminta izin kamera, berikan izin agar perangkat dapat digunakan.
-4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Pratinjau berhenti dan kamera dinyalakan kembali saat REC dimulai.
-5. Mulai Live kemudian tekan `Rekam`. Video MP4 berisi layar bersih ditambah kamera; monitor klien tidak mendapatkan overlay kamera.
+4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Pratinjau berhenti dan kamera dinyalakan kembali saat merekam.
+5. Siapkan layar atau mulai menampilkan presentasi, kemudian tekan `Rekam`. Video berisi layar ditambah kamera; layar audiens tidak mendapatkan gambar kamera tambahan.
 
-Output video tetap 1080p 30/60 fps sesuai Settings; kelancaran kamera mengikuti frame rate yang diberikan perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di dalam area aman agar taskbar tidak tertutup. Saat Privacy atau sumber layar terputus, kamera juga disembunyikan dari video. Freeze membekukan layar; kamera tetap bergerak. Suara belum disertakan.
+Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Layar jeda aktif atau tampilan terputus, kamera juga disembunyikan dari video. Tahan gambar mempertahankan gambar layar; kamera tetap bergerak. Suara belum disertakan.
 
 Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Aplikasi yang hanya menampilkan preview kamera tanpa menyediakan perangkat kamera virtual belum dapat dipilih sebagai input kamera. Bila perangkat tidak muncul, aktifkan output virtualnya terlebih dahulu lalu muat ulang daftar; kompatibilitas perlu diuji pada driver yang dipakai.
 
@@ -106,7 +106,7 @@ Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Apli
 - permukaan graphite dengan kontras tenang;
 - satu warna aksen utama, indigo;
 - warna status hanya digunakan secara semantik;
-- hijau untuk Live, amber untuk Freeze, merah untuk Privacy;
+- hijau untuk tampilan aktif, amber untuk gambar yang ditahan, merah untuk layar jeda;
 - tipografi Segoe UI Variable;
 - tidak menggunakan gradient dekoratif atau kumpulan kartu yang tidak diperlukan;
 - tindakan darurat selalu terlihat dan memiliki label yang jelas.

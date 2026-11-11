@@ -127,7 +127,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
         if (!preparation.CanTranscode)
         {
-            throw new InvalidOperationException($"Encoder 1080p{_frameRate} tidak tersedia ({preparation.FailureReason}).");
+            throw new InvalidOperationException($"Perangkat belum dapat merekam 1080p {_frameRate} fps. Coba pilih 30 fps di Pengaturan.");
         }
 
         _producerTask = Task.Run(() => ProduceFramesAsync(_producerCancellation.Token));
@@ -323,7 +323,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
         if (Interlocked.Increment(ref _allocatedFrameCount) > MaximumFrameCount)
         {
             Interlocked.Decrement(ref _allocatedFrameCount);
-            throw new InvalidOperationException("Encoder tidak mengembalikan buffer tepat waktu.");
+            throw new InvalidOperationException("Perangkat tidak dapat memproses rekaman tepat waktu. Coba pilih 30 fps di Pengaturan.");
         }
 
         try
@@ -351,9 +351,9 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private static void DrawPrivacySlate(CanvasDrawingSession drawingSession, ClientOutputMode mode)
     {
         drawingSession.Clear(Color.FromArgb(255, 14, 17, 22));
-        var title = mode == ClientOutputMode.SourceLost ? "Sumber terputus" : "Presentasi dijeda";
+        var title = mode == ClientOutputMode.SourceLost ? "Tampilan terputus" : "Presentasi dijeda";
         var subtitle = mode == ClientOutputMode.SourceLost
-            ? "Pilih ulang sumber di laptop presenter"
+            ? "Pilih kembali layar atau aplikasi di perangkat presenter"
             : "Mohon tunggu sebentar";
 
         using var titleFormat = new CanvasTextFormat

@@ -47,10 +47,10 @@ public sealed class CameraCaptureService : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_capture is not null) throw new InvalidOperationException("Kamera sudah aktif.");
             if (string.IsNullOrWhiteSpace(deviceId))
-                throw new InvalidOperationException("Pilih perangkat kamera di Settings sebelum merekam.");
+                throw new InvalidOperationException("Pilih kamera di Pengaturan sebelum merekam.");
             var devices = await GetDevicesAsync();
             var selected = devices.FirstOrDefault(device => device.Id == deviceId)
-                ?? throw new InvalidOperationException("Kamera terpilih tidak terhubung. Nyalakan aplikasi kamera lalu muat ulang daftar di Settings.");
+                ?? throw new InvalidOperationException("Kamera terpilih belum terhubung. Hubungkan kamera, lalu klik Perbarui daftar di Pengaturan.");
             DeviceName = selected.Name;
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -69,7 +69,7 @@ public sealed class CameraCaptureService : IAsyncDisposable
                 .Where(item => item.Info.SourceKind == MediaFrameSourceKind.Color)
                 .OrderBy(item => item.Info.MediaStreamType == MediaStreamType.VideoPreview ? 0 : 1)
                 .FirstOrDefault()
-                ?? throw new InvalidOperationException("Perangkat ini tidak menyediakan stream kamera berwarna yang kompatibel.");
+                ?? throw new InvalidOperationException("Gambar dari kamera ini belum dapat digunakan. Pilih kamera lain di Pengaturan.");
 
             // The camera overlay needs at most 672 pixels across in a 1080p video.
             // Resize during acquisition instead of uploading a full 4K frame.
@@ -96,7 +96,7 @@ public sealed class CameraCaptureService : IAsyncDisposable
         }
         catch (TimeoutException exception)
         {
-            throw new InvalidOperationException("Kamera belum mengirim gambar. Jalankan aplikasi kamera eksternal/virtual lalu coba lagi.", exception);
+            throw new InvalidOperationException("Kamera belum mengirim gambar. Periksa sambungan webcam atau buka aplikasi kamera HP, lalu coba lagi.", exception);
         }
         finally
         {

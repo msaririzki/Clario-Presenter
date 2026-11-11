@@ -55,9 +55,9 @@ public sealed partial class OutputWindow : Window
         }
 
         PrivacySlate.Visibility = Visibility.Visible;
-        SlateTitle.Text = mode == ClientOutputMode.SourceLost ? "Sumber terputus" : "Presentasi dijeda";
+        SlateTitle.Text = mode == ClientOutputMode.SourceLost ? "Tampilan terputus" : "Presentasi dijeda";
         SlateSubtitle.Text = detail ?? (mode == ClientOutputMode.SourceLost
-            ? "Pilih ulang jendela sumber di laptop presenter"
+            ? "Pilih kembali layar atau aplikasi di perangkat presenter"
             : "Mohon tunggu sebentar");
     }
 

@@ -35,7 +35,7 @@ public sealed record DisplayTarget(
             var physicalSize = EstimatedDiagonalInches is double diagonal
                 ? $"  ·  ≈{diagonal:0.#}″"
                 : string.Empty;
-            return $"Display {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}  ·  {ScalePercent}%{physicalSize}";
+            return $"Layar {Index}{(IsPrimary ? " · Utama" : string.Empty)}  ·  {Bounds.Width} × {Bounds.Height}  ·  {ScalePercent}%{physicalSize}";
         }
     }
 }

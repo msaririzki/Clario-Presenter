@@ -86,7 +86,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles, bool retainSceneIfEmpty = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_desktopLayout is null) throw new InvalidOperationException("Layout desktop belum disiapkan.");
+        if (_desktopLayout is null) throw new InvalidOperationException("Layar belum siap. Pilih layar dan mulai kembali sesi.");
 
         var nextLayers = new List<PublicWindowLayer>();
         foreach (var handle in windowHandles)
@@ -194,7 +194,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         _item = captureItem;
         if (_item.Size.Width <= 0 || _item.Size.Height <= 0)
         {
-            throw new InvalidOperationException("Jendela sumber sedang diminimalkan atau tidak memiliki ukuran yang valid.");
+            throw new InvalidOperationException("Aplikasi belum dapat ditampilkan. Buka kembali jendelanya, lalu coba lagi.");
         }
 
         _lastSize = _item.Size;
@@ -379,7 +379,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         }
         catch (Exception exception)
         {
-            CaptureFailed?.Invoke(this, new CaptureFailureEventArgs("Frame capture berhenti.", exception));
+            CaptureFailed?.Invoke(this, new CaptureFailureEventArgs("Gambar tidak dapat diperbarui.", exception));
         }
     }
 

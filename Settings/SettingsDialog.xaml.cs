@@ -82,9 +82,9 @@ public sealed partial class SettingsDialog : ContentDialog
                 ? devices.FirstOrDefault()
                 : devices.FirstOrDefault(device => device.Id == selectedId);
             CameraStatusText.Text = devices.Count == 0
-                ? "Belum ada kamera. Hubungkan kamera atau jalankan aplikasi kamera virtual, lalu muat ulang."
+                ? "Kamera belum ditemukan. Hubungkan webcam USB, lalu klik Perbarui daftar."
                 : CameraDeviceComboBox.SelectedItem is null
-                    ? "Kamera tersimpan tidak terhubung. Pilih perangkat yang akan dipakai."
+                    ? "Kamera yang sebelumnya dipilih belum terhubung. Pilih kamera yang tersedia."
                     : "Tekan Uji kamera untuk memeriksa gambar sebelum merekam.";
         }
         catch (Exception exception)
@@ -117,15 +117,17 @@ public sealed partial class SettingsDialog : ContentDialog
                 return;
             }
             if (CameraDeviceComboBox.SelectedItem is not CameraDevice device)
-                throw new InvalidOperationException("Pilih perangkat kamera terlebih dahulu.");
+                throw new InvalidOperationException("Pilih kamera terlebih dahulu.");
             CameraStatusText.Text = "Menyalakan kamera…";
             _previewCamera = new CameraCaptureService();
             _previewCamera.FrameAvailable += PreviewCamera_FrameAvailable;
             await _previewCamera.StartAsync(device.Id, _previewCancellation.Token);
             if (_closing) return;
             CameraPreviewPlaceholder.Visibility = Visibility.Collapsed;
-            TestCameraButton.Content = "Matikan uji";
-            CameraStatusText.Text = "Kamera siap. Simpan pengaturan untuk memakainya saat REC.";
+            TestCameraButton.Content = "Tutup pratinjau";
+            CameraStatusText.Text = CameraEnabledToggle.IsOn
+                ? "Kamera siap. Klik Simpan untuk memakai kamera ini saat merekam."
+                : "Kamera siap. Aktifkan Sertakan kamera dalam rekaman, lalu klik Simpan.";
             _previewStatusTimer.Start();
             CameraPreviewCanvas.Invalidate();
         }
@@ -195,7 +197,7 @@ public sealed partial class SettingsDialog : ContentDialog
         if (CameraEnabledToggle.IsOn && CameraDeviceComboBox.SelectedItem is not CameraDevice)
         {
             args.Cancel = true;
-            SettingsErrorText.Text = "Pilih kamera yang terhubung atau matikan Sertakan kamera sebelum menyimpan.";
+            SettingsErrorText.Text = "Pilih kamera yang terhubung, atau nonaktifkan kamera sebelum menyimpan.";
             SettingsErrorText.Visibility = Visibility.Visible;
         }
     }
@@ -263,7 +265,7 @@ public sealed partial class SettingsDialog : ContentDialog
     private void UpdateFolderLabel()
     {
         FolderPathText.Text = string.IsNullOrWhiteSpace(_folderPath)
-            ? "Videos\\Clario Presenter (default)"
+            ? "Videos\\Clario Presenter (folder bawaan)"
             : _folderPath;
     }
 }
