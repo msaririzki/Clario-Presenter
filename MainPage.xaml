@@ -8,6 +8,33 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="AccentButtonBackground" Color="#F3F5F8" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#E4E8EE" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#CDD5E1" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#262D37" />
+                    <SolidColorBrush x:Key="AccentButtonForeground" Color="#0E1116" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#0E1116" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#0E1116" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#AAB4C2" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="AccentButtonBackground" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="{ThemeResource SystemColorButtonFaceColor}" />
+                    <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="{ThemeResource SystemColorButtonFaceColor}" />
+                    <SolidColorBrush x:Key="AccentButtonForeground" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="{ThemeResource SystemColorGrayTextColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
+
     <Grid Background="{StaticResource ClarioCanvasBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
