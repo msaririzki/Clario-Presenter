@@ -7,22 +7,18 @@ Orang yang baru membuka Clario perlu bisa menjawab tiga hal dengan sekali lihat.
 ### Tampilan saat menyiapkan rekaman
 
 ```text
-Clario Presenter                                                Siap
+Clario Presenter                                                                     Siap
 
-[ Rekam | Presentasi ]                                    [Pengaturan]
+Mode                     Sumber                Pilih layar
+[ Rekam | Presentasi ]   [ Layar | Aplikasi ]   [ Layar 1 (utama) ▾ ]   [Pengaturan] [Lihat pratinjau] [Mulai rekam]
 
-Sumber                    Pilih layar
-[ Layar | Aplikasi ]       [ Layar 1 (utama) ▾ ]
-[ Sembunyikan aplikasi ]  [ Catatan ]
-                              [ Lihat pratinjau ]  [ MULAI REKAM ]
-
-┌ Pratinjau · Layar 1 (utama) ───────────────────────────────────────┐
-│                                                                  │
-│         Gambar layar terpilih atau petunjuk sebelum mulai.        │
-└──────────────────────────────────────────────────────────────────┘
+Pratinjau · Layar 1 (utama)                                             [Sembunyikan aplikasi] [Catatan]
+┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                             Gambar terpilih atau petunjuk sebelum mulai.                             │
+└────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Kelompok sumber dan aksi utama memakai area selebar maksimal sekitar 920 unit logis dari sisi kiri. Di monitor lebar, pratinjau boleh memenuhi area kerja. Tombol mulai berada di ujung kelompok sumber sehingga mudah ditemukan setelah memilih layar. **Pengaturan** ada di sudut kanan area kerja, dengan label teks.
+Pada jendela lebar, mode dan sumber berada dalam satu baris di kiri, sedangkan aksi utama dan **Pengaturan** berada di kanan. **Sembunyikan aplikasi** dan **Catatan** ditempatkan di baris pratinjau. Pratinjau memakai ruang yang tersisa.
 
 ### Tampilan saat sesi berjalan
 
@@ -73,9 +69,11 @@ Gunakan abu kebiruan gelap untuk area kerja, tombol utama terang, dan ungu lembu
 
 | Lebar area kerja | Penyusunan kontrol |
 | --- | --- |
-| 1.080 unit logis ke atas | Kontrol sumber dan aksi berdekatan di atas pratinjau. Catatan terbuka sebagai panel kanan dengan lebar sekitar 320. |
-| 720–1.079 | Letakkan aksi di baris di bawah pemilih. Catatan terbuka sebagai panel sementara dan dapat ditutup dengan Esc. |
-| Di bawah 720 | Pemilih disusun vertikal, badan halaman bisa digulir, dan aksi utama tetap terlihat di bilah bawah. Kontrol sesi yang sering dipakai tetap dapat dijangkau saat pratinjau atau editor digulir. |
+| 1.240 unit logis ke atas | Mode dan sumber di kiri serta aksi rekam di kanan, dalam satu baris. |
+| 720–1.239 | Mode dan jenis sumber di baris pertama, dengan pemilih layar atau aplikasi di bawah. Aksi utama tetap terlihat di bilah bawah. |
+| Di bawah 720 | Alat pratinjau pindah ke baris tersendiri. Aksi utama tetap terlihat di bilah bawah. |
+
+Catatan terbuka sebagai panel kanan selebar sekitar 320 unit pada jendela dengan lebar minimal 1.080 unit. Di bawahnya, catatan terbuka sebagai panel sementara yang bisa ditutup dengan Esc.
 
 Gunakan `Grid` dan `VisualStateManager` agar kontrol yang sama berpindah posisi saat ukuran berubah. Uji 1.366 × 768 dan 1.920 × 1.080 pada skala Windows 100%, 125%, dan 150%, serta kondisi jendela sekitar 560 × 360 unit logis. Uji pemindahan jendela antarmonitor dengan DPI berbeda. Nilai lebar awal di tabel dapat disesuaikan berdasarkan hasil uji. [Panduan tata letak responsif Windows](https://learn.microsoft.com/windows/apps/design/layout/responsive-design).
 

@@ -27,92 +27,110 @@
                 <VisualState x:Name="Compact">
                     <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
                 </VisualState>
-                <VisualState x:Name="Wide">
+                <VisualState x:Name="Medium">
                     <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="720" /></VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <Setter Target="MiddleRow.Height" Value="Auto" />
-                        <Setter Target="NextRow.Height" Value="*" />
-                        <Setter Target="StudioGrid.(Grid.Row)" Value="3" />
-                        <Setter Target="FeedbackBar.(Grid.Row)" Value="4" />
-                        <Setter Target="ActionBar.(Grid.Row)" Value="2" />
-                        <Setter Target="SourceOptions.(Grid.Row)" Value="0" />
-                        <Setter Target="SourceOptions.(Grid.Column)" Value="1" />
-                        <Setter Target="SourceOptions.Margin" Value="16,0,0,0" />
                         <Setter Target="SupportActions.(Grid.Row)" Value="0" />
                         <Setter Target="SupportActions.(Grid.Column)" Value="1" />
-                        <Setter Target="SupportActions.Margin" Value="12,0,0,0" />
+                        <Setter Target="SupportActions.HorizontalAlignment" Value="Right" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Wide">
+                    <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1240" /></VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SetupBar.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SourceOptions.(Grid.Row)" Value="0" />
+                        <Setter Target="SourceOptions.(Grid.Column)" Value="2" />
+                        <Setter Target="SourceOptions.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="SourceOptions.Margin" Value="16,0,0,0" />
+                        <Setter Target="ActionBar.(Grid.Row)" Value="0" />
+                        <Setter Target="ActionBar.(Grid.Column)" Value="1" />
+                        <Setter Target="ActionBar.(Grid.ColumnSpan)" Value="1" />
+                        <Setter Target="ActionBar.BorderThickness" Value="0,0,0,1" />
+                        <Setter Target="ActionBar.Padding" Value="16,12,20,12" />
+                        <Setter Target="PrimaryActions.VerticalAlignment" Value="Bottom" />
+                        <Setter Target="SupportActions.(Grid.Row)" Value="0" />
+                        <Setter Target="SupportActions.(Grid.Column)" Value="1" />
+                        <Setter Target="SupportActions.HorizontalAlignment" Value="Right" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
-            <RowDefinition x:Name="MiddleRow" Height="*" />
-            <RowDefinition x:Name="NextRow" Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
-        <Grid Background="{StaticResource ClarioSurfaceBrush}" Padding="20,8" ColumnSpacing="12"
+        <Grid x:Name="SetupBar" Grid.ColumnSpan="2" Background="{StaticResource ClarioSurfaceBrush}" Padding="20,12"
               BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,0,0,1">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <RadioButtons x:Name="SessionModePicker" MaxColumns="2" SelectedIndex="0" SelectionChanged="SessionModePicker_SelectionChanged"
-                          AutomationProperties.Name="Mode sesi" HorizontalAlignment="Left">
+            <RadioButtons x:Name="SessionModePicker" Header="Mode" MaxColumns="2" SelectedIndex="0"
+                          SelectionChanged="SessionModePicker_SelectionChanged" AutomationProperties.Name="Mode sesi"
+                          HorizontalAlignment="Left" VerticalAlignment="Bottom">
                 <RadioButton Content="Rekam" Style="{StaticResource ClarioChoiceStyle}" />
                 <RadioButton Content="Presentasi" Style="{StaticResource ClarioChoiceStyle}" />
             </RadioButtons>
-            <Button x:Name="SettingsButton" Grid.Column="1" Content="Pengaturan" Style="{StaticResource ClarioButtonStyle}"
-                    VerticalAlignment="Center" Click="SettingsButton_Click" />
+
+            <RadioButtons x:Name="CaptureModePicker" Grid.Column="1" Margin="24,0,0,0" Header="Sumber" MaxColumns="2" SelectedIndex="0"
+                          SelectionChanged="CaptureModePicker_SelectionChanged" VerticalAlignment="Bottom">
+                <RadioButton Content="Layar" Style="{StaticResource ClarioChoiceStyle}" />
+                <RadioButton Content="Aplikasi" Style="{StaticResource ClarioChoiceStyle}" />
+            </RadioButtons>
+            <Grid x:Name="SourceOptions" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,8,0,0" ColumnSpacing="8"
+                  HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MaxWidth="232" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="SourceMonitorComboBox" Header="Pilih layar" MinWidth="150" Style="{StaticResource ClarioPickerStyle}"
+                          DisplayMemberPath="ShortDisplayName" ItemContainerStyle="{StaticResource SourceOptionStyle}" DropDownOpened="DisplayComboBox_DropDownOpened"
+                          SelectionChanged="SourceMonitorComboBox_SelectionChanged" />
+                <ComboBox x:Name="SourceComboBox" Header="Pilih aplikasi" PlaceholderText="Pilih jendela" MinWidth="150" MaxWidth="232" Visibility="Collapsed"
+                          Style="{StaticResource ClarioPickerStyle}" DisplayMemberPath="Title" ItemContainerStyle="{StaticResource SourceOptionStyle}"
+                          DropDownOpened="SourceComboBox_DropDownOpened" SelectionChanged="SourceComboBox_SelectionChanged" />
+                <Button x:Name="RefreshSourcesButton" Grid.Column="1" VerticalAlignment="Bottom" Visibility="Collapsed"
+                        Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Perbarui daftar aplikasi"
+                        ToolTipService.ToolTip="Perbarui daftar aplikasi" Click="RefreshSources_Click">
+                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                </Button>
+                <ComboBox x:Name="DisplayComboBox" Grid.Column="2" Header="Layar audiens" PlaceholderText="Pilih layar" MinWidth="142" Visibility="Collapsed"
+                          Style="{StaticResource ClarioPickerStyle}" DisplayMemberPath="ShortDisplayName" ItemContainerStyle="{StaticResource SourceOptionStyle}"
+                          DropDownOpened="DisplayComboBox_DropDownOpened" SelectionChanged="DisplayComboBox_SelectionChanged" />
+            </Grid>
         </Grid>
 
-        <ScrollViewer x:Name="SetupPanel" Grid.Row="1" MaxHeight="208" HorizontalScrollMode="Disabled"
-                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <Grid Padding="20,12,20,4" MaxWidth="940" HorizontalAlignment="Left" RowSpacing="8">
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                <RadioButtons x:Name="CaptureModePicker" Header="Sumber" MaxColumns="2" SelectedIndex="0"
-                              SelectionChanged="CaptureModePicker_SelectionChanged" VerticalAlignment="Bottom">
-                    <RadioButton Content="Layar" Style="{StaticResource ClarioChoiceStyle}" />
-                    <RadioButton Content="Aplikasi" Style="{StaticResource ClarioChoiceStyle}" />
-                </RadioButtons>
+        <Grid x:Name="ActionBar" Grid.Row="3" Grid.ColumnSpan="2" Padding="20,8,20,12"
+              Background="{StaticResource ClarioSurfaceBrush}" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel x:Name="PrimaryActions" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button x:Name="SettingsButton" Content="Pengaturan" Style="{StaticResource ClarioButtonStyle}" Click="SettingsButton_Click" />
+                <Button x:Name="PreviewButton" Content="Lihat pratinjau" Style="{StaticResource ClarioButtonStyle}" Click="PreviewButton_Click" />
+                <Button x:Name="PrimaryButton" Content="Mulai rekam" MinWidth="140"
+                        Style="{StaticResource ClarioPrimaryButtonStyle}" Click="PrimaryButton_Click" />
+            </StackPanel>
+        </Grid>
 
-                <Grid x:Name="SourceOptions" Grid.Row="1" ColumnSpacing="8" VerticalAlignment="Bottom">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <ComboBox x:Name="SourceMonitorComboBox" Header="Pilih layar" MinWidth="144" Style="{StaticResource ClarioPickerStyle}"
-                              DisplayMemberPath="ShortDisplayName" ItemContainerStyle="{StaticResource SourceOptionStyle}" DropDownOpened="DisplayComboBox_DropDownOpened"
-                              SelectionChanged="SourceMonitorComboBox_SelectionChanged" />
-                    <ComboBox x:Name="SourceComboBox" Header="Pilih aplikasi" PlaceholderText="Pilih jendela" MinWidth="144" MaxWidth="330" Visibility="Collapsed"
-                              Style="{StaticResource ClarioPickerStyle}" DisplayMemberPath="Title" ItemContainerStyle="{StaticResource SourceOptionStyle}"
-                              DropDownOpened="SourceComboBox_DropDownOpened" SelectionChanged="SourceComboBox_SelectionChanged" />
-                    <Button x:Name="RefreshSourcesButton" Grid.Column="1" VerticalAlignment="Bottom" Visibility="Collapsed"
-                            Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Perbarui daftar aplikasi"
-                            ToolTipService.ToolTip="Perbarui daftar aplikasi" Click="RefreshSources_Click">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                    </Button>
-                    <ComboBox x:Name="DisplayComboBox" Grid.Column="2" Header="Layar audiens" PlaceholderText="Pilih layar" MinWidth="142" Visibility="Collapsed"
-                              Style="{StaticResource ClarioPickerStyle}" DisplayMemberPath="ShortDisplayName" ItemContainerStyle="{StaticResource SourceOptionStyle}"
-                              DropDownOpened="DisplayComboBox_DropDownOpened" SelectionChanged="DisplayComboBox_SelectionChanged" />
-                </Grid>
-            </Grid>
-        </ScrollViewer>
-
-        <Grid x:Name="ActionBar" Grid.Row="4" Padding="20,8,20,12" HorizontalAlignment="Stretch">
-            <Grid HorizontalAlignment="Left" MaxWidth="940">
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" Padding="20,8,20,8" RowSpacing="8">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <Grid ColumnSpacing="12" RowSpacing="4">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="PrimaryButton" Content="Mulai rekam" MinWidth="132"
-                            Style="{StaticResource ClarioPrimaryButtonStyle}" Click="PrimaryButton_Click" />
-                    <Button x:Name="PreviewButton" Content="Lihat pratinjau" Style="{StaticResource ClarioButtonStyle}" Click="PreviewButton_Click" />
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel x:Name="PreviewHeading" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Pratinjau" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ActiveSourceTitle" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-                <StackPanel x:Name="SupportActions" Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <StackPanel x:Name="SupportActions" Grid.Row="1" Orientation="Horizontal" Spacing="8">
                     <Button x:Name="PrivateAppsButton" Content="Sembunyikan aplikasi" Style="{StaticResource ClarioButtonStyle}"
                             Click="PrivateAppsButton_Click" />
                     <Button x:Name="OutputOptionsButton" Content="Opsi tampilan" Style="{StaticResource ClarioButtonStyle}" Visibility="Collapsed">
@@ -137,28 +155,14 @@
                     </StackPanel>
                 </StackPanel>
             </Grid>
-        </Grid>
+            <Grid x:Name="StudioGrid" Grid.Row="1" SizeChanged="StudioGrid_SizeChanged" ColumnSpacing="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="NotesColumn" Width="0" />
+                </Grid.ColumnDefinitions>
 
-        <Grid x:Name="StudioGrid" Grid.Row="2" Padding="20,4,20,8" SizeChanged="StudioGrid_SizeChanged" ColumnSpacing="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition x:Name="NotesColumn" Width="0" />
-            </Grid.ColumnDefinitions>
-
-            <Border x:Name="PreviewPanel" Style="{StaticResource ClarioPanelStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <Grid Padding="14,8" RowSpacing="6" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,0,0,1">
-                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                            <TextBlock Text="Pratinjau" FontSize="14" FontWeight="SemiBold" />
-                            <TextBlock x:Name="ActiveSourceTitle" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Grid.Row="1" Margin="8" Background="{StaticResource ClarioCanvasBrush}">
+                <Border x:Name="PreviewPanel" Padding="8" Style="{StaticResource ClarioPanelStyle}">
+                    <Grid Background="{StaticResource ClarioCanvasBrush}">
                         <canvas:CanvasControl x:Name="LivePreviewCanvas" Visibility="Collapsed" UseSharedDevice="True"
                                               ClearColor="#0E1116" Draw="LivePreviewCanvas_Draw" />
                         <StackPanel x:Name="ClientStateOverlay" MaxWidth="340" Margin="18" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -170,74 +174,74 @@
                                        Foreground="{StaticResource ClarioSecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
-                </Grid>
-            </Border>
+                </Border>
 
-            <Border x:Name="NotesPanel" Grid.Column="1" Canvas.ZIndex="1" Padding="14" Style="{StaticResource ClarioPanelStyle}" Visibility="Collapsed">
-                <Border.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="Escape" ScopeOwner="{x:Bind NotesPanel}" Invoked="CloseNotesAccelerator_Invoked" />
-                </Border.KeyboardAccelerators>
-                <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <Grid RowSpacing="12">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Catatan pribadi" Style="{StaticResource ClarioHeadingStyle}" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Tutup editor catatan"
-                                    Click="CollapseNotes_Click" ToolTipService.ToolTip="Tutup editor catatan">
-                                <FontIcon Glyph="&#xE711;" FontSize="12" />
-                            </Button>
-                        </Grid>
-                        <TextBox Grid.Row="1" x:Name="FreeNotesTextBox" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap"
-                                 AutomationProperties.Name="Teks catatan" PlaceholderText="Ketik atau tempel catatan di sini…" TextChanged="FreeNotesTextBox_TextChanged" />
-                        <StackPanel Grid.Row="2" Spacing="8">
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                <Button x:Name="OpenNotesButton" Content="Buka file" Click="OpenNotes_Click" HorizontalAlignment="Stretch"
-                                        Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Buka file catatan .md atau .txt" />
-                                <Button x:Name="PinNotesButton" Grid.Column="1" Content="Sematkan" Click="PinNotes_Click" HorizontalAlignment="Stretch"
-                                        Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Tampilkan catatan di atas aplikasi lain" />
+                <Border x:Name="NotesPanel" Grid.Column="1" Canvas.ZIndex="1" Padding="14" Style="{StaticResource ClarioPanelStyle}" Visibility="Collapsed">
+                    <Border.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Escape" ScopeOwner="{x:Bind NotesPanel}" Invoked="CloseNotesAccelerator_Invoked" />
+                    </Border.KeyboardAccelerators>
+                    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Grid RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Catatan pribadi" Style="{StaticResource ClarioHeadingStyle}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Tutup editor catatan"
+                                        Click="CollapseNotes_Click" ToolTipService.ToolTip="Tutup editor catatan">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                </Button>
                             </Grid>
-                            <Button Content="Atur catatan" Style="{StaticResource ClarioButtonStyle}">
-                                <Button.Flyout>
-                                    <Flyout Opening="NoteOptions_Opening">
-                                        <ScrollViewer Width="278" MaxHeight="470" VerticalScrollBarVisibility="Auto">
-                                            <StackPanel Width="265" Spacing="8">
-                                                <CheckBox x:Name="MarkdownNotesCheckBox" Content="Gunakan format Markdown" Checked="MarkdownNotes_Changed" Unchecked="MarkdownNotes_Changed"
-                                                          ToolTipService.ToolTip="Judul dengan ## menjadi langkah terpisah. Letakkan perintah di blok kode." />
-                                                <ComboBox x:Name="NotesMonitorComboBox" Header="Layar catatan" DisplayMemberPath="ShortDisplayName"
-                                                          Style="{StaticResource ClarioPickerStyle}" SelectionChanged="NoteAppearance_Changed" />
-                                                <ToggleSwitch x:Name="NotesClickThroughToggle" Header="Klik tembus" IsOn="True" OnContent="Klik masuk ke aplikasi di belakang" OffContent="Atur ukuran dan navigasi" Toggled="NoteAppearance_Changed" />
-                                                <Slider x:Name="NotesOpacitySlider" Header="Opasitas catatan (%)" Minimum="25" Maximum="100" Value="82" StepFrequency="5" ValueChanged="NoteAppearance_Changed" />
-                                                <Slider x:Name="NotesFontSizeSlider" Header="Ukuran teks" Minimum="12" Maximum="26" Value="16" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
-                                                <Slider x:Name="NotesWidthSlider" Header="Lebar panel" Minimum="264" Maximum="1600" Value="440" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
-                                                <Slider x:Name="NotesHeightSlider" Header="Tinggi panel" Minimum="168" Maximum="1200" Value="360" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
-                                                <TextBlock Text="Matikan Klik tembus untuk menarik sisi panel, scrollbar, atau membuka Daftar."
-                                                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                                                <TextBlock Text="Ctrl+Shift+F8 · tampil atau sembunyi&#xA;Ctrl+Shift+F9 · ubah Klik tembus&#xA;Ctrl+Shift+F10/F11 · pindah bagian&#xA;Ctrl+Shift+↑/↓ · gulir&#xA;Ctrl+Shift+Page Up/Page Down · gulir satu layar&#xA;Ctrl+Shift+Home/End · awal atau akhir"
-                                                           TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                                            </StackPanel>
-                                        </ScrollViewer>
-                                    </Flyout>
-                                </Button.Flyout>
-                            </Button>
-                            <TextBlock x:Name="NoteStatusText" Text="" TextWrapping="Wrap"
-                                       FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                        </StackPanel>
-                    </Grid>
-                </ScrollViewer>
-            </Border>
+                            <TextBox Grid.Row="1" x:Name="FreeNotesTextBox" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap"
+                                     AutomationProperties.Name="Teks catatan" PlaceholderText="Ketik atau tempel catatan di sini…" TextChanged="FreeNotesTextBox_TextChanged" />
+                            <StackPanel Grid.Row="2" Spacing="8">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button x:Name="OpenNotesButton" Content="Buka file" Click="OpenNotes_Click" HorizontalAlignment="Stretch"
+                                            Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Buka file catatan .md atau .txt" />
+                                    <Button x:Name="PinNotesButton" Grid.Column="1" Content="Sematkan" Click="PinNotes_Click" HorizontalAlignment="Stretch"
+                                            Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Tampilkan catatan di atas aplikasi lain" />
+                                </Grid>
+                                <Button Content="Atur catatan" Style="{StaticResource ClarioButtonStyle}">
+                                    <Button.Flyout>
+                                        <Flyout Opening="NoteOptions_Opening">
+                                            <ScrollViewer Width="278" MaxHeight="470" VerticalScrollBarVisibility="Auto">
+                                                <StackPanel Width="265" Spacing="8">
+                                                    <CheckBox x:Name="MarkdownNotesCheckBox" Content="Gunakan format Markdown" Checked="MarkdownNotes_Changed" Unchecked="MarkdownNotes_Changed"
+                                                              ToolTipService.ToolTip="Judul dengan ## menjadi langkah terpisah. Letakkan perintah di blok kode." />
+                                                    <ComboBox x:Name="NotesMonitorComboBox" Header="Layar catatan" DisplayMemberPath="ShortDisplayName"
+                                                              Style="{StaticResource ClarioPickerStyle}" SelectionChanged="NoteAppearance_Changed" />
+                                                    <ToggleSwitch x:Name="NotesClickThroughToggle" Header="Klik tembus" IsOn="True" OnContent="Klik masuk ke aplikasi di belakang" OffContent="Atur ukuran dan navigasi" Toggled="NoteAppearance_Changed" />
+                                                    <Slider x:Name="NotesOpacitySlider" Header="Opasitas catatan (%)" Minimum="25" Maximum="100" Value="82" StepFrequency="5" ValueChanged="NoteAppearance_Changed" />
+                                                    <Slider x:Name="NotesFontSizeSlider" Header="Ukuran teks" Minimum="12" Maximum="26" Value="16" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
+                                                    <Slider x:Name="NotesWidthSlider" Header="Lebar panel" Minimum="264" Maximum="1600" Value="440" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
+                                                    <Slider x:Name="NotesHeightSlider" Header="Tinggi panel" Minimum="168" Maximum="1200" Value="360" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
+                                                    <TextBlock Text="Matikan Klik tembus untuk menarik sisi panel, scrollbar, atau membuka Daftar."
+                                                               TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                                                    <TextBlock Text="Ctrl+Shift+F8 · tampil atau sembunyi&#xA;Ctrl+Shift+F9 · ubah Klik tembus&#xA;Ctrl+Shift+F10/F11 · pindah bagian&#xA;Ctrl+Shift+↑/↓ · gulir&#xA;Ctrl+Shift+Page Up/Page Down · gulir satu layar&#xA;Ctrl+Shift+Home/End · awal atau akhir"
+                                                               TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                                                </StackPanel>
+                                            </ScrollViewer>
+                                        </Flyout>
+                                    </Button.Flyout>
+                                </Button>
+                                <TextBlock x:Name="NoteStatusText" Text="" TextWrapping="Wrap"
+                                           FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
 
-        <Grid x:Name="FeedbackBar" Grid.Row="3" Padding="20,2" MinHeight="36" ColumnSpacing="10"
+        <Grid x:Name="FeedbackBar" Grid.Row="2" Grid.ColumnSpan="2" Padding="20,2" MinHeight="36" ColumnSpacing="10"
               Background="{StaticResource ClarioSurfaceBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />

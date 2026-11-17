@@ -450,16 +450,19 @@ public sealed partial class MainPage : Page
     private void LayoutNoteEditor()
     {
         var visible = NotesPanel.Visibility == Visibility.Visible;
-        var docked = visible && StudioGrid.ActualWidth >= 1080;
+        var docked = visible && WorkspaceGrid.ActualWidth >= 1080;
         var noteOverlay = visible && !docked;
-        SetupPanel.Visibility = _isLive || noteOverlay ? Visibility.Collapsed : Visibility.Visible;
-        PreviewPanel.Visibility = noteOverlay || (!_isLive && StudioGrid.ActualHeight < 144)
+        var setupVisibility = _isLive || noteOverlay ? Visibility.Collapsed : Visibility.Visible;
+        CaptureModePicker.Visibility = setupVisibility;
+        SourceOptions.Visibility = setupVisibility;
+        PreviewPanel.Visibility = noteOverlay || (!_isLive && StudioGrid.ActualHeight < 120)
             ? Visibility.Collapsed : Visibility.Visible;
+        PreviewHeading.Visibility = noteOverlay ? Visibility.Collapsed : Visibility.Visible;
         NotesColumn.Width = new GridLength(docked ? 320 : 0);
         StudioGrid.ColumnSpacing = docked ? 12 : 0;
         Grid.SetColumn(NotesPanel, docked ? 1 : 0);
         NotesPanel.HorizontalAlignment = docked ? HorizontalAlignment.Stretch : HorizontalAlignment.Right;
-        NotesPanel.Width = docked ? double.NaN : Math.Min(340, Math.Max(0, StudioGrid.ActualWidth - 40));
+        NotesPanel.Width = docked ? double.NaN : Math.Min(340, StudioGrid.ActualWidth);
         if (visible) FreeNotesTextBox.Height = Math.Max(80, StudioGrid.ActualHeight - 186);
     }
 
