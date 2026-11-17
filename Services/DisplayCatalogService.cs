@@ -15,6 +15,7 @@ public sealed record DisplayTarget(
     bool IsPrimary,
     int Index)
 {
+    public string ShortDisplayName => IsPrimary ? $"Layar {Index} (utama)" : $"Layar {Index}";
     public int ScalePercent => (int)Math.Round(DpiX / 96d * 100);
     public double? EstimatedDiagonalInches
     {

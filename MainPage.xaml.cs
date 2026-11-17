@@ -16,12 +16,13 @@ public sealed partial class MainPage : Page
 {
     private readonly ObservableCollection<WindowSource> _sources = [];
     private readonly ObservableCollection<DisplayTarget> _displays = [];
+    private readonly ObservableCollection<DisplayTarget> _audienceDisplays = [];
     private readonly HashSet<nint> _privateWindows = [];
     private readonly DispatcherTimer _sessionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _privacyWatchTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _windowRescueTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private readonly AppSettingsService _settingsService = new();
-    private TimeSpan _elapsed;
+    private bool _isLoaded;
     private bool _isLive;
     private bool _isFrozen;
     private bool _isPrivacy;
@@ -41,7 +42,8 @@ public sealed partial class MainPage : Page
     private StorageFile? _recordingFile;
     private bool _recordingFileWasAutoCreated;
     private DateTimeOffset _recordingStartedAt;
-    private bool _recordingTransition;
+    private bool _sessionTransition;
+    private bool _refreshingDisplays;
     private string? _lastCameraWarning;
 
     private SolidColorBrush LiveBrush => ResourceBrush("ClarioLiveBrush");
@@ -54,7 +56,7 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         InitializeFloatingNotes();
         SourceComboBox.ItemsSource = _sources;
-        DisplayComboBox.ItemsSource = _displays;
+        DisplayComboBox.ItemsSource = _audienceDisplays;
         SourceMonitorComboBox.ItemsSource = _displays;
         _sessionTimer.Tick += SessionTimer_Tick;
         _privacyWatchTimer.Tick += PrivacyWatchTimer_Tick;
@@ -65,12 +67,9 @@ public sealed partial class MainPage : Page
 
     private void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
-        RefreshSources();
+        _isLoaded = true;
         RefreshDisplays();
         UpdateCaptureModeUi();
-        FreezeButton.IsEnabled = false;
-        PrivacyButton.IsEnabled = false;
-        UpdatePresentationState();
     }
 
     private void RefreshSources()
@@ -85,24 +84,37 @@ public sealed partial class MainPage : Page
 
         SourceComboBox.SelectedItem = _sources.FirstOrDefault(item => item.Handle == selectedHandle)
                                       ?? _sources.FirstOrDefault();
-        FooterStatusText.Text = _sources.Count == 0
-            ? "Belum ada aplikasi yang terbuka. Buka aplikasi, lalu perbarui daftar."
-            : $"{_sources.Count} jendela aplikasi tersedia. Catatan hanya terlihat oleh Anda.";
     }
 
     private void RefreshDisplays()
     {
-        var selectedDeviceName = (DisplayComboBox.SelectedItem as DisplayTarget)?.DeviceName;
         var sourceDeviceName = (SourceMonitorComboBox.SelectedItem as DisplayTarget)?.DeviceName;
-        _displays.Clear();
-        foreach (var display in DisplayCatalogService.GetDisplays()) _displays.Add(display);
-        DisplayComboBox.SelectedItem = _displays.FirstOrDefault(display =>
+        _refreshingDisplays = true;
+        try
+        {
+            _displays.Clear();
+            foreach (var display in DisplayCatalogService.GetDisplays()) _displays.Add(display);
+            SourceMonitorComboBox.SelectedItem = _displays.FirstOrDefault(display =>
+                display.DeviceName.Equals(sourceDeviceName, StringComparison.OrdinalIgnoreCase))
+                ?? _displays.FirstOrDefault(display => display.IsPrimary) ?? _displays.FirstOrDefault();
+        }
+        finally { _refreshingDisplays = false; }
+
+        RefreshAudienceDisplays();
+        UpdateSourceLabel();
+    }
+
+    private void RefreshAudienceDisplays()
+    {
+        var selectedDeviceName = (DisplayComboBox.SelectedItem as DisplayTarget)?.DeviceName;
+        var source = IsSafeMirrorMode ? SourceMonitorComboBox.SelectedItem as DisplayTarget : null;
+        _audienceDisplays.Clear();
+        foreach (var display in _displays.Where(display => display.Handle != source?.Handle))
+            _audienceDisplays.Add(display);
+        DisplayComboBox.SelectedItem = _audienceDisplays.FirstOrDefault(display =>
                                            display.DeviceName.Equals(selectedDeviceName, StringComparison.OrdinalIgnoreCase))
-                                       ?? _displays.FirstOrDefault(display => !display.IsPrimary)
-                                       ?? _displays.FirstOrDefault();
-        SourceMonitorComboBox.SelectedItem = _displays.FirstOrDefault(display =>
-            display.DeviceName.Equals(sourceDeviceName, StringComparison.OrdinalIgnoreCase))
-            ?? _displays.FirstOrDefault(display => display.IsPrimary) ?? _displays.FirstOrDefault();
+                                       ?? _audienceDisplays.FirstOrDefault(display => !display.IsPrimary)
+                                       ?? _audienceDisplays.FirstOrDefault();
     }
 
     private void DisplayComboBox_DropDownOpened(object sender, object e)
@@ -110,80 +122,67 @@ public sealed partial class MainPage : Page
         if (!_isLive) RefreshDisplays();
     }
 
-    private void SourceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (SourceComboBox.SelectedItem is not WindowSource source)
-        {
-            ActiveSourceTitle.Text = "Pilih aplikasi untuk memulai";
-            ActiveSourceSubtitle.Text = "Pilih jendela aplikasi yang ingin direkam atau dibagikan";
-            return;
-        }
-
-        ActiveSourceTitle.Text = source.Title;
-        ActiveSourceSubtitle.Text = $"{source.ProcessName} · hanya jendela ini yang direkam atau dibagikan";
-        BrowserAddressText.Text = source.ProcessName.Equals("msedge", StringComparison.OrdinalIgnoreCase)
-            || source.ProcessName.Equals("chrome", StringComparison.OrdinalIgnoreCase)
-            ? "Jendela browser yang dipilih"
-            : $"Aplikasi desktop · {source.ProcessName}";
-        DemoHeadingText.Text = source.ShortTitle;
-        MiniOutputTitle.Text = source.ShortTitle;
-    }
-
-    private void RefreshSources_Click(object sender, RoutedEventArgs e) => RefreshSources();
-
-    private bool IsSafeMirrorMode => CaptureModeComboBox.SelectedIndex == 1;
-    private bool IsRecordingOnly => RecordingOnlyCheckBox.IsChecked == true;
-
-    private void RecordingOnly_Changed(object sender, RoutedEventArgs e)
-    {
-        if (SourceMonitorComboBox is not null && PrivateAppsButton is not null) UpdateCaptureModeUi();
-    }
+    private void SourceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateSourceLabel();
 
     private void SourceMonitorComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_isLive && SourceMonitorComboBox.SelectedItem is DisplayTarget source
-            && DisplayComboBox?.SelectedItem is DisplayTarget target && source.Handle == target.Handle)
-            DisplayComboBox.SelectedItem = _displays.FirstOrDefault(display => display.Handle != source.Handle);
-        if (PrivateAppsButton is not null) UpdateCaptureModeUi();
+        if (_refreshingDisplays || _isLive || !_isLoaded) return;
+        RefreshAudienceDisplays();
+        UpdateSourceLabel();
+    }
+
+    private void UpdateSourceLabel()
+    {
+        if (ActiveSourceTitle is null) return;
+        ActiveSourceTitle.Text = IsSafeMirrorMode
+            ? (SourceMonitorComboBox.SelectedItem as DisplayTarget)?.ShortDisplayName ?? "Pilih layar"
+            : (SourceComboBox.SelectedItem as WindowSource)?.Title ?? "Pilih aplikasi";
+    }
+
+    private void RefreshSources_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshSources();
+        if (_sources.Count == 0)
+            FooterStatusText.Text = "Buka aplikasi yang ingin dipilih, lalu perbarui daftar.";
+    }
+
+    private bool IsSafeMirrorMode => CaptureModeComboBox.SelectedIndex == 1;
+    private bool IsRecordingOnly => SessionModeComboBox.SelectedIndex == 0;
+
+    private void SessionModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoaded) UpdateCaptureModeUi();
     }
 
     private void CaptureModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (SourceMonitorComboBox is null || PrivateAppsButton is null || RecordingOnlyCheckBox is null) return;
+        if (!_isLoaded) return;
+        if (!IsSafeMirrorMode) RefreshSources();
+        RefreshAudienceDisplays();
         UpdateCaptureModeUi();
     }
 
     private void UpdateCaptureModeUi()
     {
-        var safeMirror = IsSafeMirrorMode;
-        SourceComboBox.IsEnabled = !safeMirror && !_isLive;
-        SourceComboBox.Visibility = safeMirror ? Visibility.Collapsed : Visibility.Visible;
-        SourceMonitorComboBox.Visibility = safeMirror ? Visibility.Visible : Visibility.Collapsed;
-        SourceMonitorComboBox.IsEnabled = !_isLive;
-        PrivateAppsButton.IsEnabled = safeMirror && !_isLive;
-        RecordingOnlyCheckBox.IsEnabled = !_isLive;
-        DisplayComboBox.IsEnabled = !IsRecordingOnly && !_isLive;
-        OutputScaleComboBox.IsEnabled = !safeMirror && !_isLive;
-        if (safeMirror) OutputScaleComboBox.SelectedIndex = 1;
-        WindowModeChoice.Content = IsRecordingOnly ? "Rekam aplikasi" : "Bagikan aplikasi";
-        ScreenModeChoice.Content = IsRecordingOnly ? "Rekam layar" : "Bagikan layar";
-        SourcePrivacyBadgeText.Text = safeMirror ? "LAYAR" : "APLIKASI";
-        ClientPreviewLabel.Text = IsRecordingOnly ? "Preview rekaman" : "Layar kedua";
-
-        if (safeMirror)
-        {
-            var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
-            ActiveSourceTitle.Text = monitor is null ? "Pilih layar" : $"Layar {monitor.Index}";
-            ActiveSourceSubtitle.Text = "Klik Sembunyikan aplikasi untuk memilih aplikasi yang tidak ikut tampil";
-            BrowserAddressText.Text = "Seluruh layar, tanpa terpotong";
-            DemoHeadingText.Text = "Preview layar";
-            MiniOutputTitle.Text = "Layar yang dipilih";
-        }
-        else
-        {
-            SourceComboBox_SelectionChanged(SourceComboBox, null!);
-        }
-
+        var selecting = !_isLive;
+        var screen = IsSafeMirrorMode;
+        var presentation = !IsRecordingOnly;
+        SessionModeComboBox.IsEnabled = selecting;
+        CaptureModeComboBox.IsEnabled = selecting;
+        SourceComboBox.Visibility = screen ? Visibility.Collapsed : Visibility.Visible;
+        SourceComboBox.IsEnabled = selecting;
+        SourceMonitorComboBox.Visibility = screen ? Visibility.Visible : Visibility.Collapsed;
+        SourceMonitorComboBox.IsEnabled = selecting;
+        RefreshSourcesButton.Visibility = screen ? Visibility.Collapsed : Visibility.Visible;
+        RefreshSourcesButton.IsEnabled = selecting;
+        PrivateAppsButton.Visibility = screen ? Visibility.Visible : Visibility.Collapsed;
+        PrivateAppsButton.IsEnabled = selecting;
+        OutputOptions.Visibility = presentation || !screen ? Visibility.Visible : Visibility.Collapsed;
+        DisplayComboBox.Visibility = presentation ? Visibility.Visible : Visibility.Collapsed;
+        DisplayComboBox.IsEnabled = selecting;
+        OutputScaleComboBox.Visibility = screen ? Visibility.Collapsed : Visibility.Visible;
+        OutputScaleComboBox.IsEnabled = selecting;
+        UpdateSourceLabel();
         UpdatePresentationState();
     }
 
@@ -221,71 +220,107 @@ public sealed partial class MainPage : Page
         var windowHandle = (nint)rawHandle;
         if (item.IsChecked) _privateWindows.Add(windowHandle);
         else _privateWindows.Remove(windowHandle);
-        PrivateAppsButtonText.Text = $"Sembunyikan aplikasi ({_privateWindows.Count})";
+        PrivateAppsButton.Content = _privateWindows.Count == 0
+            ? "Sembunyikan aplikasi"
+            : $"Sembunyikan aplikasi ({_privateWindows.Count})";
     }
 
-    private async void LiveButton_Click(object sender, RoutedEventArgs e)
+    private async void PrimaryButton_Click(object sender, RoutedEventArgs e) => await RunPrimaryActionAsync();
+
+    private async Task RunPrimaryActionAsync()
     {
-        if (!_isLive && ((!IsRecordingOnly && DisplayComboBox.SelectedItem is null)
-            || (IsSafeMirrorMode && SourceMonitorComboBox.SelectedItem is null)
-            || (!IsSafeMirrorMode && SourceComboBox.SelectedItem is null)))
+        if (_sessionTransition) return;
+        if (!IsRecordingOnly)
         {
-            FooterStatusText.Text = "Pilih layar atau aplikasi terlebih dahulu. Untuk merekam tanpa layar audiens, centang Rekam saja.";
+            if (_isLive) await StopSessionAsync();
+            else if (TryStartSession()) MinimizeForScreenSession();
             return;
         }
 
-        if (!_isLive)
+        if (_recorder is not null)
         {
-            var source = SourceComboBox.SelectedItem as WindowSource;
-            var target = IsRecordingOnly ? null : DisplayComboBox.SelectedItem as DisplayTarget;
-            var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
-            if ((!IsRecordingOnly && target is null)
-                || (IsSafeMirrorMode && monitor is null) || (!IsSafeMirrorMode && source is null))
-            {
-                FooterStatusText.Text = "Pilih layar atau aplikasi terlebih dahulu. Untuk merekam tanpa layar audiens, centang Rekam saja.";
-                return;
-            }
-
-            try
-            {
-                StartPresentation(source, monitor, target);
-            }
-            catch (Exception exception)
-            {
-                StopPresentation();
-                FooterStatusText.Text = $"Tampilan belum dapat dibuka. {exception.Message}";
-                SetWindowStatus("Tampilan belum tersedia", PrivacyBrush);
-                return;
-            }
-
-            _isLive = true;
-            _elapsed = TimeSpan.Zero;
-            _sessionTimer.Start();
-            CaptureModeComboBox.IsEnabled = false;
-            SourceComboBox.IsEnabled = false;
-            DisplayComboBox.IsEnabled = false;
-            OutputScaleComboBox.IsEnabled = false;
-            SourceMonitorComboBox.IsEnabled = false;
-            RecordingOnlyCheckBox.IsEnabled = false;
-            PrivateAppsButton.IsEnabled = false;
+            await StopSessionAsync();
+            return;
         }
-        else
+
+        var startedCapture = !_isLive;
+        if (startedCapture && !TryStartSession()) return;
+        if (await RunRecordingChangeAsync(StartRecordingAsync, "Menyiapkan rekaman…"))
         {
-            await StopRecordingAsync();
+            MinimizeForScreenSession();
+        }
+        else if (startedCapture && _isLive)
+        {
+            var status = FooterStatusText.Text;
             StopPresentation();
+            FooterStatusText.Text = status;
+        }
+    }
+
+    private async void PreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sessionTransition) return;
+        if (_isLive) await StopSessionAsync();
+        else if (TryStartSession()) MinimizeForScreenSession();
+    }
+
+    private bool TryStartSession()
+    {
+        var source = SourceComboBox.SelectedItem as WindowSource;
+        var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
+        var target = IsRecordingOnly ? null : DisplayComboBox.SelectedItem as DisplayTarget;
+        if (IsSafeMirrorMode ? monitor is null : source is null)
+        {
+            FooterStatusText.Text = IsSafeMirrorMode ? "Pilih layar yang ingin digunakan." : "Pilih aplikasi yang ingin digunakan.";
+            return false;
+        }
+        if (!IsRecordingOnly && target is null)
+        {
+            FooterStatusText.Text = "Sambungkan dan pilih layar audiens. Untuk menyimpan video saja, pilih mode Rekam.";
+            return false;
         }
 
-        FreezeButton.IsEnabled = _isLive;
-        PrivacyButton.IsEnabled = _isLive;
-        RecordButton.IsEnabled = _isLive;
-        if (!_isLive)
+        try
         {
-            CaptureModeComboBox.IsEnabled = true;
-            DisplayComboBox.IsEnabled = true;
-            OutputScaleComboBox.IsEnabled = true;
-            UpdateCaptureModeUi();
+            StartPresentation(source, monitor, target);
         }
-        UpdatePresentationState();
+        catch (Exception exception)
+        {
+            StopPresentation();
+            FooterStatusText.Text = $"Tampilan belum dapat dibuka. {exception.Message}";
+            SetWindowStatus("Tampilan belum tersedia", PrivacyBrush);
+            return false;
+        }
+
+        _isLive = true;
+        NotesButton.IsChecked = false;
+        SetNotesVisible(false);
+        _sessionTimer.Start();
+        UpdateCaptureModeUi();
+        return true;
+    }
+
+    private void MinimizeForScreenSession()
+    {
+        if (!_isSafeMirrorSession || App.MainWindow is not MainWindow window) return;
+        window.AutoMinimizeOnDeactivate = true;
+        window.MinimizeForPresentation();
+    }
+
+    private async Task StopSessionAsync()
+    {
+        if (_recorder is null)
+        {
+            StopPresentation();
+            return;
+        }
+        await RunRecordingChangeAsync(async () =>
+        {
+            var status = await StopRecordingAsync();
+            StopPresentation();
+            if (status is not null) FooterStatusText.Text = status;
+            return true;
+        }, "Menyimpan…");
     }
 
     private void FreezeButton_Click(object sender, RoutedEventArgs e)
@@ -331,26 +366,19 @@ public sealed partial class MainPage : Page
 
     private void SessionTimer_Tick(object? sender, object e)
     {
-        _elapsed = _elapsed.Add(TimeSpan.FromSeconds(1));
-        TimerText.Text = _elapsed.ToString(@"mm\:ss");
-        if (_recorder?.IsRecording == true)
-        {
-            var recordingElapsed = DateTimeOffset.Now - _recordingStartedAt;
-            RecordButtonText.Text = $"Stop rekam · {recordingElapsed:mm\\:ss}";
-            var cameraWarning = _recorder.CameraWarning;
-            if (cameraWarning != _lastCameraWarning && cameraWarning is not null)
-                FooterStatusText.Text = $"{cameraWarning} · rekaman layar tetap berjalan";
-            _lastCameraWarning = cameraWarning;
-        }
-        UpdateRecordingStatusLabels();
+        if (_recorder?.IsRecording != true) return;
+        UpdateSessionActions();
+        var cameraWarning = _recorder.CameraWarning;
+        if (cameraWarning != _lastCameraWarning && cameraWarning is not null)
+            FooterStatusText.Text = $"{cameraWarning} · rekaman tetap berjalan";
+        _lastCameraWarning = cameraWarning;
     }
 
     private void UpdateRecordingStatusLabels()
     {
         if (ResolveState() != PresentationState.Live) return;
         var recording = _recorder?.IsRecording == true;
-        ClientStatusText.Text = recording ? "REC" : _isRecordingOnlySession ? "PREVIEW" : "LIVE";
-        SetWindowStatus(recording ? "Sedang merekam" : _isRecordingOnlySession ? "Preview aktif" : "Presentasi aktif", LiveBrush);
+        SetWindowStatus(recording ? "Sedang merekam" : _isRecordingOnlySession ? "Pratinjau" : "Presentasi aktif", LiveBrush);
     }
 
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -370,33 +398,45 @@ public sealed partial class MainPage : Page
 
     private async void RecordButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_recordingTransition)
+        if (_recorder is null)
         {
-            RecordButton.IsChecked = _recorder?.IsRecording == true;
-            return;
+            await RunRecordingChangeAsync(StartRecordingAsync, "Menyiapkan…");
         }
+        else
+        {
+            await RunRecordingChangeAsync(async () =>
+            {
+                var status = await StopRecordingAsync();
+                if (status is not null) FooterStatusText.Text = status;
+                return true;
+            }, "Menyimpan…");
+        }
+    }
 
-        _recordingTransition = true;
-        RecordButton.IsEnabled = false;
-        LiveButton.IsEnabled = false;
-        SettingsButton.IsEnabled = false;
+    private async Task<bool> RunRecordingChangeAsync(Func<Task<bool>> action, string busyLabel)
+    {
+        if (_sessionTransition) return false;
+        _sessionTransition = true;
+        (IsRecordingOnly ? PrimaryButton : RecordButton).Content = busyLabel;
+        UpdateSessionActions();
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            _sessionTransition = false;
+            UpdateSessionActions();
+        }
+    }
+
+    private async Task<bool> StartRecordingAsync()
+    {
+        if (!_isLive || _capture is null) return false;
         StorageFile? pendingFile = null;
         var pendingFileWasAutoCreated = false;
         try
         {
-            if (_recorder?.IsRecording == true)
-            {
-                await StopRecordingAsync();
-                return;
-            }
-
-            if (!_isLive || _capture is null)
-            {
-                RecordButton.IsChecked = false;
-                FooterStatusText.Text = "Klik Buka preview atau Mulai presentasi, lalu klik Rekam.";
-                return;
-            }
-
             var settings = _settingsService.Current;
             pendingFileWasAutoCreated = !settings.AskRecordingLocation;
             var file = settings.AskRecordingLocation
@@ -404,13 +444,13 @@ public sealed partial class MainPage : Page
                 : await _settingsService.CreateRecordingFileAsync();
             if (file is null)
             {
-                RecordButton.IsChecked = false;
-                return;
+                FooterStatusText.Text = "Perekaman dibatalkan.";
+                return false;
             }
             pendingFile = file;
 
             if (!_isLive || _capture is null)
-                throw new InvalidOperationException("Preview sudah ditutup. Klik Buka preview lagi sebelum merekam.");
+                throw new InvalidOperationException("Sesi sudah ditutup. Mulai kembali untuk merekam.");
 
             var stream = await file.OpenAsync(FileAccessMode.ReadWrite);
             var recorder = new OutputRecordingService();
@@ -432,7 +472,7 @@ public sealed partial class MainPage : Page
                             Mirror = settings.CameraMirror
                         }));
                 if (!_isLive || _capture is null)
-                    throw new InvalidOperationException("Tampilan ditutup saat kamera disiapkan. Buka preview lagi sebelum merekam.");
+                    throw new InvalidOperationException("Sesi ditutup saat kamera disiapkan. Mulai kembali untuk merekam.");
             }
             catch
             {
@@ -445,62 +485,37 @@ public sealed partial class MainPage : Page
             _recordingFileWasAutoCreated = pendingFileWasAutoCreated;
             _recordingStartedAt = DateTimeOffset.Now;
             _lastCameraWarning = null;
-            RecordButton.IsChecked = true;
-            RecordButtonText.Text = "Stop rekam · 00:00";
-            RecordButtonDot.Fill = PrivacyBrush;
-            FooterStatusText.Text = $"Merekam {(recorder.IncludesCamera ? "layar dan kamera" : "tampilan yang dipilih")} · 1080p {settings.RecordingFrameRate} fps. Klik Stop rekam untuk menyimpan.";
+            FooterStatusText.Text = $"Sedang merekam{(recorder.IncludesCamera ? " dengan kamera" : "")} · 1080p {settings.RecordingFrameRate} fps.";
             UpdateRecordingStatusLabels();
             _ = WatchRecordingAsync(recorder);
+            return true;
         }
         catch (Exception exception)
         {
             if (pendingFileWasAutoCreated) await DeleteEmptyRecordingAsync(pendingFile);
-            RecordButton.IsChecked = false;
-            RecordButtonText.Text = "Rekam";
             FooterStatusText.Text = $"Rekaman belum dapat dimulai. {exception.Message}";
-        }
-        finally
-        {
-            _recordingTransition = false;
-            RecordButton.IsEnabled = _isLive;
-            LiveButton.IsEnabled = true;
-            SettingsButton.IsEnabled = true;
+            return false;
         }
     }
 
-    private async Task StopRecordingAsync()
+    private async Task<string?> StopRecordingAsync()
     {
         var recorder = _recorder;
+        if (recorder is null) return null;
         var file = _recordingFile;
         _recorder = null;
         _recordingFile = null;
         _recordingFileWasAutoCreated = false;
-        RecordButton.IsEnabled = false;
-        RecordButtonText.Text = "Menyimpan…";
 
-        if (recorder is not null)
+        try
         {
-            try
-            {
-                await recorder.StopAsync();
-                FooterStatusText.Text = file is null
-                    ? "Rekaman selesai"
-                    : $"Rekaman tersimpan · {file.Name}";
-            }
-            catch (Exception exception)
-            {
-                FooterStatusText.Text = $"Rekaman belum dapat disimpan. {exception.Message}";
-            }
-            finally
-            {
-                await recorder.DisposeAsync();
-            }
+            await recorder.DisposeAsync();
+            return file is null ? "Rekaman selesai." : $"Rekaman tersimpan · {file.Name}";
         }
-
-        RecordButton.IsChecked = false;
-        RecordButtonText.Text = "Rekam";
-        RecordButton.IsEnabled = _isLive;
-        UpdateRecordingStatusLabels();
+        catch (Exception exception)
+        {
+            return $"Rekaman belum dapat disimpan. {exception.Message}";
+        }
     }
 
     private async Task WatchRecordingAsync(OutputRecordingService recorder)
@@ -534,9 +549,7 @@ public sealed partial class MainPage : Page
             failure ??= exception;
         }
         if (fileWasAutoCreated) await DeleteEmptyRecordingAsync(file);
-        RecordButton.IsChecked = false;
-        RecordButtonText.Text = "Rekam";
-        RecordButton.IsEnabled = _isLive;
+        UpdateSessionActions();
         UpdateRecordingStatusLabels();
         FooterStatusText.Text = failure is null
             ? "Rekaman terhenti. Tekan Rekam untuk memulai video baru."
@@ -560,7 +573,7 @@ public sealed partial class MainPage : Page
     private void StartPresentation(WindowSource? source, DisplayTarget? sourceMonitor, DisplayTarget? target)
     {
         if (IsSafeMirrorMode && target is not null && sourceMonitor?.Handle == target.Handle)
-            throw new InvalidOperationException("Pilih layar audiens yang berbeda dari layar yang direkam, atau centang Rekam saja.");
+            throw new InvalidOperationException("Pilih layar audiens yang berbeda dari layar sumber, atau gunakan mode Rekam.");
         _capture = new CaptureSessionService();
         _capture.FrameAvailable += Capture_FrameAvailable;
         _capture.SourceClosed += Capture_SourceClosed;
@@ -601,7 +614,6 @@ public sealed partial class MainPage : Page
             _capture.Start(source!.Handle);
         }
 
-        LivePreviewCanvas.Visibility = Visibility.Visible;
         if (target is not null)
         {
             var previewMode = target.IsPrimary && _displays.Count == 1;
@@ -611,11 +623,6 @@ public sealed partial class MainPage : Page
             _outputWindow.ApplyPlacement();
         }
         (App.MainWindow as MainWindow)?.Activate();
-        if (_isSafeMirrorSession && App.MainWindow is MainWindow mirrorWindow)
-        {
-            mirrorWindow.AutoMinimizeOnDeactivate = true;
-            mirrorWindow.MinimizeForPresentation();
-        }
     }
 
     private void StopPresentation()
@@ -657,13 +664,6 @@ public sealed partial class MainPage : Page
         ApplyNoteCaptureRules();
         SetNotesEditingEnabled(true);
 
-        LivePreviewCanvas.Visibility = Visibility.Collapsed;
-        FreezeButton.IsEnabled = false;
-        PrivacyButton.IsEnabled = false;
-        RecordButton.IsEnabled = false;
-        CaptureModeComboBox.IsEnabled = true;
-        DisplayComboBox.IsEnabled = true;
-        OutputScaleComboBox.IsEnabled = true;
         UpdateCaptureModeUi();
     }
 
@@ -795,7 +795,9 @@ public sealed partial class MainPage : Page
 
     private void Capture_FrameAvailable(object? sender, EventArgs e)
     {
-        if (_isLive) LivePreviewCanvas.Invalidate();
+        if (!_isLive) return;
+        if (!_isPrivacy && ClientStateOverlay.Visibility == Visibility.Visible) UpdatePreview();
+        LivePreviewCanvas.Invalidate();
     }
 
     private void Capture_SourceClosed(object? sender, EventArgs e)
@@ -825,15 +827,16 @@ public sealed partial class MainPage : Page
     private async void OutputWindow_Closed(object sender, WindowEventArgs args)
     {
         _outputWindow = null;
-        await StopRecordingAsync();
+        var status = await StopRecordingAsync();
         StopPresentation();
-        UpdatePresentationState();
+        if (status is not null) FooterStatusText.Text = status;
     }
 
     private void LivePreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) => _capture?.Draw(sender, args);
 
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
+        _isLoaded = false;
         DisposeFloatingNotes();
         await StopRecordingAsync();
         StopPresentation();
@@ -851,75 +854,91 @@ public sealed partial class MainPage : Page
             _ => MutedBrush
         };
 
-        ClientStatusText.Foreground = brush;
         FooterStatusIcon.Foreground = brush;
-        LiveButtonDot.Fill = _isLive ? PrivacyBrush : LiveBrush;
-        LiveButtonText.Text = _isLive
-            ? (_isRecordingOnlySession ? "Stop preview" : "Stop presentasi")
-            : IsRecordingOnly ? "Buka preview" : "Mulai presentasi";
+        UpdateSessionActions();
+        UpdatePreview();
 
         switch (state)
         {
             case PresentationState.Live:
                 _outputWindow?.SetMode(ClientOutputMode.Live);
                 UpdateRecordingStatusLabels();
-                ClientStateOverlay.Visibility = Visibility.Collapsed;
-                FooterStatusText.Text = _recorder?.IsRecording == true
-                    ? (_isProtectedPublicCapture
-                        ? "Sedang merekam. Aplikasi yang disembunyikan tidak ikut tampil."
-                        : "Sedang merekam. Klik Stop rekam untuk menyimpan video.")
-                    : _isProtectedPublicCapture
-                    ? "Aplikasi yang disembunyikan tidak ikut tampil. Aplikasi lain tetap berjalan."
-                    : _isRecordingOnlySession
-                        ? "Preview aktif. Klik Rekam untuk mulai menyimpan video."
-                    : _isSafeMirrorSession
-                        ? "Layar sedang dibagikan. Aplikasi yang disembunyikan tidak ikut tampil."
-                        : "Hanya aplikasi yang dipilih yang dibagikan.";
+                FooterStatusText.Text = _isProtectedPublicCapture
+                    ? "Aplikasi yang disembunyikan tidak ikut tampil."
+                    : _recorder?.IsRecording == true
+                        ? "Sedang merekam. Klik Stop rekam untuk menyimpan video."
+                        : _isRecordingOnlySession
+                            ? "Pratinjau aktif. Klik Mulai rekam untuk menyimpan video."
+                            : "Presentasi aktif. Klik Rekam jika Anda juga ingin menyimpan video.";
                 break;
             case PresentationState.Frozen:
                 var waitingForPublicApp = _isAutoHeld && !(_capture?.HasFrame ?? false);
                 _outputWindow?.SetMode(
                     waitingForPublicApp ? ClientOutputMode.Privacy : ClientOutputMode.Frozen,
                     waitingForPublicApp ? "Buka aplikasi yang ingin ditampilkan" : null);
-                ClientStatusText.Text = "FREEZE";
-                ClientStateOverlay.Visibility = Visibility.Visible;
-                ClientStateIcon.Glyph = "\uE768";
-                ClientStateTitle.Text = waitingForPublicApp
-                    ? "Menunggu aplikasi"
-                    : _isAutoHeld ? "Aplikasi disembunyikan" : "Freeze aktif";
-                ClientStateSubtitle.Text = waitingForPublicApp
-                    ? "Buka aplikasi yang ingin ditampilkan"
-                    : "Tampilan terakhir tidak bergerak";
                 FooterStatusText.Text = waitingForPublicApp
                     ? "Buka aplikasi yang ingin ditampilkan untuk melanjutkan."
                     : _isAutoHeld ? "Aplikasi yang disembunyikan tidak ikut tampil."
                     : "Freeze aktif. Klik Freeze lagi untuk melanjutkan.";
-                SetWindowStatus("Freeze aktif", FreezeBrush);
+                SetWindowStatus(waitingForPublicApp ? "Menyiapkan tampilan" : "Freeze aktif", FreezeBrush);
                 break;
             case PresentationState.Privacy:
                 _outputWindow?.SetMode(ClientOutputMode.Privacy);
-                ClientStatusText.Text = "PRIVASI";
-                ClientStateOverlay.Visibility = Visibility.Visible;
-                ClientStateIcon.Glyph = "\uE890";
-                ClientStateTitle.Text = "Privasi aktif";
-                ClientStateSubtitle.Text = "Tampilan disembunyikan sementara";
-                FooterStatusText.Text = "Privasi aktif. Klik Privasi lagi untuk menampilkan layar kembali.";
+                FooterStatusText.Text = "Privasi aktif. Klik Privasi lagi untuk menampilkan gambar kembali.";
                 SetWindowStatus("Privasi aktif", PrivacyBrush);
                 break;
             default:
-                ClientStatusText.Text = "SIAP";
-                ClientStateOverlay.Visibility = Visibility.Visible;
-                ClientStateIcon.Glyph = "\uE930";
-                ClientStateTitle.Text = "Belum dimulai";
-                ClientStateSubtitle.Text = "Pilih layar atau aplikasi";
                 FooterStatusText.Text = IsRecordingOnly
-                    ? "Pilih layar → Sembunyikan aplikasi → Buka preview → Rekam."
-                    : IsSafeMirrorMode
-                    ? "Pilih layar → Sembunyikan aplikasi → Mulai presentasi."
-                    : "Pilih aplikasi dan layar kedua, lalu klik Mulai presentasi.";
+                    ? "Pilih layar atau aplikasi, lalu klik Mulai rekam."
+                    : "Pilih sumber dan layar audiens, lalu klik Mulai presentasi.";
                 SetWindowStatus("Siap", MutedBrush);
                 break;
         }
+    }
+
+    private void UpdateSessionActions()
+    {
+        var recording = _recorder is not null;
+        var elapsed = DateTimeOffset.Now - _recordingStartedAt;
+        var stopRecordingLabel = $"Stop rekam · {elapsed:mm\\:ss}";
+        PrimaryButton.IsEnabled = !_sessionTransition;
+        PreviewButton.IsEnabled = !_sessionTransition;
+        SettingsButton.IsEnabled = !_sessionTransition;
+        RecordButton.IsEnabled = !_sessionTransition;
+        PreviewButton.Visibility = IsRecordingOnly && !recording ? Visibility.Visible : Visibility.Collapsed;
+        PreviewButton.Content = _isLive ? "Tutup pratinjau" : "Lihat pratinjau";
+        SessionControls.Visibility = _isLive ? Visibility.Visible : Visibility.Collapsed;
+        RecordButton.Visibility = IsRecordingOnly ? Visibility.Collapsed : Visibility.Visible;
+        if (_sessionTransition) return;
+
+        PrimaryButton.Content = IsRecordingOnly
+            ? recording ? stopRecordingLabel : "Mulai rekam"
+            : _isLive ? "Stop presentasi" : "Mulai presentasi";
+        RecordButton.Content = recording ? stopRecordingLabel : "Rekam";
+    }
+
+    private void UpdatePreview()
+    {
+        var frameVisible = _isLive && !_isPrivacy && _capture?.HasFrame == true;
+        LivePreviewCanvas.Visibility = frameVisible ? Visibility.Visible : Visibility.Collapsed;
+        ClientStateOverlay.Visibility = frameVisible ? Visibility.Collapsed : Visibility.Visible;
+        if (frameVisible) return;
+
+        if (_isPrivacy)
+        {
+            ClientStateIcon.Glyph = "\uE890";
+            ClientStateTitle.Text = "Privasi aktif";
+            ClientStateSubtitle.Text = "Tampilan disembunyikan sementara.";
+            return;
+        }
+
+        ClientStateIcon.Glyph = "\uE7F4";
+        ClientStateTitle.Text = _isLive ? "Menyiapkan tampilan…" : IsRecordingOnly ? "Siap merekam" : "Siap presentasi";
+        ClientStateSubtitle.Text = _isLive
+            ? "Buka layar atau aplikasi yang ingin ditampilkan."
+            : IsRecordingOnly
+                ? "Tampilan sumber akan terlihat di sini saat pratinjau atau rekaman berjalan."
+                : "Sumber presentasi akan terlihat di sini.";
     }
 
     private PresentationState ResolveState()
