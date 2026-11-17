@@ -35,6 +35,10 @@ public sealed class AppSettingsService
         _localSettings.Values[nameof(PresenterSettings.CameraPosition)] = Current.CameraPosition;
         _localSettings.Values[nameof(PresenterSettings.CameraWidthPercent)] = Current.CameraWidthPercent;
         _localSettings.Values[nameof(PresenterSettings.CameraMirror)] = Current.CameraMirror;
+        _localSettings.Values[nameof(PresenterSettings.ComputerAudioEnabled)] = Current.ComputerAudioEnabled;
+        _localSettings.Values[nameof(PresenterSettings.PlaybackDeviceId)] = Current.PlaybackDeviceId;
+        _localSettings.Values[nameof(PresenterSettings.MicrophoneEnabled)] = Current.MicrophoneEnabled;
+        _localSettings.Values[nameof(PresenterSettings.MicrophoneDeviceId)] = Current.MicrophoneDeviceId;
     }
 
     public async Task<StorageFolder> GetRecordingFolderAsync()
@@ -105,7 +109,11 @@ public sealed class AppSettingsService
             CameraDeviceId = values[nameof(PresenterSettings.CameraDeviceId)] as string ?? string.Empty,
             CameraPosition = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraPosition), 0), 0, 3),
             CameraWidthPercent = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24), 15, 35),
-            CameraMirror = ReadBool(values, nameof(PresenterSettings.CameraMirror))
+            CameraMirror = ReadBool(values, nameof(PresenterSettings.CameraMirror)),
+            ComputerAudioEnabled = ReadBool(values, nameof(PresenterSettings.ComputerAudioEnabled)),
+            PlaybackDeviceId = values[nameof(PresenterSettings.PlaybackDeviceId)] as string ?? string.Empty,
+            MicrophoneEnabled = ReadBool(values, nameof(PresenterSettings.MicrophoneEnabled)),
+            MicrophoneDeviceId = values[nameof(PresenterSettings.MicrophoneDeviceId)] as string ?? string.Empty
         };
     }
 

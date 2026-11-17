@@ -1,3 +1,4 @@
+using Clario_Presenter.Audio;
 using Clario_Presenter.Capture;
 using Clario_Presenter.Camera;
 using Clario_Presenter.Recording;
@@ -48,7 +49,7 @@ public sealed partial class MainPage : Page
     private bool _sourceDisplayNeedsSelection;
     private bool _audienceDisplayNeedsSelection;
     private string? _lastSavedRecordingFolder;
-    private string? _lastCameraWarning;
+    private string? _lastRecordingWarning;
 
     private SolidColorBrush LiveBrush => ResourceBrush("ClarioLiveBrush");
     private SolidColorBrush FreezeBrush => ResourceBrush("ClarioFreezeBrush");
@@ -233,7 +234,8 @@ public sealed partial class MainPage : Page
 
         void UpdateSelectionCount() => selectionText.Text = checks.Length == 0
             ? "Buka aplikasi yang ingin disembunyikan terlebih dahulu."
-            : $"{checks.Count(check => check.IsChecked == true)} dipilih. Pilihan berlaku per jendela.";
+            : $"{checks.Count(check => check.IsChecked == true)} dipilih. Pilihan berlaku per jendela."
+                + (_settingsService.Current.ComputerAudioEnabled ? " Suara komputer tetap mengikuti keluaran yang dipilih." : "");
 
         foreach (var check in checks)
         {
@@ -470,10 +472,10 @@ public sealed partial class MainPage : Page
     {
         if (_recorder?.IsRecording != true) return;
         UpdateRecordingStatusLabels();
-        var cameraWarning = _recorder.CameraWarning;
-        if (cameraWarning != _lastCameraWarning && cameraWarning is not null)
-            FooterStatusText.Text = $"{cameraWarning} · rekaman tetap berjalan";
-        _lastCameraWarning = cameraWarning;
+        var warning = _recorder.AudioWarning ?? _recorder.CameraWarning;
+        if (warning != _lastRecordingWarning && warning is not null)
+            FooterStatusText.Text = $"{warning} Rekaman tetap berjalan.";
+        _lastRecordingWarning = warning;
     }
 
     private void UpdateRecordingStatusLabels()
@@ -602,9 +604,11 @@ public sealed partial class MainPage : Page
                             Position = (CameraOverlayPosition)settings.CameraPosition,
                             WidthPercent = settings.CameraWidthPercent,
                             Mirror = settings.CameraMirror
-                        }));
+                        },
+                        new RecordingAudioOptions(settings.ComputerAudioEnabled, settings.PlaybackDeviceId,
+                            settings.MicrophoneEnabled, settings.MicrophoneDeviceId)));
                 if (!_isLive || _capture is null)
-                    throw new InvalidOperationException("Sesi ditutup saat kamera disiapkan. Mulai kembali untuk merekam.");
+                    throw new InvalidOperationException("Sesi ditutup saat rekaman disiapkan. Mulai kembali untuk merekam.");
             }
             catch
             {
@@ -616,8 +620,10 @@ public sealed partial class MainPage : Page
             _recordingFile = file;
             _recordingFileWasAutoCreated = pendingFileWasAutoCreated;
             _recordingStartedAt = DateTimeOffset.Now;
-            _lastCameraWarning = null;
-            FooterStatusText.Text = $"Sedang merekam{(recorder.IncludesCamera ? " dengan kamera" : "")} · 1080p {settings.RecordingFrameRate} fps.";
+            _lastRecordingWarning = null;
+            var camera = recorder.IncludesCamera ? " · Kamera aktif" : "";
+            var audio = recorder.IncludesAudio ? " · Audio aktif" : "";
+            FooterStatusText.Text = $"Sedang merekam · 1080p {settings.RecordingFrameRate} fps{camera}{audio}.";
             UpdateRecordingStatusLabels();
             _ = WatchRecordingAsync(recorder);
             return true;
@@ -994,6 +1000,7 @@ public sealed partial class MainPage : Page
     private void UpdatePresentationState()
     {
         var state = ResolveState();
+        _recorder?.SetAudioPrivacy(state == PresentationState.Privacy);
         var brush = state switch
         {
             PresentationState.Live => LiveBrush,
@@ -1031,7 +1038,9 @@ public sealed partial class MainPage : Page
                 break;
             case PresentationState.Privacy:
                 _outputWindow?.SetMode(ClientOutputMode.Privacy);
-                FooterStatusText.Text = "Tampilan disembunyikan. Klik Matikan privasi untuk menampilkan gambar.";
+                FooterStatusText.Text = _recorder?.IncludesAudio == true
+                    ? "Tampilan disembunyikan dan audio dibisukan. Klik Matikan privasi untuk melanjutkan."
+                    : "Tampilan disembunyikan. Klik Matikan privasi untuk menampilkan gambar.";
                 break;
             default:
                 FooterStatusText.Text = IsRecordingOnly

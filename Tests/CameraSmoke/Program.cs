@@ -29,6 +29,8 @@ internal static class Program
                     new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
                 if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
                 else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
+                else if (args.Contains("--audio")) await AudioChecks.RunAsync(reportPath);
+                else if (args.Contains("--audio-input-open-only")) await AudioChecks.OpenInputOnlyAsync(reportPath);
                 else await RunChecksAsync(reportPath);
                 completion.TrySetResult();
             });

@@ -66,7 +66,7 @@ dotnet run --no-build -p:Platform=x64
 2. Jika merekam layar, buka **Sembunyikan aplikasi**, centang jendela privat, lalu klik **Terapkan**. Untuk memeriksa gambar terlebih dahulu, klik **Lihat pratinjau**.
 3. Klik **Mulai rekam**. Tekan **Stop rekam** untuk menyimpan video dan mengakhiri sesi. Untuk rekaman layar, buka kembali Clario dari taskbar agar tombolnya terlihat.
 
-Video disimpan ke `Videos\Clario Presenter`. Setelah video tersimpan, klik **Buka folder** untuk melihat hasilnya. Gunakan **Pengaturan** untuk mengganti folder atau memilih lokasi setiap kali merekam. Rekaman belum menyertakan suara.
+Video disimpan ke `Videos\Clario Presenter`. Setelah video tersimpan, klik **Buka folder** untuk melihat hasilnya. Gunakan **Pengaturan** untuk mengganti folder atau memilih lokasi setiap kali merekam.
 
 ### Presentasi
 
@@ -86,9 +86,17 @@ Sumber layar ditampilkan utuh. Untuk sumber aplikasi, buka **Opsi tampilan** unt
 4. Pilih posisi dan ukuran, lalu tekan **Simpan**. Pratinjau berhenti dan kamera dinyalakan kembali saat merekam.
 5. Klik **Mulai rekam**, atau klik **Rekam** setelah presentasi dimulai. Kamera muncul di video.
 
-Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Privasi aktif atau tampilan terputus, kamera juga disembunyikan dari video. Freeze mempertahankan gambar layar; kamera tetap bergerak. Suara belum disertakan.
+Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Privasi aktif atau tampilan terputus, kamera juga disembunyikan dari video. Freeze mempertahankan gambar layar; kamera tetap bergerak.
 
 Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Aplikasi yang hanya menampilkan preview kamera tanpa menyediakan perangkat kamera virtual belum dapat dipilih sebagai input kamera. Bila perangkat tidak muncul, aktifkan output virtualnya terlebih dahulu lalu muat ulang daftar; kompatibilitas perlu diuji pada driver yang dipakai.
+
+### Rekam suara komputer dan mikrofon
+
+1. Buka **Pengaturan → Audio**. Aktifkan **Suara komputer** untuk menangkap audio yang diputar lewat speaker, headphone, atau keluaran audio lain yang dipilih.
+2. Aktifkan **Mikrofon**, lalu pilih mikrofon laptop, perangkat USB, atau mixer/interface yang muncul sebagai input Windows. Gunakan **Perbarui perangkat audio** setelah menyambungkan perangkat.
+3. Aktifkan keduanya jika ingin mencampur narasi dan suara komputer. Klik **Simpan**, lalu mulai merekam. MP4 menyimpan satu trek AAC stereo 48 kHz. Kedua pilihan mati secara bawaan.
+
+Suara komputer mengikuti perangkat keluaran yang dipilih dan mencakup aplikasi lain yang terdengar di sana, termasuk aplikasi yang gambarnya disembunyikan. **Privasi** membisukan rekaman selama aktif. **Freeze** menahan gambar sambil melanjutkan audio.
 
 ### Catatan mengambang untuk praktik Cisco
 
@@ -177,6 +185,8 @@ Tambahkan `--desktop-only` pada argumen harness untuk uji perpindahan publik/pri
 
 Gunakan `--floating-notes` pada harness yang sama untuk menguji catatan mengambang tanpa kamera. Harness memeriksa baris terakhir teks dan blok kode panjang, resize, perpindahan dari daftar bagian, tombol gulir, fokus, dan warna dua jendela uji di balik panel melalui jalur gambar yang dipakai perekam. Gambar monitor tidak disimpan.
 
+Tambahkan `--audio` untuk menguji enumerasi perangkat, pembukaan keluaran WASAPI, pencampuran PCM, serta MP4 dengan dan tanpa audio. File uji audio memakai nada sintetis, menyertakan segmen Privasi, dan tidak menyimpan suara mikrofon atau keluaran asli. Opsi terpisah `--audio-input-open-only` memeriksa apakah input mikrofon dapat dibuka tanpa membaca sampel suara.
+
 ## Pengembangan berikutnya
 
 1. Shortcut global untuk Freeze, Privacy, dan fokus kembali ke sumber.
@@ -184,4 +194,3 @@ Gunakan `--floating-notes` pada harness yang sama untuk menguji catatan mengamba
 3. Penyimpanan sesi catatan per klien/proyek.
 4. Installer MSIX bertanda tangan dan alur pembaruan aplikasi.
 5. Telemetri performa lokal untuk mendeteksi frame drop tanpa merekam isi layar.
-6. Pilihan audio mikrofon dan audio sistem untuk rekaman presentasi.

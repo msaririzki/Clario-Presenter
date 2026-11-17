@@ -11,4 +11,8 @@ public sealed record PresenterSettings
     public int CameraPosition { get; init; }
     public int CameraWidthPercent { get; init; } = 24;
     public bool CameraMirror { get; init; }
+    public bool ComputerAudioEnabled { get; init; }
+    public string PlaybackDeviceId { get; init; } = string.Empty;
+    public bool MicrophoneEnabled { get; init; }
+    public string MicrophoneDeviceId { get; init; } = string.Empty;
 }

@@ -39,6 +39,7 @@ public sealed partial class SettingsDialog : ContentDialog
         CameraMirrorCheckBox.IsChecked = settings.CameraMirror;
         _previewStatusTimer.Tick += PreviewStatusTimer_Tick;
         UpdateFolderLabel();
+        InitializeAudioSettings(settings);
     }
 
     public PresenterSettings GetSettings()
@@ -61,14 +62,19 @@ public sealed partial class SettingsDialog : ContentDialog
             CameraDeviceId = (CameraDeviceComboBox.SelectedItem as CameraDevice)?.Id ?? _originalSettings.CameraDeviceId,
             CameraPosition = Math.Clamp(CameraPositionComboBox.SelectedIndex, 0, 3),
             CameraWidthPercent = CameraSizeComboBox.SelectedIndex switch { 0 => 18, 2 => 30, _ => 24 },
-            CameraMirror = CameraMirrorCheckBox.IsChecked == true
+            CameraMirror = CameraMirrorCheckBox.IsChecked == true,
+            ComputerAudioEnabled = ComputerAudioToggle.IsOn,
+            PlaybackDeviceId = SelectedAudioDeviceId(PlaybackAudioComboBox, _originalSettings.PlaybackDeviceId),
+            MicrophoneEnabled = MicrophoneAudioToggle.IsOn,
+            MicrophoneDeviceId = SelectedAudioDeviceId(MicrophoneAudioComboBox, _originalSettings.MicrophoneDeviceId)
         };
     }
 
     private async void SettingsDialog_Opened(ContentDialog sender, ContentDialogOpenedEventArgs args)
     {
         _opened = true;
-        if (CameraEnabledToggle.IsOn) await RefreshCamerasAsync();
+        await Task.WhenAll(CameraEnabledToggle.IsOn ? RefreshCamerasAsync() : Task.CompletedTask,
+            AudioEnabled ? RefreshAudioDevicesAsync() : Task.CompletedTask);
     }
 
     private async void CameraEnabled_Changed(object sender, RoutedEventArgs e)
@@ -219,13 +225,15 @@ public sealed partial class SettingsDialog : ContentDialog
 
     private void SettingsDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        if (CameraEnabledToggle.IsOn && CameraDeviceComboBox.SelectedItem is not CameraDevice)
-        {
-            args.Cancel = true;
-            SettingsErrorText.Text = "Pilih kamera yang terhubung, atau nonaktifkan kamera sebelum menyimpan.";
-            SettingsErrorText.Visibility = Visibility.Visible;
-            SettingsErrorText.StartBringIntoView();
-        }
+        var error = GetAudioSelectionError();
+        if (error is null && CameraEnabledToggle.IsOn && CameraDeviceComboBox.SelectedItem is not CameraDevice)
+            error = "Pilih kamera yang terhubung, atau nonaktifkan kamera sebelum menyimpan.";
+        if (error is null) return;
+
+        args.Cancel = true;
+        SettingsErrorText.Text = error;
+        SettingsErrorText.Visibility = Visibility.Visible;
+        SettingsErrorText.StartBringIntoView();
     }
 
     private async void SettingsDialog_Closing(ContentDialog sender, ContentDialogClosingEventArgs args)

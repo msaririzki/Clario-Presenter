@@ -1,3 +1,4 @@
+using Clario_Presenter.Audio;
 using Clario_Presenter.Capture;
 using Clario_Presenter.Camera;
 using Microsoft.Graphics.Canvas;
@@ -41,6 +42,14 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private Func<ClientOutputMode>? _modeProvider;
     private CameraCaptureService? _camera;
     private CameraOverlayOptions? _cameraOptions;
+    private readonly IRecordingAudioSource? _suppliedAudio;
+    private IRecordingAudioSource? _audio;
+    private long _clockStart;
+    private long _nextAudioFrame;
+    private long _audioEndFrame = long.MaxValue;
+    private readonly object _audioPrivacyGate = new();
+    private readonly Queue<(long Start, long End)> _audioPrivacyIntervals = new();
+    private long? _audioPrivacyStarted;
     private StableCpuFrame? _pendingFrame;
     private MediaStreamSource? _mediaSource;
     private IRandomAccessStream? _outputStream;
@@ -58,6 +67,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
     public Exception? Failure { get; private set; }
     public string? CameraWarning => _camera?.Warning;
     public bool IncludesCamera => _cameraOptions?.Enabled == true;
+    public bool IncludesAudio => _audio is not null;
+    public string? AudioWarning => _audio?.Warning;
+
+    public OutputRecordingService() { }
+
+    internal OutputRecordingService(IRecordingAudioSource audio) => _suppliedAudio = audio;
 
     public async Task StartAsync(
         IRecordingFrameSource capture,
@@ -101,12 +116,28 @@ public sealed class OutputRecordingService : IAsyncDisposable
         inputProperties.PixelAspectRatio.Denominator = 1;
 
         var descriptor = new VideoStreamDescriptor(inputProperties);
-        _mediaSource = new MediaStreamSource(descriptor) { BufferTime = TimeSpan.Zero };
+        var audioOptions = options.Audio;
+        _audio = _suppliedAudio ?? (audioOptions is { Enabled: true }
+            ? new RecordingAudioSource(audioOptions, AudioShouldBeMuted)
+            : null);
+        if (_audio is not null)
+        {
+            await _audio.StartAsync(_producerCancellation.Token);
+            var pcm = AudioEncodingProperties.CreatePcm(RecordingAudioFormat.SampleRate, RecordingAudioFormat.Channels, 16);
+            _mediaSource = new MediaStreamSource(descriptor, new AudioStreamDescriptor(pcm));
+        }
+        else
+        {
+            _mediaSource = new MediaStreamSource(descriptor);
+        }
+        _mediaSource.BufferTime = TimeSpan.Zero;
         _mediaSource.Starting += MediaSource_Starting;
         _mediaSource.SampleRequested += MediaSource_SampleRequested;
 
         var profile = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
-        profile.Audio = null;
+        profile.Audio = _audio is null
+            ? null
+            : AudioEncodingProperties.CreateAac(RecordingAudioFormat.SampleRate, RecordingAudioFormat.Channels, 192_000);
         profile.Video.Width = OutputWidth;
         profile.Video.Height = OutputHeight;
         profile.Video.Bitrate = (uint)Math.Clamp(options.BitrateMbps, 8, 32) * 1_000_000;
@@ -130,6 +161,9 @@ public sealed class OutputRecordingService : IAsyncDisposable
             throw new InvalidOperationException($"Perangkat belum dapat merekam 1080p {_frameRate} fps. Coba pilih 30 fps di Pengaturan.");
         }
 
+        _clockStart = Stopwatch.GetTimestamp();
+        _audio?.StartClock(_clockStart);
+        SetAudioPrivacy(_modeProvider() is ClientOutputMode.Privacy or ClientOutputMode.SourceLost);
         _producerTask = Task.Run(() => ProduceFramesAsync(_producerCancellation.Token));
         _transcodeTask = preparation.TranscodeAsync().AsTask();
     }
@@ -141,14 +175,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             if (_stopCompleted) return;
 
-            _stopping = true;
-            _producerCancellation.Cancel();
-            lock (_frameGate)
-            {
-                RecycleFrame(_pendingFrame);
-                _pendingFrame = null;
-                Monitor.PulseAll(_frameGate);
-            }
+            SignalEndOfStream();
 
             if (_producerTask is not null)
             {
@@ -171,6 +198,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
             {
                 try
                 {
+                    if (_audio is not null) await _audio.Completion;
                     if (_camera is not null) await _camera.DisposeAsync();
                 }
                 finally
@@ -189,7 +217,6 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
     private async Task ProduceFramesAsync(CancellationToken cancellationToken)
     {
-        var clock = Stopwatch.StartNew();
         long nextFrameIndex = 0;
 
         try
@@ -199,7 +226,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
                 // Keep timestamps tied to real elapsed time. When a slower GPU
                 // misses a 60 fps slot, skip that timestamp instead of making
                 // the final recording run faster than the live presentation.
-                var elapsedFrameIndex = clock.Elapsed.Ticks / _frameDuration.Ticks;
+                var elapsedFrameIndex = Stopwatch.GetElapsedTime(_clockStart).Ticks / _frameDuration.Ticks;
                 var frameIndex = Math.Max(nextFrameIndex, elapsedFrameIndex);
 
                 if (!RefreshPendingFrameTimestamp(frameIndex))
@@ -210,7 +237,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
                 nextFrameIndex = frameIndex + 1;
 
                 var nextFrameTime = TimeSpan.FromTicks(nextFrameIndex * _frameDuration.Ticks);
-                var delay = nextFrameTime - clock.Elapsed;
+                var delay = nextFrameTime - Stopwatch.GetElapsedTime(_clockStart);
                 if (delay > TimeSpan.Zero)
                 {
                     await Task.Delay(delay, cancellationToken);
@@ -388,6 +415,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
     private void MediaSource_SampleRequested(MediaStreamSource sender, MediaStreamSourceSampleRequestedEventArgs args)
     {
+        if (args.Request.StreamDescriptor is AudioStreamDescriptor)
+        {
+            _ = SupplyAudioAsync(args.Request);
+            return;
+        }
+
         var frame = TakeNextFrame();
         if (frame is null)
         {
@@ -409,6 +442,95 @@ public sealed class OutputRecordingService : IAsyncDisposable
             RecycleFrame(frame);
             args.Request.Sample = null;
         }
+    }
+
+    private bool AudioShouldBeMuted() => _capture is not { HasFrame: true }
+        || _modeProvider?.Invoke() is not (ClientOutputMode.Live or ClientOutputMode.Frozen);
+
+    internal void SetAudioPrivacy(bool enabled)
+    {
+        if (_audio is null || _clockStart == 0) return;
+        lock (_audioPrivacyGate)
+        {
+            if (enabled == _audioPrivacyStarted.HasValue) return;
+            var frame = RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(_clockStart));
+            if (enabled) _audioPrivacyStarted = frame;
+            else if (_audioPrivacyStarted is long start)
+            {
+                _audioPrivacyIntervals.Enqueue((start, frame));
+                _audioPrivacyStarted = null;
+            }
+        }
+    }
+
+    private void SuppressPrivateAudio(long firstFrame, Span<short> samples)
+    {
+        lock (_audioPrivacyGate)
+        {
+            while (_audioPrivacyIntervals.TryPeek(out var interval) && interval.End <= firstFrame)
+                _audioPrivacyIntervals.Dequeue();
+
+            foreach (var interval in _audioPrivacyIntervals)
+                MuteOverlap(firstFrame, samples, interval.Start, interval.End);
+            if (_audioPrivacyStarted is long start)
+                MuteOverlap(firstFrame, samples, start, long.MaxValue);
+        }
+    }
+
+    private static void MuteOverlap(long firstFrame, Span<short> pcm, long start, long end)
+    {
+        const int channels = RecordingAudioFormat.Channels;
+        var packetFrames = pcm.Length / channels;
+        var from = (int)Math.Clamp(start - firstFrame, 0, packetFrames);
+        var to = (int)Math.Clamp(end - firstFrame, 0, packetFrames);
+        if (to > from) pcm.Slice(from * channels, (to - from) * channels).Clear();
+    }
+
+    private async Task SupplyAudioAsync(MediaStreamSourceSampleRequest request)
+    {
+        var deferral = request.GetDeferral();
+        try
+        {
+            const int packetFrames = RecordingAudioFormat.PacketFrames;
+            var firstFrame = Interlocked.Add(ref _nextAudioFrame, packetFrames) - packetFrames;
+            // The capture timestamps already use the video clock. A short lead
+            // lets USB and playback packets reach the mixer before they are read.
+            var due = RecordingAudioFormat.PacketTime(firstFrame + packetFrames) + TimeSpan.FromMilliseconds(80);
+            var wait = due - Stopwatch.GetElapsedTime(_clockStart);
+            if (wait > TimeSpan.Zero && !_stopping)
+            {
+                try { await Task.Delay(wait, _producerCancellation.Token); }
+                catch (OperationCanceledException) when (_stopping) { }
+            }
+
+            var frames = (int)Math.Clamp(Volatile.Read(ref _audioEndFrame) - firstFrame, 0, packetFrames);
+            if (frames == 0 || _audio is null)
+            {
+                request.Sample = null;
+                return;
+            }
+
+            var samples = new short[frames * RecordingAudioFormat.Channels];
+            if (!AudioShouldBeMuted())
+            {
+                _audio.Read(firstFrame, samples);
+                SuppressPrivateAudio(firstFrame, samples);
+            }
+            var pcm = new byte[samples.Length * sizeof(short)];
+            System.Buffer.BlockCopy(samples, 0, pcm, 0, pcm.Length);
+            using var writer = new DataWriter();
+            writer.WriteBytes(pcm);
+            var sample = MediaStreamSample.CreateFromBuffer(writer.DetachBuffer(), RecordingAudioFormat.PacketTime(firstFrame));
+            sample.Duration = RecordingAudioFormat.PacketTime(frames);
+            request.Sample = sample;
+        }
+        catch (Exception exception)
+        {
+            Failure = exception;
+            request.Sample = null;
+            SignalEndOfStream();
+        }
+        finally { deferral.Complete(); }
     }
 
     private StableCpuFrame? TakeNextFrame()
@@ -436,6 +558,8 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private void SignalEndOfStream()
     {
         _stopping = true;
+        var endFrame = _clockStart == 0 ? 0 : RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(_clockStart));
+        Interlocked.CompareExchange(ref _audioEndFrame, endFrame, long.MaxValue);
         _producerCancellation.Cancel();
         lock (_frameGate)
         {
@@ -458,6 +582,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
         while (_availableFrames.TryTake(out var availableFrame)) availableFrame.Dispose();
         _pendingFrame?.Dispose();
         _pendingFrame = null;
+        _audio = null;
         _capture = null;
         _modeProvider = null;
         _outputStream?.Dispose();
@@ -491,7 +616,8 @@ public sealed class OutputRecordingService : IAsyncDisposable
     }
 }
 
-public sealed record RecordingOptions(int FrameRate, int BitrateMbps, CameraOverlayOptions? Camera = null)
+public sealed record RecordingOptions(int FrameRate, int BitrateMbps, CameraOverlayOptions? Camera = null,
+    RecordingAudioOptions? Audio = null)
 {
     public static RecordingOptions HighQuality60Fps { get; } = new(60, 18);
 }

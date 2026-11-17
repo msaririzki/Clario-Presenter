@@ -68,6 +68,30 @@
             </StackPanel>
         </Border>
 
+        <StackPanel Spacing="8">
+            <TextBlock Text="Audio" Style="{StaticResource ClarioHeadingStyle}" />
+            <ToggleSwitch x:Name="ComputerAudioToggle" Header="Suara komputer" OffContent="Mati" OnContent="Aktif"
+                          Toggled="AudioSource_Changed" />
+            <StackPanel x:Name="ComputerAudioOptions" Visibility="Collapsed" Spacing="6">
+                <ComboBox x:Name="PlaybackAudioComboBox" Header="Keluaran suara" DisplayMemberPath="Name"
+                          Style="{StaticResource ClarioPickerStyle}" PlaceholderText="Pilih speaker atau headphone"
+                          SelectionChanged="AudioDevice_SelectionChanged" />
+                <TextBlock Text="Semua suara dari keluaran yang dipilih ikut terekam, termasuk dari aplikasi tersembunyi."
+                           TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+            </StackPanel>
+            <ToggleSwitch x:Name="MicrophoneAudioToggle" Header="Mikrofon" OffContent="Mati" OnContent="Aktif"
+                          Toggled="AudioSource_Changed" />
+            <ComboBox x:Name="MicrophoneAudioComboBox" Header="Input mikrofon" DisplayMemberPath="Name" Visibility="Collapsed"
+                      Style="{StaticResource ClarioPickerStyle}" PlaceholderText="Pilih mikrofon laptop, USB, atau mixer"
+                      SelectionChanged="AudioDevice_SelectionChanged" />
+            <StackPanel x:Name="AudioDeviceActions" Visibility="Collapsed" Spacing="4">
+                <Button x:Name="RefreshAudioButton" Content="Perbarui perangkat audio" Click="RefreshAudio_Click"
+                        Style="{StaticResource ClarioButtonStyle}" />
+                <TextBlock x:Name="AudioStatusText" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+            </StackPanel>
+        </StackPanel>
+
         <TextBlock x:Name="SettingsErrorText" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{StaticResource ClarioPrivacyBrush}" FontSize="12" />
         <StackPanel Spacing="4">
             <TextBlock Text="Video" Style="{StaticResource ClarioHeadingStyle}" />
