@@ -12,7 +12,7 @@ internal sealed record NoteStep(string Title, IReadOnlyList<NoteBlock> Blocks);
 
 internal static class NoteDocument
 {
-    public const int MaximumLength = 32_000;
+    public const int MaximumLength = 200_000;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().DisableHtml().Build();
 
     public static IReadOnlyList<NoteStep> Parse(string text, bool markdown)

@@ -49,6 +49,8 @@ internal sealed partial class FloatingNoteWindow
     private static extern nint DefWindowProc(nint window, uint message, nint wParam, nint lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint LoadCursor(nint instance, nint name);
+    [DllImport("user32.dll")]
+    private static extern nint SetCursor(nint cursor);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint SetWindowLong(nint window, int index, uint value);
     [DllImport("user32.dll")]
@@ -60,9 +62,15 @@ internal sealed partial class FloatingNoteWindow
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out Point point);
     [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")]
     private static extern nint SetCapture(nint window);
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
+    [DllImport("user32.dll")]
+    private static extern nuint SetTimer(nint window, nuint id, uint milliseconds, nint callback);
+    [DllImport("user32.dll")]
+    private static extern bool KillTimer(nint window, nuint id);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowDisplayAffinity(nint window, uint affinity);
     [DllImport("user32.dll", SetLastError = true)]

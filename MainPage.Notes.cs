@@ -16,7 +16,14 @@ public sealed partial class MainPage
     private string? _notesFileName;
     private readonly DispatcherTimer _notesUpdateTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
 
-    private void InitializeFloatingNotes() => _notesUpdateTimer.Tick += NotesUpdateTimer_Tick;
+    private void InitializeFloatingNotes()
+    {
+        FreeNotesTextBox.MaxLength = NoteDocument.MaximumLength;
+        _notesUpdateTimer.Tick += NotesUpdateTimer_Tick;
+    }
+
+    private static string NotesLengthMessage =>
+        $"File catatan terlalu panjang. Gunakan maksimal {NoteDocument.MaximumLength.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("id-ID"))} karakter.";
 
     private void NoteOptions_Opening(object sender, object args)
     {
@@ -53,9 +60,9 @@ public sealed partial class MainPage
             WinRT.Interop.InitializeWithWindow.Initialize(picker, GetPresenterWindowHandle());
             var file = await picker.PickSingleFileAsync();
             if (file is null || _isLive) return;
-            if ((await file.GetBasicPropertiesAsync()).Size > NoteDocument.MaximumLength * 4)
+            if ((await file.GetBasicPropertiesAsync()).Size > NoteDocument.MaximumLength * 4 + 4)
             {
-                NoteStatusText.Text = "File catatan terlalu panjang. Gunakan maksimal 32.000 karakter.";
+                NoteStatusText.Text = NotesLengthMessage;
                 return;
             }
 
@@ -66,7 +73,7 @@ public sealed partial class MainPage
             if (_isLive) return;
             if (length > NoteDocument.MaximumLength)
             {
-                NoteStatusText.Text = "File catatan terlalu panjang. Gunakan maksimal 32.000 karakter.";
+                NoteStatusText.Text = NotesLengthMessage;
                 return;
             }
             _notesFileName = file.Name;
@@ -126,7 +133,8 @@ public sealed partial class MainPage
     private void ApplyNoteAppearance()
     {
         if (_floatingNotes is null) return;
-        _floatingNotes.SetAppearance((float)NotesOpacitySlider.Value / 100, (float)NotesFontSizeSlider.Value, (float)NotesWidthSlider.Value);
+        _floatingNotes.SetAppearance((float)NotesOpacitySlider.Value / 100, (float)NotesFontSizeSlider.Value,
+            (float)NotesWidthSlider.Value, (float)NotesHeightSlider.Value);
         _floatingNotes.SetClickThrough(NotesClickThroughToggle.IsOn);
         ApplyNoteCaptureRules();
     }
@@ -142,7 +150,15 @@ public sealed partial class MainPage
         if (_floatingNotes is null) return;
         PinNotesButton.Content = _floatingNotes.IsRequested ? "Tutup catatan" : "Sematkan";
         _syncingNotesControls = true;
-        try { NotesClickThroughToggle.IsOn = _floatingNotes.ClickThrough; }
+        try
+        {
+            NotesClickThroughToggle.IsOn = _floatingNotes.ClickThrough;
+            var (width, height) = _floatingNotes.Size;
+            NotesWidthSlider.Maximum = Math.Max(NotesWidthSlider.Maximum, Math.Ceiling(width));
+            NotesHeightSlider.Maximum = Math.Max(NotesHeightSlider.Maximum, Math.Ceiling(height));
+            NotesWidthSlider.Value = width;
+            NotesHeightSlider.Value = height;
+        }
         finally { _syncingNotesControls = false; }
         NoteStatusText.Text = _floatingNotes.Status +
             (_floatingNotes.ShortcutsAvailable ? "" : " Sebagian shortcut tidak tersedia.");

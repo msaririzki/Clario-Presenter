@@ -145,4 +145,11 @@ Check(NoteOverlayPlacement.IsAllowed(otherDisplay, false, sourceDisplay, null),
     "An unused second monitor is an available fallback.");
 Check(NoteOverlayPlacement.Clamp(new(-300, 200, 440, 360), otherDisplay) == new DisplayBounds(-440, 200, 440, 360),
     "Dragging on a monitor with a negative origin does not cross into the recording.");
+var initialPanel = new DisplayBounds(-540, 100, 440, 360);
+Check(NoteOverlayPlacement.Resize(initialPanel, otherDisplay, NoteResizeEdge.Left | NoteResizeEdge.Bottom,
+    -300, 1000, 264, 168) == new DisplayBounds(-840, 100, 740, 620),
+    "Dragging a corner resizes both axes and stays inside the chosen monitor.");
+Check(NoteOverlayPlacement.Resize(initialPanel, otherDisplay, NoteResizeEdge.Top,
+    500, 500, 264, 168) == new DisplayBounds(-540, 292, 440, 168),
+    "Dragging a single edge preserves the other dimension and the opposite edge.");
 Console.WriteLine($"PASS: {checks} composition and notes checks.");

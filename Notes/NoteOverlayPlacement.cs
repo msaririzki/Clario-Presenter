@@ -2,6 +2,9 @@ using Clario_Presenter.Services;
 
 namespace Clario_Presenter.Notes;
 
+[Flags]
+internal enum NoteResizeEdge { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
+
 internal static class NoteOverlayPlacement
 {
     internal static bool IsAllowed(DisplayBounds panel, bool excludedFromCapture,
@@ -20,5 +23,21 @@ internal static class NoteOverlayPlacement
         var height = Math.Clamp(requested.Height, 1, Math.Max(1, work.Height));
         return new(Math.Clamp(requested.Left, work.Left, work.Left + Math.Max(0, work.Width - width)),
             Math.Clamp(requested.Top, work.Top, work.Top + Math.Max(0, work.Height - height)), width, height);
+    }
+
+    internal static DisplayBounds Resize(DisplayBounds start, DisplayBounds work, NoteResizeEdge edges,
+        int dx, int dy, int minimumWidth, int minimumHeight)
+    {
+        var left = start.Left;
+        var top = start.Top;
+        var right = left + start.Width;
+        var bottom = top + start.Height;
+        var minWidth = Math.Min(start.Width, minimumWidth);
+        var minHeight = Math.Min(start.Height, minimumHeight);
+        if ((edges & NoteResizeEdge.Left) != 0) left = Math.Clamp(left + dx, work.Left, right - minWidth);
+        if ((edges & NoteResizeEdge.Right) != 0) right = Math.Clamp(right + dx, left + minWidth, work.Left + work.Width);
+        if ((edges & NoteResizeEdge.Top) != 0) top = Math.Clamp(top + dy, work.Top, bottom - minHeight);
+        if ((edges & NoteResizeEdge.Bottom) != 0) bottom = Math.Clamp(bottom + dy, top + minHeight, work.Top + work.Height);
+        return new(left, top, right - left, bottom - top);
     }
 }

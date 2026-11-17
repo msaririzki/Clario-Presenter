@@ -93,10 +93,12 @@ Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Apli
 ### Catatan mengambang untuk praktik Cisco
 
 1. Di panel **Catatan**, ketik atau tempel teks, atau klik **Buka file** dan pilih `.txt`, `.md`, atau `.markdown`. Contoh siap dibuka: [Praktik-Cisco.md](Examples/Praktik-Cisco.md).
-2. Klik **Sematkan**. Di **Atur catatan** Anda bisa memilih layar, mengubah ukuran teks/panel, serta menyesuaikan transparansi. Matikan **Klik tembus** untuk menggeser panel lewat bagian judul, lalu aktifkan lagi agar klik masuk ke aplikasi di belakangnya.
+2. Klik **Sematkan**. Matikan **Klik tembus** dengan **Ctrl+Shift+F9** untuk menarik tepi atau sudut panel, menggesernya dari judul, atau menarik scrollbar. Di **Atur catatan**, lebar dan tinggi bisa diatur terpisah. Klik **Aktifkan tembus** pada panel untuk kembali mengendalikan aplikasi di belakangnya.
 3. Pilih mode **Rekam** dan sumber **Layar**. Pilih layar tempat topologi dan dialog router/switch terbuka, lalu klik **Mulai rekam**. Dialog harus tetap berada di layar yang dipilih.
 
-Gunakan **Ctrl+Shift+F8** untuk menampilkan/menyembunyikan catatan, **F9** dengan pengubah yang sama untuk beralih Klik tembus, **F10/F11** untuk langkah sebelumnya/berikutnya, dan **Ctrl+Shift+↑/↓** untuk menggulir teks. Perintah tidak pernah dikirim otomatis ke Cisco. Sebagian shortcut mungkin sedang dipakai aplikasi lain; kontrol tetap tersedia di panel Catatan dan klik navigasi di mode Atur.
+Untuk Markdown dengan beberapa judul `##`, klik **Daftar** untuk melompat langsung ke bagian yang dipilih. Setiap bagian bisa digulir sampai akhir. Catatan `.txt` dan Markdown dapat berisi hingga 200.000 karakter.
+
+Tahan **Ctrl+Shift** saat menggunakan shortcut panel. **F8** menampilkan atau menyembunyikan catatan, **F9** mengubah Klik tembus, **F10/F11** berpindah bagian, **↑/↓** menggulir sedikit, **Page Up/Page Down** menggulir hampir satu layar, dan **Home/End** menuju awal atau akhir. Shortcut gulir dan pindah bagian bisa dipakai ketika Klik tembus aktif. Jika shortcut sedang digunakan aplikasi lain, gunakan scrollbar atau tombol panel dalam mode Atur.
 
 Untuk catatan dari AI, minta satu file Markdown UTF-8 dengan judul `## Nomor — Perangkat dan tugas` per langkah. Gunakan teks tebal untuk Narasi dan Cek hasil, dan blok kode untuk perintah. Clario menampilkan isi Markdown sebagai teks lokal; gambar, halaman web, dan skrip tidak dimuat. Siapkan isi catatan sebelum memulai pratinjau atau perekaman. Editor dilipat saat sesi dimulai dan catatan yang disematkan tetap terlihat.
 
@@ -173,7 +175,7 @@ Sesuaikan path repository. Laporan tersimpan di `%TEMP%\Clario-CameraSmoke.json`
 
 Tambahkan `--desktop-only` pada argumen harness untuk uji perpindahan publik/privat tanpa menyalakan kamera. Uji ini membuat jendela pola sementara, melakukan sepuluh perpindahan, memeriksa frame privat/blank dan pembaruan aplikasi publik, serta memastikan dua capture publik tidak dimulai ulang. Contoh `-Args '--desktop-only C:\Users\msari\AppData\Local\Temp\Clario-DesktopSwitch.json'`.
 
-Gunakan `--floating-notes` pada harness yang sama untuk menguji catatan mengambang tanpa kamera. Harness memeriksa target klik, fokus, dan warna dua jendela uji di balik panel melalui jalur gambar yang dipakai perekam. Gambar monitor tidak disimpan; hanya hasil uji JSON yang ditulis.
+Gunakan `--floating-notes` pada harness yang sama untuk menguji catatan mengambang tanpa kamera. Harness memeriksa baris terakhir teks dan blok kode panjang, resize, perpindahan dari daftar bagian, tombol gulir, fokus, dan warna dua jendela uji di balik panel melalui jalur gambar yang dipakai perekam. Gambar monitor tidak disimpan.
 
 ## Pengembangan berikutnya
 

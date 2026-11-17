@@ -18,8 +18,6 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     private nint _window;
     private bool _shown;
     private bool _requested;
-    private bool _dragging;
-    private Point _dragOffset;
     private DisplayTarget? _placement;
     private DisplayBounds _bounds;
     private DisplayTarget? _recorded;
@@ -29,6 +27,11 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     private float _scale = 1;
     private float _scroll;
     private float _maxScroll;
+    private float _contentHeight;
+    private bool _indexOpen;
+    private float _indexScroll;
+    private readonly NoteOverlayRenderer _renderer = new();
+    private CanvasRenderTarget? _renderTarget;
     private float _opacity = .82f;
     private float _fontSize = 16;
     private float _width = 440;
@@ -46,6 +49,11 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     internal string Status { get; private set; } = "";
     internal nint Handle => _window;
     internal DisplayBounds Bounds => _bounds;
+    internal (float Width, float Height) Size => (_width, _height);
+    internal int StepIndex => _step;
+    internal float ScrollOffset => _indexOpen ? _indexScroll : _scroll;
+
+    private NoteOverlayGeometry Geometry => new(_bounds.Width / _scale, _bounds.Height / _scale);
 
     internal FloatingNoteWindow(bool registerShortcuts = true)
     {
@@ -79,16 +87,21 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     {
         _steps = steps;
         _step = reset ? 0 : Math.Clamp(_step, 0, _steps.Count - 1);
+        if (reset || _steps.Count < 2)
+        {
+            _indexOpen = false;
+            _indexScroll = 0;
+        }
         if (reset) _scroll = 0;
         if (_shown) Refresh();
     }
 
-    internal void SetAppearance(float opacity, float fontSize, float width)
+    internal void SetAppearance(float opacity, float fontSize, float width, float height)
     {
         _opacity = opacity;
         _fontSize = fontSize;
         _width = width;
-        _height = width * .8f;
+        _height = height;
     }
 
     internal void ApplyMonitors(DisplayTarget? preferred, DisplayTarget? recorded, DisplayTarget? audience)
@@ -171,13 +184,10 @@ internal sealed partial class FloatingNoteWindow : IDisposable
 
     private void HideWindow()
     {
-        if (_dragging)
-        {
-            _dragging = false;
-            ReleaseCapture();
-        }
-        ShowWindow(_window, 0);
         _shown = false;
+        CancelResizeRender();
+        EndPointer(release: true);
+        ShowWindow(_window, 0);
     }
 
     internal void SetClickThrough(bool enabled)
@@ -192,19 +202,36 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         else Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    internal void Go(int direction)
+    internal void Go(int direction) => SelectStep(Math.Clamp(_step + direction, 0, _steps.Count - 1));
+
+    private void SelectStep(int index)
     {
-        var next = Math.Clamp(_step + direction, 0, _steps.Count - 1);
-        if (next == _step) return;
-        _step = next;
-        _scroll = 0;
+        if (_step == index && !_indexOpen) return;
+        if (_step != index) _scroll = 0;
+        _step = index;
+        _indexOpen = false;
         if (_shown) Refresh();
     }
 
-    private void Scroll(int direction)
+    private void ToggleIndex()
     {
-        _scroll = Math.Clamp(_scroll + direction * 58, 0, _maxScroll);
-        if (_shown) Refresh();
+        if (_steps.Count < 2) return;
+        _indexOpen = !_indexOpen;
+        if (_indexOpen)
+        {
+            var row = _step * NoteOverlayGeometry.IndexRowHeight;
+            _indexScroll = Math.Max(0, row - (float)Geometry.Body.Height / 3);
+        }
+        Refresh();
+    }
+
+    private void ScrollTo(float offset)
+    {
+        offset = Math.Clamp(offset, 0, _maxScroll);
+        if (offset == ScrollOffset) return;
+        if (_indexOpen) _indexScroll = offset;
+        else _scroll = offset;
+        Refresh();
     }
 
     private bool TryExclude()
@@ -221,17 +248,29 @@ internal sealed partial class FloatingNoteWindow : IDisposable
 
     private void Refresh()
     {
+        if (!KeepVisibleIfProtected()) return;
         var device = CanvasDevice.GetSharedDevice();
-        using var target = new CanvasRenderTarget(device, _bounds.Width / _scale, _bounds.Height / _scale, 96 * _scale);
-        using (var session = target.CreateDrawingSession())
+        var geometry = Geometry;
+        _contentHeight = _indexOpen
+            ? _steps.Count * NoteOverlayGeometry.IndexRowHeight
+            : _renderer.Measure(device, _steps[_step], (float)geometry.Body.Width, _fontSize);
+        _maxScroll = geometry.ScrollLimit(_contentHeight);
+        if (_indexOpen) _indexScroll = Math.Clamp(_indexScroll, 0, _maxScroll);
+        else _scroll = Math.Clamp(_scroll, 0, _maxScroll);
+
+        if (_renderTarget is null || _renderTarget.SizeInPixels.Width != _bounds.Width
+            || _renderTarget.SizeInPixels.Height != _bounds.Height || _renderTarget.Dpi != 96 * _scale
+            || !ReferenceEquals(_renderTarget.Device, device))
         {
-            _maxScroll = NoteOverlayRenderer.Draw(device, session, _steps[_step], _step, _steps.Count,
-                _bounds.Width / _scale, _bounds.Height / _scale, _fontSize, ClickThrough, _scroll);
-            _scroll = Math.Min(_scroll, _maxScroll);
+            _renderTarget?.Dispose();
+            _renderTarget = new CanvasRenderTarget(device, geometry.Width, geometry.Height, 96 * _scale);
         }
-        _pixels = target.GetPixelBytes();
-        _pixelWidth = (int)target.SizeInPixels.Width;
-        _pixelHeight = (int)target.SizeInPixels.Height;
+        using (var session = _renderTarget.CreateDrawingSession())
+            _renderer.Draw(session, geometry, _steps, _step, _indexOpen, ClickThrough, ScrollOffset, _contentHeight);
+
+        _pixels = _renderTarget.GetPixelBytes();
+        _pixelWidth = (int)_renderTarget.SizeInPixels.Width;
+        _pixelHeight = (int)_renderTarget.SizeInPixels.Height;
         if (!SetLayeredWindowAttributes(_window, 0, (byte)Math.Round(Math.Clamp(_opacity, .25f, 1) * 255), 2))
             throw new Win32Exception();
         if (!KeepVisibleIfProtected()) return;
@@ -264,15 +303,6 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         return false;
     }
 
-    private bool RegisterShortcuts()
-    {
-        uint[] keys = [0x77, 0x78, 0x79, 0x7A, 0x26, 0x28]; // F8–F11, Up, Down
-        var success = true;
-        for (var i = 0; i < keys.Length; i++)
-            success &= RegisterHotKey(_window, i + 1, 0x4006, keys[i]); // Ctrl+Shift, no repeat
-        return success;
-    }
-
     private nint WindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
     {
         try
@@ -291,53 +321,29 @@ internal sealed partial class FloatingNoteWindow : IDisposable
                         Changed?.Invoke(this, EventArgs.Empty);
                     }
                     return 0;
-                case 0x312:
-                    if (wParam == 1) Toggle(_placement);
-                    else if (_shown)
-                    {
-                        switch (wParam)
-                        {
-                            case 2: SetClickThrough(!ClickThrough); break;
-                            case 3: Go(-1); break;
-                            case 4: Go(1); break;
-                            case 5: Scroll(-1); break;
-                            case 6: Scroll(1); break;
-                        }
-                    }
+                case 0x312: HandleShortcut((int)wParam); return 0; // WM_HOTKEY
+                case 0x113 when wParam == ResizeTimer: // WM_TIMER
+                    CancelResizeRender();
+                    if (_shown) Refresh();
                     return 0;
-                case 0x201 when !ClickThrough && _shown:
-                    var x = (short)((long)lParam & 0xffff);
-                    var y = (short)(((long)lParam >> 16) & 0xffff);
-                    if (y > _bounds.Height - NoteOverlayRenderer.Footer * _scale)
-                    {
-                        if (x < 120 * _scale) Go(-1);
-                        if (x > _bounds.Width - 120 * _scale) Go(1);
-                    }
-                    else if (y < NoteOverlayRenderer.Header * _scale)
-                    {
-                        _dragging = true;
-                        _dragOffset = new Point { X = x, Y = y };
-                        SetCapture(hwnd);
-                    }
+                case 0x113 when wParam == PointerTimer:
+                    TrackPointer();
                     return 0;
-                case 0x200 when _dragging && _placement is not null:
-                    if (GetCursorPos(out var cursor))
-                    {
-                        _bounds = NoteOverlayPlacement.Clamp(_bounds with
-                        {
-                            Left = cursor.X - _dragOffset.X,
-                            Top = cursor.Y - _dragOffset.Y
-                        }, _placement.WorkArea);
-                        SetWindowPos(hwnd, -1, _bounds.Left, _bounds.Top, 0, 0, NoActivate | 1);
-                    }
+                case 0x20 when !ClickThrough && _shown && (short)lParam == 1: // WM_SETCURSOR, HTCLIENT
+                    UpdatePointerCursor();
+                    return 1;
+                case 0x201 when !ClickThrough && _shown: // WM_LBUTTONDOWN
+                    BeginPointer(hwnd, MousePoint(lParam));
                     return 0;
-                case 0x202 when _dragging:
-                    _dragging = false;
-                    ReleaseCapture();
+                case 0x200 when _pointerAction != PointerAction.None: // WM_MOUSEMOVE
+                    DragPointer(MousePoint(lParam));
                     return 0;
-                case 0x215: _dragging = false; break; // WM_CAPTURECHANGED
-                case 0x20A when !ClickThrough && _shown:
-                    Scroll(Math.Sign(-(short)(((long)wParam >> 16) & 0xffff)));
+                case 0x202 when _pointerAction != PointerAction.None: // WM_LBUTTONUP
+                    EndPointer(release: true);
+                    return 0;
+                case 0x215 when !_trackingPointer: EndPointer(release: false); break; // WM_CAPTURECHANGED
+                case 0x20A when !ClickThrough && _shown: // WM_MOUSEWHEEL
+                    ScrollTo(ScrollOffset - (short)((long)wParam >> 16) / 120f * _fontSize * 3.5f);
                     return 0;
             }
         }
@@ -354,7 +360,10 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     {
         if (_window == 0) return;
         HideWindow();
-        for (var i = 1; i <= 6; i++) UnregisterHotKey(_window, i);
+        for (var i = 1; i <= ShortcutKeys.Length; i++) UnregisterHotKey(_window, i);
+        _renderer.Dispose();
+        _renderTarget?.Dispose();
+        _pixels = null;
         DestroyWindow(_window);
         _window = 0;
         UnregisterClass(_className, _instance);
