@@ -28,6 +28,7 @@ internal static class Program
                 SynchronizationContext.SetSynchronizationContext(
                     new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
                 if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
+                else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
                 else await RunChecksAsync(reportPath);
                 completion.TrySetResult();
             });

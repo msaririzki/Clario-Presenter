@@ -17,9 +17,11 @@
     <Using Remove="System.Drawing" />
     <Using Remove="System.Windows.Forms" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
+    <PackageReference Include="Markdig" Version="1.6.0" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
     <Compile Include="..\..\Camera\*.cs" Link="Camera\%(Filename)%(Extension)" />
     <Compile Include="..\..\Capture\*.cs" Link="Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Notes\*.cs" Link="Notes\%(Filename)%(Extension)" />
     <Compile Include="..\..\Services\*.cs" Link="Services\%(Filename)%(Extension)" />
     <Compile Include="..\..\Recording\OutputRecordingService.cs" Link="OutputRecordingService.cs" />
   </ItemGroup>

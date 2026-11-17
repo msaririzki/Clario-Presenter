@@ -101,6 +101,18 @@ Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti
 
 Clario menerima perangkat video yang bisa dibuka oleh Windows MediaCapture. Aplikasi yang hanya menampilkan preview kamera tanpa menyediakan perangkat kamera virtual belum dapat dipilih sebagai input kamera. Bila perangkat tidak muncul, aktifkan output virtualnya terlebih dahulu lalu muat ulang daftar; kompatibilitas perlu diuji pada driver yang dipakai.
 
+### Catatan mengambang untuk praktik Cisco
+
+1. Di panel **Catatan**, ketik atau tempel teks, atau klik **Buka file** dan pilih `.txt`, `.md`, atau `.markdown`. Contoh siap dibuka: [Praktik-Cisco.md](Examples/Praktik-Cisco.md).
+2. Klik **Sematkan**. Di **Atur catatan** Anda bisa memilih layar, mengubah ukuran teks/panel, serta menyesuaikan transparansi. Matikan **Klik tembus** untuk menggeser panel lewat bagian judul, lalu aktifkan lagi agar klik masuk ke aplikasi di belakangnya.
+3. Centang **Rekam saja → Rekam layar**, lalu pilih layar tempat topologi dan dialog router/switch terbuka. **Buka preview → Rekam**. Dialog yang pindah ke luar monitor itu tidak ikut terekam.
+
+Gunakan **Ctrl+Shift+F8** untuk menampilkan/menyembunyikan catatan, **F9** dengan pengubah yang sama untuk beralih Klik tembus, **F10/F11** untuk langkah sebelumnya/berikutnya, dan **Ctrl+Shift+↑/↓** untuk menggulir teks. Perintah tidak pernah dikirim otomatis ke Cisco. Sebagian shortcut mungkin sedang dipakai aplikasi lain; kontrol tetap tersedia di panel Catatan dan klik navigasi di mode Atur.
+
+Untuk catatan dari AI, minta satu file Markdown UTF-8 dengan judul `## Nomor — Perangkat dan tugas` per langkah. Gunakan teks tebal untuk Narasi dan Cek hasil, dan blok kode untuk perintah. Clario menampilkan isi Markdown sebagai teks lokal; gambar, halaman web, dan skrip tidak dimuat. Siapkan isi catatan sebelum membuka preview; editor dan impor file dikunci selama sesi.
+
+Clario meminta Windows mengecualikan panel dari tangkapan. Jika pengecualian tidak dapat dipasang atau diverifikasi, Clario memindahkan panel ke layar yang tidak direkam dan tidak digunakan audiens, atau menyembunyikannya. Ini diverifikasi untuk jalur tangkapan Clario, bukan jaminan untuk perekam lain. Lakukan satu rekaman uji singkat dengan file Packet Tracer yang akan dipakai.
+
 ## Prinsip desain
 
 - permukaan graphite dengan kontras tenang;
@@ -171,6 +183,8 @@ Invoke-CommandInDesktopPackage -PackageFamilyName '237E57D9-2488-4F07-B595-A20D0
 Sesuaikan path repository. Laporan tersimpan di `%TEMP%\Clario-CameraSmoke.json`; lokasi MP4 uji dicantumkan di laporan. Kamera virtual/eksternal perlu diuji ulang setelah drivernya tersedia.
 
 Tambahkan `--desktop-only` pada argumen harness untuk uji perpindahan publik/privat tanpa menyalakan kamera. Uji ini membuat jendela pola sementara, melakukan sepuluh perpindahan, memeriksa frame privat/blank dan pembaruan aplikasi publik, serta memastikan dua capture publik tidak dimulai ulang. Contoh `-Args '--desktop-only C:\Users\msari\AppData\Local\Temp\Clario-DesktopSwitch.json'`.
+
+Gunakan `--floating-notes` pada harness yang sama untuk menguji catatan mengambang tanpa kamera. Harness memeriksa target klik, fokus, dan warna dua jendela uji di balik panel melalui jalur gambar yang dipakai perekam. Gambar monitor tidak disimpan; hanya hasil uji JSON yang ditulis.
 
 ## Pengembangan berikutnya
 

@@ -1,5 +1,6 @@
 using Clario_Presenter.Capture;
 using Clario_Presenter.Camera;
+using Clario_Presenter.Notes;
 using Clario_Presenter.Services;
 
 var checks = 0;
@@ -103,4 +104,45 @@ var boundedScene = DesktopWindowPlan.Select(Enumerable.Range(1, 20)
     .Select(index => new DesktopWindowCandidate(index, new(index * 10, index * 10, 200, 200))),
     new(0, 0, 1920, 1040));
 Check(boundedScene.Count == 8, "Many open apps do not allocate unlimited active capture layers.");
-Console.WriteLine($"PASS: {checks} total composition and monitor-isolation checks.");
+var steps = NoteDocument.Parse("""
+    # Praktik Cisco
+    ## 1 — Router
+    **Narasi**: Cek IP pada `Gi0/0`.
+
+    ```text
+    show ip interface brief
+    ## bukan langkah
+    ```
+
+    - Cek hasil
+    ## 2 — Switch
+    ![Topologi](https://example.invalid/topologi.png)
+    """, true);
+Check(steps.Count == 2 && steps[0].Title == "1 — Router" && steps[1].Title == "2 — Switch",
+    "AI notes with headings and a code fence produce two steps, not three.");
+Check(steps[0].Blocks[0].Runs.Any(run => run is { Text: "Narasi", Bold: true })
+    && steps[0].Blocks[0].Runs.Any(run => run is { Text: "Gi0/0", Monospace: true }),
+    "Narration and inline commands retain their formatting.");
+Check(steps[0].Blocks.Any(block => block.Kind == NoteBlockKind.Code && block.Runs[0].Text == "show ip interface brief\n## bukan langkah"),
+    "Cisco commands are preserved verbatim.");
+Check(steps[0].Blocks.SelectMany(block => block.Runs).Any(run => run.Text == "• "),
+    "Checklist items retain their list marker.");
+Check(string.Concat(steps[1].Blocks.SelectMany(block => block.Runs).Select(run => run.Text)) == "Topologi",
+    "External image URLs are not in the display model.");
+var plain = NoteDocument.Parse("## Langkah\r\nshow vlan brief", false);
+Check(plain.Count == 1 && plain[0].Blocks[0].Runs[0].Text == "## Langkah\nshow vlan brief",
+    "Plain text does not interpret headings.");
+var sourceDisplay = new DisplayBounds(0, 0, 1920, 1080);
+var otherDisplay = new DisplayBounds(-1280, 0, 1280, 720);
+var panelOnSource = new DisplayBounds(1000, 50, 440, 360);
+Check(!NoteOverlayPlacement.IsAllowed(panelOnSource, false, sourceDisplay, null),
+    "An unprotected note cannot overlap the capture source.");
+Check(NoteOverlayPlacement.IsAllowed(panelOnSource, true, sourceDisplay, otherDisplay),
+    "An excluded note can remain on the recorded monitor.");
+Check(!NoteOverlayPlacement.IsAllowed(otherDisplay, true, sourceDisplay, otherDisplay),
+    "Even an excluded note must not appear on the physical audience display.");
+Check(NoteOverlayPlacement.IsAllowed(otherDisplay, false, sourceDisplay, null),
+    "An unused second monitor is an available fallback.");
+Check(NoteOverlayPlacement.Clamp(new(-300, 200, 440, 360), otherDisplay) == new DisplayBounds(-440, 200, 440, 360),
+    "Dragging on a monitor with a negative origin does not cross into the recording.");
+Console.WriteLine($"PASS: {checks} composition and notes checks.");

@@ -52,6 +52,7 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+        InitializeFloatingNotes();
         SourceComboBox.ItemsSource = _sources;
         DisplayComboBox.ItemsSource = _displays;
         SourceMonitorComboBox.ItemsSource = _displays;
@@ -570,6 +571,9 @@ public sealed partial class MainPage : Page
         _clientDisplay = target is not null && target.Handle != _presenterDisplay?.Handle ? target : null;
         _outputScaleMode = _isSafeMirrorSession ? CaptureScaleMode.Fit : ResolveOutputScaleMode();
         _outputAdaptiveZoom = target is null ? 1 : CalculateAdaptiveZoom(_presenterDisplay, target);
+        _notesAudience = target;
+        ApplyNoteCaptureRules();
+        SetNotesEditingEnabled(false);
 
         if (_clientDisplay is not null)
         {
@@ -649,6 +653,10 @@ public sealed partial class MainPage : Page
             _capture = null;
         }
 
+        _notesAudience = null;
+        ApplyNoteCaptureRules();
+        SetNotesEditingEnabled(true);
+
         LivePreviewCanvas.Visibility = Visibility.Collapsed;
         FreezeButton.IsEnabled = false;
         PrivacyButton.IsEnabled = false;
@@ -671,7 +679,7 @@ public sealed partial class MainPage : Page
 
     private bool HasPrivateView()
     {
-        if (IsForegroundPrivate() || WindowCatalogService.IsApplicationSwitcherActive()
+        if (IsForegroundPrivate() || IsNoteEditorOnRecordedDisplay() || WindowCatalogService.IsApplicationSwitcherActive()
             || (_presenterDisplay is not null
                 && WindowCatalogService.HasPrivateWindowOnDisplay(_presenterDisplay.Bounds, _privateWindows)))
         {
@@ -826,6 +834,7 @@ public sealed partial class MainPage : Page
 
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
+        DisposeFloatingNotes();
         await StopRecordingAsync();
         StopPresentation();
         LivePreviewCanvas.RemoveFromVisualTree();

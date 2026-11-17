@@ -171,7 +171,7 @@
 
             <Border x:Name="NotesPanel" Grid.Column="1" Padding="16" Style="{StaticResource ClarioPanelStyle}">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <Grid Grid.Row="0">
                         <StackPanel Spacing="5"><StackPanel Orientation="Horizontal" Spacing="6"><FontIcon Glyph="&#xE890;" FontSize="11" Foreground="{StaticResource ClarioAccentBrush}" /><TextBlock Text="HANYA UNTUK ANDA" Style="{StaticResource ClarioSectionLabelStyle}" Foreground="{StaticResource ClarioAccentBrush}" /></StackPanel><TextBlock Text="Catatan presenter" Style="{StaticResource ClarioHeadingStyle}" /></StackPanel>
                         <Button HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Sembunyikan catatan" Click="CollapseNotes_Click" ToolTipService.ToolTip="Sembunyikan catatan"><FontIcon Glyph="&#xE76B;" FontSize="13" /></Button>
@@ -181,18 +181,40 @@
                         <StackPanel Spacing="4"><TextBlock Text="DURASI" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBlock x:Name="TimerText" Text="00:00" FontSize="17" FontWeight="SemiBold" /></StackPanel>
                         <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="BAGIAN" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBlock Text="Demo utama" FontSize="13" FontWeight="SemiBold" /></StackPanel>
                     </Grid>
-                    <Border Grid.Row="2" Padding="13" CornerRadius="9" Background="{StaticResource ClarioAccentSoftBrush}">
-                        <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border Width="28" Height="28" CornerRadius="7" BorderBrush="{StaticResource ClarioAccentBrush}" BorderThickness="1"><TextBlock Text="03" FontSize="10" Foreground="{StaticResource ClarioAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Tunjukkan alur laporan" FontSize="13" FontWeight="SemiBold" /><TextBlock Text="Tekankan bahwa laporan dibuat otomatis dan dapat diekspor tanpa proses manual." TextWrapping="Wrap" FontSize="11" LineHeight="17" Foreground="{StaticResource ClarioSecondaryTextBrush}" /></StackPanel></Grid>
-                    </Border>
-                    <Grid Grid.Row="3" Margin="0,15,0,12">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                        <TextBlock Text="CHECKLIST" Style="{StaticResource ClarioSectionLabelStyle}" />
-                        <StackPanel Grid.Row="1" Margin="0,10,0,12" Spacing="9"><CheckBox Content="Jelaskan masalah klien" IsChecked="True" /><CheckBox Content="Demo proses login" IsChecked="True" /><CheckBox Content="Buat laporan baru" /><CheckBox Content="Tunjukkan ekspor PDF" /></StackPanel>
-                        <StackPanel Grid.Row="2" Spacing="6"><TextBlock Text="CATATAN BEBAS" Style="{StaticResource ClarioSectionLabelStyle}" /><TextBox x:Name="FreeNotesTextBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="Tulis poin yang tidak boleh terlupakan..." /></StackPanel>
+                    <Grid Grid.Row="2" Margin="0,0,0,12" RowSpacing="8">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <TextBlock Text="NARASI DAN PERINTAH" Style="{StaticResource ClarioSectionLabelStyle}" />
+                        <TextBox Grid.Row="1" x:Name="FreeNotesTextBox" MinHeight="80" MaxLength="32000" AcceptsReturn="True" TextWrapping="Wrap"
+                                 AutomationProperties.Name="Teks catatan" PlaceholderText="Ketik atau tempel catatan di sini…" TextChanged="FreeNotesTextBox_TextChanged" />
+                        <CheckBox Grid.Row="2" x:Name="MarkdownNotesCheckBox" Content="Tampilkan sebagai Markdown" AutomationProperties.Name="Tampilkan sebagai Markdown"
+                                  Checked="MarkdownNotes_Changed" Unchecked="MarkdownNotes_Changed"
+                                  ToolTipService.ToolTip="Judul dengan ## menjadi langkah terpisah. Letakkan perintah di blok kode." />
                     </Grid>
-                    <StackPanel Grid.Row="4" Spacing="9">
-                        <Button Style="{StaticResource ClarioButtonStyle}" HorizontalAlignment="Stretch"><StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="7"><FontIcon Glyph="&#xE8A5;" FontSize="13" /><TextBlock Text="Buka PDF referensi" /></StackPanel></Button>
-                        <TextBlock Text="Catatan ini hanya tampil di laptop Anda." FontSize="10" TextAlignment="Center" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                    <StackPanel Grid.Row="3" Spacing="8">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Button x:Name="OpenNotesButton" Content="Buka file" Click="OpenNotes_Click" HorizontalAlignment="Stretch"
+                                    Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Buka file catatan .md atau .txt" />
+                            <Button x:Name="PinNotesButton" Grid.Column="1" Content="Sematkan" Click="PinNotes_Click" HorizontalAlignment="Stretch"
+                                    Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Tampilkan catatan di atas aplikasi lain" />
+                        </Grid>
+                        <Button Content="Atur catatan" Style="{StaticResource ClarioButtonStyle}">
+                            <Button.Flyout>
+                                <Flyout Opening="NoteOptions_Opening">
+                                    <StackPanel Width="265" Spacing="8">
+                                        <ComboBox x:Name="NotesMonitorComboBox" Header="Layar catatan" DisplayMemberPath="DisplayName"
+                                                  HorizontalAlignment="Stretch" SelectionChanged="NoteAppearance_Changed" />
+                                        <ToggleSwitch x:Name="NotesClickThroughToggle" Header="Klik tembus" IsOn="True" OnContent="Klik masuk ke aplikasi di belakang" OffContent="Catatan bisa digeser" Toggled="NoteAppearance_Changed" />
+                                        <Slider x:Name="NotesOpacitySlider" Header="Opasitas catatan (%)" Minimum="25" Maximum="100" Value="82" StepFrequency="5" ValueChanged="NoteAppearance_Changed" />
+                                        <Slider x:Name="NotesFontSizeSlider" Header="Ukuran teks" Minimum="12" Maximum="26" Value="16" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
+                                        <Slider x:Name="NotesWidthSlider" Header="Ukuran panel" Minimum="320" Maximum="760" Value="440" StepFrequency="20" ValueChanged="NoteAppearance_Changed" />
+                                        <TextBlock Text="Ctrl+Shift+F8: tampil atau sembunyi&#xA;Ctrl+Shift+F9: ubah Klik tembus&#xA;Ctrl+Shift+F10 / F11: pindah langkah&#xA;Ctrl+Shift+↑ / ↓: gulir langkah" TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <TextBlock x:Name="NoteStatusText" Text="Ketik catatan atau buka file .md / .txt." TextWrapping="Wrap"
+                                   FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                     </StackPanel>
                 </Grid>
             </Border>
