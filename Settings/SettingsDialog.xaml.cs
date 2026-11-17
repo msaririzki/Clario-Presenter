@@ -17,6 +17,7 @@ public sealed partial class SettingsDialog : ContentDialog
     private readonly DispatcherTimer _previewStatusTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CameraCaptureService? _previewCamera;
     private bool _closing;
+    private bool _opened;
 
     public SettingsDialog(PresenterSettings settings)
     {
@@ -32,6 +33,7 @@ public sealed partial class SettingsDialog : ContentDialog
         };
         AskLocationToggle.IsOn = settings.AskRecordingLocation;
         CameraEnabledToggle.IsOn = settings.CameraEnabled;
+        CameraOptionsPanel.Visibility = settings.CameraEnabled ? Visibility.Visible : Visibility.Collapsed;
         CameraPositionComboBox.SelectedIndex = Math.Clamp(settings.CameraPosition, 0, 3);
         CameraSizeComboBox.SelectedIndex = settings.CameraWidthPercent <= 18 ? 0 : settings.CameraWidthPercent >= 30 ? 2 : 1;
         CameraMirrorCheckBox.IsChecked = settings.CameraMirror;
@@ -63,8 +65,31 @@ public sealed partial class SettingsDialog : ContentDialog
         };
     }
 
-    private async void SettingsDialog_Opened(ContentDialog sender, ContentDialogOpenedEventArgs args) =>
-        await RefreshCamerasAsync();
+    private async void SettingsDialog_Opened(ContentDialog sender, ContentDialogOpenedEventArgs args)
+    {
+        _opened = true;
+        if (CameraEnabledToggle.IsOn) await RefreshCamerasAsync();
+    }
+
+    private async void CameraEnabled_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_opened || _closing) return;
+        CameraOptionsPanel.Visibility = CameraEnabledToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        SettingsErrorText.Visibility = Visibility.Collapsed;
+        if (CameraEnabledToggle.IsOn)
+        {
+            if (CameraDeviceComboBox.Items.Count == 0) await RefreshCamerasAsync();
+            return;
+        }
+
+        await _previewGate.WaitAsync();
+        try
+        {
+            if (!_closing && !CameraEnabledToggle.IsOn)
+                await StopCameraPreviewAsync();
+        }
+        finally { _previewGate.Release(); }
+    }
 
     private async void RefreshCameras_Click(object sender, RoutedEventArgs e) => await RefreshCamerasAsync();
 
@@ -124,7 +149,7 @@ public sealed partial class SettingsDialog : ContentDialog
             await _previewCamera.StartAsync(device.Id, _previewCancellation.Token);
             if (_closing) return;
             CameraPreviewPlaceholder.Visibility = Visibility.Collapsed;
-            TestCameraButton.Content = "Stop preview";
+            TestCameraButton.Content = "Stop pratinjau";
             CameraStatusText.Text = CameraEnabledToggle.IsOn
                 ? "Kamera siap. Klik Simpan untuk memakai kamera ini saat merekam."
                 : "Kamera siap. Aktifkan Sertakan kamera dalam rekaman, lalu klik Simpan.";
@@ -199,6 +224,7 @@ public sealed partial class SettingsDialog : ContentDialog
             args.Cancel = true;
             SettingsErrorText.Text = "Pilih kamera yang terhubung, atau nonaktifkan kamera sebelum menyimpan.";
             SettingsErrorText.Visibility = Visibility.Visible;
+            SettingsErrorText.StartBringIntoView();
         }
     }
 

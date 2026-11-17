@@ -9,14 +9,14 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
-            <FontFamily x:Key="ClarioFont">Segoe UI Variable Text</FontFamily>
+            <FontFamily x:Key="ClarioFont">Segoe UI Variable Text, Segoe UI</FontFamily>
             <SolidColorBrush x:Key="ClarioCanvasBrush" Color="#0E1116" />
             <SolidColorBrush x:Key="ClarioSurfaceBrush" Color="#151922" />
             <SolidColorBrush x:Key="ClarioRaisedBrush" Color="#1B202A" />
             <SolidColorBrush x:Key="ClarioSubtleBrush" Color="#202631" />
             <SolidColorBrush x:Key="ClarioBorderBrush" Color="#2A313E" />
             <SolidColorBrush x:Key="ClarioTextBrush" Color="#F3F5F8" />
-            <SolidColorBrush x:Key="ClarioSecondaryTextBrush" Color="#9CA7B7" />
+            <SolidColorBrush x:Key="ClarioSecondaryTextBrush" Color="#AAB4C2" />
             <SolidColorBrush x:Key="ClarioAccentBrush" Color="#817BE8" />
             <SolidColorBrush x:Key="ClarioAccentSoftBrush" Color="#292747" />
             <SolidColorBrush x:Key="ClarioLiveBrush" Color="#49C49A" />
@@ -24,7 +24,9 @@
             <SolidColorBrush x:Key="ClarioFreezeBrush" Color="#E9B85B" />
             <SolidColorBrush x:Key="ClarioFreezeSoftBrush" Color="#3A2E19" />
             <SolidColorBrush x:Key="ClarioPrivacyBrush" Color="#EC6A7E" />
-            <SolidColorBrush x:Key="ClarioPrivacySoftBrush" Color="#3D2028" />
+            <SolidColorBrush x:Key="ClarioPrivacySoftBrush" Color="#292747" />
+            <SolidColorBrush x:Key="ClarioPrivateStatusBrush" Color="#C7C5FF" />
+            <SolidColorBrush x:Key="ClarioRecordingBrush" Color="#FFB2BE" />
 
             <Style TargetType="Page">
                 <Setter Property="FontFamily" Value="{StaticResource ClarioFont}" />
@@ -38,33 +40,38 @@
                 <Setter Property="CornerRadius" Value="12" />
             </Style>
             <Style x:Key="ClarioButtonStyle" TargetType="Button">
-                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="14,7" />
                 <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Background" Value="{StaticResource ClarioRaisedBrush}" />
-                <Setter Property="Foreground" Value="{StaticResource ClarioTextBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource ClarioBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
             </Style>
             <Style x:Key="ClarioPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
-                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="14,7" />
                 <Setter Property="CornerRadius" Value="8" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="FontWeight" Value="SemiBold" />
             </Style>
             <Style x:Key="ClarioIconButtonStyle" TargetType="Button" BasedOn="{StaticResource ClarioButtonStyle}">
-                <Setter Property="Width" Value="36" />
+                <Setter Property="Width" Value="40" />
                 <Setter Property="Padding" Value="0" />
             </Style>
             <Style x:Key="ClarioToggleStyle" TargetType="ToggleButton">
-                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="MinHeight" Value="40" />
                 <Setter Property="Padding" Value="12,7" />
                 <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Background" Value="{StaticResource ClarioRaisedBrush}" />
-                <Setter Property="Foreground" Value="{StaticResource ClarioTextBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource ClarioBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
+            </Style>
+            <Style x:Key="ClarioChoiceStyle" TargetType="RadioButton">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="Padding" Value="8,6,12,6" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+            <Style x:Key="ClarioPickerStyle" TargetType="ComboBox">
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
             </Style>
             <Style x:Key="ClarioSectionLabelStyle" TargetType="TextBlock">
                 <Setter Property="Foreground" Value="{StaticResource ClarioSecondaryTextBrush}" />

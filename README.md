@@ -63,27 +63,27 @@ dotnet run --no-build -p:Platform=x64
 ### Rekam
 
 1. Pilih mode **Rekam**, lalu pilih sumber **Layar** atau **Aplikasi**.
-2. Jika merekam layar, buka **Sembunyikan aplikasi** dan centang jendela privat sebelum mulai. Untuk memeriksa gambar terlebih dahulu, klik **Lihat pratinjau**.
+2. Jika merekam layar, buka **Sembunyikan aplikasi**, centang jendela privat, lalu klik **Terapkan**. Untuk memeriksa gambar terlebih dahulu, klik **Lihat pratinjau**.
 3. Klik **Mulai rekam**. Tekan **Stop rekam** untuk menyimpan video dan mengakhiri sesi. Untuk rekaman layar, buka kembali Clario dari taskbar agar tombolnya terlihat.
 
-Video disimpan ke `Videos\Clario Presenter`. Gunakan **Pengaturan** untuk mengganti folder atau memilih lokasi setiap kali merekam. Rekaman belum menyertakan suara.
+Video disimpan ke `Videos\Clario Presenter`. Setelah video tersimpan, klik **Buka folder** untuk melihat hasilnya. Gunakan **Pengaturan** untuk mengganti folder atau memilih lokasi setiap kali merekam. Rekaman belum menyertakan suara.
 
 ### Presentasi
 
 1. Pilih mode **Presentasi**, tentukan sumber dan **Layar audiens**.
 2. Jika sumbernya **Layar**, Anda bisa memilih **Sembunyikan aplikasi** sebelum mulai. Jika sumbernya **Aplikasi**, biarkan jendela tersebut terbuka.
-3. Klik **Mulai presentasi**. Klik **Rekam** di samping pratinjau jika Anda juga ingin menyimpan video. **Stop rekam** menyimpan video sambil meneruskan presentasi. **Stop presentasi** mengakhiri sesi dan menyimpan video yang sedang direkam.
+3. Klik **Mulai presentasi**. Klik **Rekam** di bilah sesi jika Anda juga ingin menyimpan video. **Stop rekam** menyimpan video sambil meneruskan presentasi. **Stop presentasi** mengakhiri sesi dan menyimpan video yang sedang direkam.
 
 **Freeze** menahan gambar terakhir. **Privasi** menutup gambar sementara. Keduanya tersedia ketika sesi berjalan. Aplikasi yang dipilih lewat **Sembunyikan aplikasi** bisa dibuka selama sesi. Untuk tab Chrome privat, pindahkan tab tersebut ke jendela Chrome tersendiri sebelum memilihnya.
 
-Sumber layar ditampilkan utuh. Untuk sumber aplikasi, pilihan **Ukuran gambar** juga menawarkan **Perbesar** atau **Isi layar**, yang dapat memotong tepi gambar.
+Sumber layar ditampilkan utuh. Untuk sumber aplikasi, buka **Opsi tampilan** untuk memilih **Ukuran gambar**. Pilihan **Perbesar** dan **Isi layar** dapat memotong tepi gambar.
 
 ### Rekam layar dan kamera
 
 1. Hubungkan webcam USB, atau jalankan aplikasi kamera pihak ketiga dan aktifkan output kamera virtualnya.
-2. Buka **Pengaturan**, tekan `Perbarui daftar`, lalu pilih kamera pada `Pilih kamera`.
+2. Buka **Pengaturan**, aktifkan **Sertakan kamera dalam video**, lalu pilih kamera. Gunakan **Perbarui daftar** jika perangkat baru disambungkan.
 3. Tekan `Tes kamera` untuk memeriksa gambar. Jika Windows meminta izin kamera, berikan izin agar perangkat dapat digunakan.
-4. Aktifkan `Sertakan kamera dalam rekaman`, pilih posisi/ukuran, dan tekan `Simpan`. Preview berhenti dan kamera dinyalakan kembali saat merekam.
+4. Pilih posisi dan ukuran, lalu tekan **Simpan**. Pratinjau berhenti dan kamera dinyalakan kembali saat merekam.
 5. Klik **Mulai rekam**, atau klik **Rekam** setelah presentasi dimulai. Kamera muncul di video.
 
 Hasil video tetap 1080p 30/60 fps sesuai Pengaturan; kelancaran kamera mengikuti perangkat/aplikasi kamera. Kamera 4:3 atau vertikal dipaskan tanpa meregangkan atau memotong wajah. Kamera ditempatkan di area aman agar taskbar tidak tertutup. Saat Privasi aktif atau tampilan terputus, kamera juga disembunyikan dari video. Freeze mempertahankan gambar layar; kamera tetap bergerak. Suara belum disertakan.
@@ -107,7 +107,7 @@ Clario meminta Windows mengecualikan panel dari tangkapan. Jika pengecualian tid
 - permukaan graphite dengan kontras tenang;
 - satu warna aksen utama, indigo;
 - warna status hanya digunakan secara semantik;
-- hijau untuk tampilan aktif, amber untuk gambar yang ditahan, merah untuk layar jeda;
+- hijau untuk presentasi aktif, kuning untuk Freeze, ungu untuk Privasi, dan merah muda untuk perekaman;
 - tipografi Segoe UI Variable;
 - tidak menggunakan gradient dekoratif atau kumpulan kartu yang tidak diperlukan;
 - tindakan darurat selalu terlihat dan memiliki label yang jelas.

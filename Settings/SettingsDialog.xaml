@@ -14,42 +14,50 @@
     PrimaryButtonClick="SettingsDialog_PrimaryButtonClick">
 
     <ContentDialog.Resources>
-        <x:Double x:Key="ContentDialogMaxWidth">640</x:Double>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default" Source="ms-appx:///Themes/ControlBrushes.xaml" />
+                <ResourceDictionary x:Key="Light" Source="ms-appx:///Themes/ControlBrushes.xaml" />
+                <ResourceDictionary x:Key="HighContrast" />
+            </ResourceDictionary.ThemeDictionaries>
+            <x:Double x:Key="ContentDialogMaxWidth">640</x:Double>
+        </ResourceDictionary>
     </ContentDialog.Resources>
 
     <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Width="540" Padding="0,0,12,0" Spacing="18">
+    <StackPanel MaxWidth="540" Padding="0,0,8,0" Spacing="18">
         <StackPanel Spacing="7">
-            <TextBlock Text="LAYAR + KAMERA" Style="{StaticResource ClarioSectionLabelStyle}" />
-            <ToggleSwitch x:Name="CameraEnabledToggle" Header="Sertakan kamera dalam rekaman" OffContent="Layar saja" OnContent="Layar dan kamera" AutomationProperties.Name="Sertakan kamera dalam rekaman" />
-            <TextBlock Text="Kamera hanya tampil dalam video hasil rekaman. Tampilan audiens tidak berubah." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+            <TextBlock Text="Kamera" Style="{StaticResource ClarioHeadingStyle}" />
+            <ToggleSwitch x:Name="CameraEnabledToggle" Header="Sertakan kamera dalam video" OffContent="Mati" OnContent="Aktif"
+                          Toggled="CameraEnabled_Changed" />
+            <TextBlock Text="Gambar kamera muncul di video yang disimpan." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
         </StackPanel>
 
-        <Border Padding="14" Style="{StaticResource ClarioPanelStyle}">
+        <Border x:Name="CameraOptionsPanel" Visibility="Collapsed" Padding="12" Style="{StaticResource ClarioPanelStyle}">
             <StackPanel Spacing="12">
                 <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="CameraDeviceComboBox" Header="Pilih kamera" HorizontalAlignment="Stretch" DisplayMemberPath="Name" AutomationProperties.Name="Pilih kamera" />
+                    <ComboBox x:Name="CameraDeviceComboBox" Header="Pilih kamera" Style="{StaticResource ClarioPickerStyle}" DisplayMemberPath="Name" AutomationProperties.Name="Pilih kamera" />
                     <Button x:Name="RefreshCamerasButton" Grid.Column="1" Content="Perbarui daftar" VerticalAlignment="Bottom" Style="{StaticResource ClarioButtonStyle}" Click="RefreshCameras_Click" />
                 </Grid>
-                <TextBlock Text="Hubungkan webcam USB, lalu klik Perbarui daftar. Jika memakai kamera dari HP, jalankan aplikasi kameranya terlebih dahulu." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                <TextBlock Text="Hubungkan webcam atau aktifkan kamera virtual, lalu perbarui daftar." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <ComboBox x:Name="CameraPositionComboBox" Header="Posisi di video" HorizontalAlignment="Stretch" AutomationProperties.Name="Posisi kamera di video">
+                    <ComboBox x:Name="CameraPositionComboBox" Header="Posisi di video" Style="{StaticResource ClarioPickerStyle}" AutomationProperties.Name="Posisi kamera di video">
                         <ComboBoxItem Content="Kanan bawah" /><ComboBoxItem Content="Kiri bawah" />
                         <ComboBoxItem Content="Kanan atas" /><ComboBoxItem Content="Kiri atas" />
                     </ComboBox>
-                    <ComboBox x:Name="CameraSizeComboBox" Grid.Column="1" Header="Ukuran kamera" HorizontalAlignment="Stretch" AutomationProperties.Name="Ukuran kamera">
+                    <ComboBox x:Name="CameraSizeComboBox" Grid.Column="1" Header="Ukuran kamera" Style="{StaticResource ClarioPickerStyle}" AutomationProperties.Name="Ukuran kamera">
                         <ComboBoxItem Content="Kecil · 18%" /><ComboBoxItem Content="Sedang · 24%" /><ComboBoxItem Content="Besar · 30%" />
                     </ComboBox>
                 </Grid>
                 <CheckBox x:Name="CameraMirrorCheckBox" Content="Cerminkan gambar kamera" Checked="CameraMirror_Changed" Unchecked="CameraMirror_Changed" />
                 <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="240" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Border Height="135" Background="{StaticResource ClarioCanvasBrush}" CornerRadius="8">
                         <Grid>
                             <canvas:CanvasControl x:Name="CameraPreviewCanvas" UseSharedDevice="True" ClearColor="#0E1116" Draw="CameraPreviewCanvas_Draw" />
-                            <TextBlock x:Name="CameraPreviewPlaceholder" Text="Preview kamera" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+                            <TextBlock x:Name="CameraPreviewPlaceholder" Text="Pratinjau kamera" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                         </Grid>
                     </Border>
                     <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
@@ -62,23 +70,20 @@
 
         <TextBlock x:Name="SettingsErrorText" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{StaticResource ClarioPrivacyBrush}" FontSize="12" />
         <StackPanel Spacing="4">
-            <TextBlock Text="REKAMAN" Style="{StaticResource ClarioSectionLabelStyle}" />
-            <TextBlock Text="Kualitas video" FontSize="18" FontWeight="SemiBold" />
-            <TextBlock Text="Pengaturan ini berlaku untuk rekaman berikutnya." FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
+            <TextBlock Text="Video" Style="{StaticResource ClarioHeadingStyle}" />
+            <TextBlock Text="Rekaman berikutnya · MP4 1080p" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
         </StackPanel>
 
         <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
             <StackPanel Spacing="6">
-                <TextBlock Text="KELANCARAN VIDEO" Style="{StaticResource ClarioSectionLabelStyle}" />
-                <ComboBox x:Name="FrameRateComboBox" HorizontalAlignment="Stretch">
+                <ComboBox x:Name="FrameRateComboBox" Header="Kelancaran" Style="{StaticResource ClarioPickerStyle}">
                     <ComboBoxItem Content="60 fps · lebih halus" Tag="60" />
                     <ComboBoxItem Content="30 fps · lebih ringan" Tag="30" />
                 </ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="6">
-                <TextBlock Text="KUALITAS" Style="{StaticResource ClarioSectionLabelStyle}" />
-                <ComboBox x:Name="BitrateComboBox" HorizontalAlignment="Stretch">
+                <ComboBox x:Name="BitrateComboBox" Header="Kualitas" Style="{StaticResource ClarioPickerStyle}">
                     <ComboBoxItem Content="Ringan · 10 Mbps" Tag="10" />
                     <ComboBoxItem Content="Seimbang · 18 Mbps" Tag="18" />
                     <ComboBoxItem Content="Detail tinggi · 28 Mbps" Tag="28" />
@@ -86,33 +91,19 @@
             </StackPanel>
         </Grid>
 
-        <Border Padding="14" Style="{StaticResource ClarioPanelStyle}">
-            <Grid RowSpacing="12">
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <StackPanel Spacing="3">
-                        <TextBlock Text="Simpan video di" FontSize="13" FontWeight="SemiBold" />
-                        <TextBlock Text="Semua video tersimpan rapi di satu lokasi." FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                        <Button Content="Buka folder" Style="{StaticResource ClarioButtonStyle}" Click="OpenFolder_Click" />
-                        <Button Content="Ganti folder" Style="{StaticResource ClarioButtonStyle}" Click="ChooseFolder_Click" />
-                    </StackPanel>
-                </Grid>
-                <Border Grid.Row="1" Padding="10,8" CornerRadius="7" Background="{StaticResource ClarioCanvasBrush}">
-                    <TextBlock x:Name="FolderPathText" TextTrimming="CharacterEllipsis" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                </Border>
-                <ToggleSwitch x:Name="AskLocationToggle" Grid.Row="2" Header="Tanyakan lokasi setiap kali merekam" OffContent="Simpan di folder di atas" OnContent="Pilih lokasi sebelum merekam" />
-            </Grid>
-        </Border>
-
-        <Border Padding="13" CornerRadius="9" Background="{StaticResource ClarioAccentSoftBrush}">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <FontIcon Glyph="&#xE946;" FontSize="14" Foreground="{StaticResource ClarioAccentBrush}" />
-                <TextBlock Text="Catatan dan aplikasi yang disembunyikan tidak masuk rekaman. Rekaman ini belum menyertakan suara." TextWrapping="Wrap" FontSize="11" />
+        <StackPanel Spacing="8">
+            <TextBlock Text="Penyimpanan" Style="{StaticResource ClarioHeadingStyle}" />
+            <Border Padding="10,8" CornerRadius="8" Background="{StaticResource ClarioRaisedBrush}">
+                <TextBlock x:Name="FolderPathText" TextTrimming="CharacterEllipsis" FontSize="12"
+                           Foreground="{StaticResource ClarioSecondaryTextBrush}" ToolTipService.ToolTip="{Binding Text, ElementName=FolderPathText}" />
+            </Border>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Buka folder" Style="{StaticResource ClarioButtonStyle}" Click="OpenFolder_Click" />
+                <Button Content="Ganti folder" Style="{StaticResource ClarioButtonStyle}" Click="ChooseFolder_Click" />
             </StackPanel>
-        </Border>
+            <ToggleSwitch x:Name="AskLocationToggle" Header="Tanya lokasi setiap kali merekam"
+                          OffContent="Simpan otomatis" OnContent="Pilih sebelum merekam" />
+        </StackPanel>
     </StackPanel>
     </ScrollViewer>
 </ContentDialog>
