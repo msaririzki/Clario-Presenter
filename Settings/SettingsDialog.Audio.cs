@@ -8,6 +8,8 @@ namespace Clario_Presenter;
 
 public sealed partial class SettingsDialog
 {
+    private readonly HashSet<string> _boostedMicrophones = new(StringComparer.OrdinalIgnoreCase);
+    private bool _syncingBoostToggle;
     private bool _loadingAudioDevices;
     private bool _loadedAudioDevices;
     private readonly SemaphoreSlim _audioMonitorGate = new(1, 1);
@@ -18,6 +20,7 @@ public sealed partial class SettingsDialog
 
     private void InitializeAudioSettings(PresenterSettings settings)
     {
+        _boostedMicrophones.UnionWith(settings.BoostedMicrophones);
         ComputerAudioToggle.IsOn = settings.ComputerAudioEnabled;
         MicrophoneAudioToggle.IsOn = settings.MicrophoneEnabled;
         FanNoiseToggle.IsOn = settings.ReduceFanNoise && FanNoiseReducer.Supported;
@@ -57,6 +60,7 @@ public sealed partial class SettingsDialog
             if (_closing) return;
             LoadAudioOptions(PlaybackAudioComboBox, devices.Outputs, devices.DefaultOutput, _originalSettings.PlaybackDeviceId);
             LoadAudioOptions(MicrophoneAudioComboBox, devices.Inputs, devices.DefaultInput, _originalSettings.MicrophoneDeviceId, devices.AutomaticInput);
+            ShowSelectedMicBoost();
             _loadedAudioDevices = true;
             _loadingAudioDevices = false;
             AudioStatusText.Text = GetAudioStatus();
@@ -77,8 +81,27 @@ public sealed partial class SettingsDialog
     private async void AudioDevice_SelectionChanged(object sender, SelectionChangedEventArgs args)
     {
         if (!_opened || _loadingAudioDevices || _closing) return;
+        if (ReferenceEquals(sender, MicrophoneAudioComboBox)) ShowSelectedMicBoost();
         AudioStatusText.Text = GetAudioStatus();
         SettingsErrorText.Visibility = Visibility.Collapsed;
+        await SyncAudioMonitorsAsync();
+    }
+
+    private void ShowSelectedMicBoost()
+    {
+        var mic = MicrophoneAudioComboBox.SelectedItem as AudioDevice;
+        _syncingBoostToggle = true;
+        MicBoostToggle.IsEnabled = mic?.Available == true;
+        MicBoostToggle.IsOn = mic?.Available == true && _boostedMicrophones.Contains(mic.EndpointId);
+        _syncingBoostToggle = false;
+    }
+
+    private async void MicBoost_Toggled(object sender, RoutedEventArgs args)
+    {
+        if (_syncingBoostToggle || !_opened || _closing ||
+            MicrophoneAudioComboBox.SelectedItem is not AudioDevice { Available: true } mic) return;
+        if (MicBoostToggle.IsOn) _boostedMicrophones.Add(mic.EndpointId);
+        else _boostedMicrophones.Remove(mic.EndpointId);
         await SyncAudioMonitorsAsync();
     }
 
@@ -111,13 +134,15 @@ public sealed partial class SettingsDialog
         var speech = !loopback && MicrophoneProfilePicker.SelectedIndex != 1;
         var warm = !loopback && MicrophoneProfilePicker.SelectedIndex == 2;
         if (monitor is { HasStopped: false } && desired?.EndpointId == monitor.DeviceId
+            && (loopback || monitor.BoostedMicrophones.Contains(monitor.DeviceId, StringComparer.OrdinalIgnoreCase) == MicBoostToggle.IsOn)
             && monitor.SpeechProfile == speech && monitor.WarmNarration == warm
             && monitor.ReduceFanNoise == (!loopback && FanNoiseToggle.IsOn)) return monitor;
         if (monitor is not null) await monitor.DisposeAsync();
         bar.Value = 0;
         return DesiredAudioDevice(toggle, picker) is { } next
             ? new AudioLevelMonitor(next.EndpointId, loopback, !loopback && MicrophoneProfilePicker.SelectedIndex != 1,
-                !loopback && MicrophoneProfilePicker.SelectedIndex == 2, !loopback && FanNoiseToggle.IsOn) : null;
+                !loopback && MicrophoneProfilePicker.SelectedIndex == 2, !loopback && FanNoiseToggle.IsOn,
+                !loopback && MicBoostToggle.IsOn ? [next.EndpointId] : null) : null;
     }
 
     private AudioDevice? DesiredAudioDevice(ToggleSwitch toggle, ComboBox picker) =>

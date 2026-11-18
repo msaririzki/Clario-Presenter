@@ -305,7 +305,7 @@
                                                   AutomationProperties.Name="Rekam mikrofon" Toggled="AudioSource_Changed" />
                                 </Grid>
                                 <Grid x:Name="MicrophoneAudioOptions" Visibility="Collapsed" ColumnSpacing="14">
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.2*" />
                                         <ColumnDefinition Width="*" />
@@ -326,6 +326,9 @@
                                         <ComboBoxItem Content="Standar perangkat" />
                                         <ComboBoxItem Content="Narasi hangat" />
                                     </ComboBox>
+                                    <ToggleSwitch x:Name="MicBoostToggle" Grid.Row="2" Grid.ColumnSpan="2" IsEnabled="False"
+                                                  Header="Perkuat mic pelan" Margin="0,10,0,0" Style="{StaticResource SettingsSwitch}"
+                                                  ToolTipService.ToolTip="Disimpan khusus untuk mikrofon yang dipilih." Toggled="MicBoost_Toggled" />
                                     <ToggleSwitch x:Name="FanNoiseToggle" Grid.Row="1" Grid.Column="1" Header="Redam suara kipas"
                                                   Margin="0,10,0,0" Style="{StaticResource SettingsSwitch}" Toggled="AudioSource_Changed" />
                                 </Grid>

@@ -161,6 +161,23 @@ internal static class AudioChecks
 
     private static void VerifyMixer()
     {
+        string[] boosted = ["headset"];
+        var gain = QuietMicBoost.ForEndpoint("HEADSET", boosted) ?? throw new InvalidOperationException("Missing saved headset gain.");
+        if (QuietMicBoost.ForEndpoint("usb", boosted) is not null || QuietMicBoost.ForEndpoint("headset", []) is not null)
+            throw new InvalidOperationException("Gain must be opt-in for each physical input.");
+        short[] quiet = [0, 0, 100, -200, 1000, -1000];
+        gain.Process(quiet, 2);
+        if (!quiet.SequenceEqual(new short[] { 0, 0, 282, -564, 2818, -2818 }))
+            throw new InvalidOperationException("Incorrect gain on silence or a quiet first syllable.");
+        short[] loud = [short.MinValue, 16384, short.MaxValue, short.MinValue];
+        gain.Process(loud, 2);
+        if (AudioLevelMonitor.PeakOf(loud) > 29204 || loud[0] != -2 * loud[1])
+            throw new InvalidOperationException("Peak limiting must preserve stereo balance without clipping.");
+        gain.Reset();
+        short[] mono = [1000];
+        gain.Process(mono, 1);
+        if (mono[0] != 2818) throw new InvalidOperationException("Microphone gain did not reset.");
+
         var voice = new WarmVoiceProcessor();
         var stereo = new short[960];
         for (int i = 0; i < stereo.Length; i += 2) stereo[i] = short.MaxValue;

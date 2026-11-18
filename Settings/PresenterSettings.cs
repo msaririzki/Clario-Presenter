@@ -22,5 +22,6 @@ public sealed record PresenterSettings
     public bool MicrophoneSpeechProfile { get; init; } = true;
     public bool WarmNarration { get; init; }
     public bool ReduceFanNoise { get; init; }
+    public string[] BoostedMicrophones { get; init; } = [];
     public string MicrophoneDeviceId { get; init; } = Wasapi.AutomaticInputId;
 }

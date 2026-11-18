@@ -107,6 +107,7 @@ public sealed partial class SettingsDialog : ContentDialog
             MicrophoneEnabled = MicrophoneAudioToggle.IsOn,
             MicrophoneSpeechProfile = MicrophoneProfilePicker.SelectedIndex != 1,
             WarmNarration = MicrophoneProfilePicker.SelectedIndex == 2,
+            BoostedMicrophones = _boostedMicrophones.ToArray(),
             ReduceFanNoise = FanNoiseToggle.IsOn,
             MicrophoneDeviceId = SelectedAudioDeviceId(MicrophoneAudioComboBox, _originalSettings.MicrophoneDeviceId)
         };

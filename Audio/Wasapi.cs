@@ -140,7 +140,8 @@ internal static class Wasapi
     }
 
     internal static void Capture(string deviceId, bool loopback, Action started,
-        Action<nint, int, uint, long, int, ulong> packet, CancellationToken token, bool speechProfile = false)
+        Action<nint, int, uint, long, int, ulong> packet, CancellationToken token, bool speechProfile = false,
+        Action<string>? endpointOpened = null)
     {
         var enumerator = CreateEnumerator();
         IDevice? device = null;
@@ -163,6 +164,12 @@ internal static class Wasapi
                 : enumerator.GetDevice(deviceId, out device));
             Check(device.GetState(out var state));
             if (state != Active) throw new InvalidOperationException("Perangkat audio sudah tidak aktif.");
+
+            if (endpointOpened is not null)
+            {
+                Check(device.GetId(out var endpointId));
+                endpointOpened(endpointId);
+            }
 
             var flags = ConvertPcm | ResampleHighQuality | (loopback ? Loopback : 0);
             int channels = 0;

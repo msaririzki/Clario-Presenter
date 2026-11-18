@@ -12,15 +12,18 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
     private volatile bool _isReady;
     private volatile string? _error;
 
-    internal AudioLevelMonitor(string deviceId, bool loopback, bool speechProfile = false, bool warmNarration = false, bool reduceFanNoise = false)
+    internal AudioLevelMonitor(string deviceId, bool loopback, bool speechProfile = false, bool warmNarration = false, bool reduceFanNoise = false,
+        string[]? boostedMicrophones = null)
     {
         DeviceId = deviceId;
+        BoostedMicrophones = loopback ? [] : boostedMicrophones ?? [];
         SpeechProfile = speechProfile;
         WarmNarration = !loopback && warmNarration;
         ReduceFanNoise = !loopback && reduceFanNoise && FanNoiseReducer.Supported;
         _worker = Task.Run(() => ReadLevels(loopback, _stop.Token));
     }
 
+    internal string[] BoostedMicrophones { get; }
     internal string DeviceId { get; }
     internal bool SpeechProfile { get; }
     internal bool WarmNarration { get; }
@@ -32,6 +35,7 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
     private void ReadLevels(bool loopback, CancellationToken token)
     {
         short[] samples = [];
+        QuietMicBoost? boost = null;
         var voice = WarmNarration ? new WarmVoiceProcessor() : null;
         using var noise = ReduceFanNoise ? new FanNoiseReducer() : null;
         try
@@ -42,6 +46,7 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
             {
                 if ((flags & Wasapi.Discontinuity) != 0)
                 {
+                    boost?.Reset();
                     voice?.Reset();
                     noise?.Reset();
                 }
@@ -49,17 +54,20 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
                 if (samples.Length < count) Array.Resize(ref samples, count);
                 if (data == nint.Zero || (flags & Wasapi.Silent) != 0)
                 {
+                    boost?.Reset();
                     count = noise?.Drain(samples.AsSpan(0, count), channels) ?? 0;
                     if (count == 0) voice?.Reset();
                 }
                 else
                 {
                     Marshal.Copy(data, samples, 0, count);
+                    boost?.Process(samples.AsSpan(0, count), channels);
                     noise?.Process(samples.AsSpan(0, count), channels);
                 }
                 voice?.Process(samples.AsSpan(0, count), channels);
                 Accumulate(ref _peak, samples.AsSpan(0, count), !loopback);
-            }, token, SpeechProfile && !WarmNarration);
+            }, token, SpeechProfile && !WarmNarration, BoostedMicrophones.Length == 0 ? null
+                : endpoint => boost = QuietMicBoost.ForEndpoint(endpoint, BoostedMicrophones));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception exception)

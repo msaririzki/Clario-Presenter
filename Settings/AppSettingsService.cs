@@ -62,6 +62,7 @@ public sealed class AppSettingsService
         _localSettings.Values[nameof(PresenterSettings.MicrophoneEnabled)] = Current.MicrophoneEnabled;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneSpeechProfile)] = Current.MicrophoneSpeechProfile;
         _localSettings.Values[nameof(PresenterSettings.WarmNarration)] = Current.WarmNarration;
+        _localSettings.Values[nameof(PresenterSettings.BoostedMicrophones)] = string.Join("\n", Current.BoostedMicrophones);
         _localSettings.Values[nameof(PresenterSettings.ReduceFanNoise)] = Current.ReduceFanNoise;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneDeviceId)] = Current.MicrophoneDeviceId;
 #endif
@@ -85,6 +86,8 @@ public sealed class AppSettingsService
             CameraPosition = position,
             CameraCustomPosition = customPosition,
             CameraCustomPositionUsesFullFrame = true,
+            BoostedMicrophones = (settings.BoostedMicrophones ?? []).Where(id => !string.IsNullOrWhiteSpace(id) && id != Wasapi.AutomaticInputId)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             CameraWidthPercent = width
         };
     }
@@ -176,6 +179,8 @@ public sealed class AppSettingsService
             PlaybackDeviceId = values[nameof(PresenterSettings.PlaybackDeviceId)] as string ?? string.Empty,
             MicrophoneEnabled = ReadBool(values, nameof(PresenterSettings.MicrophoneEnabled)),
             WarmNarration = ReadBool(values, nameof(PresenterSettings.WarmNarration)),
+            BoostedMicrophones = values.TryGetValue(nameof(PresenterSettings.BoostedMicrophones), out var boosted) && boosted is string ids
+                ? ids.Split('\n', StringSplitOptions.RemoveEmptyEntries) : [],
             ReduceFanNoise = ReadBool(values, nameof(PresenterSettings.ReduceFanNoise)),
             MicrophoneSpeechProfile = !values.TryGetValue(nameof(PresenterSettings.MicrophoneSpeechProfile), out var speech) || speech is not false,
             MicrophoneDeviceId = values.TryGetValue(nameof(PresenterSettings.MicrophoneDeviceId), out var microphoneId)

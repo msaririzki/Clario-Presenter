@@ -599,7 +599,7 @@ public sealed partial class MainPage : Page
                         PreviewCameraOptions(settings),
                         new RecordingAudioOptions(settings.ComputerAudioEnabled, settings.PlaybackDeviceId,
                             settings.MicrophoneEnabled, settings.MicrophoneDeviceId, settings.MicrophoneSpeechProfile,
-                            settings.WarmNarration, settings.ReduceFanNoise)));
+                            settings.WarmNarration, settings.ReduceFanNoise, settings.BoostedMicrophones)));
                 if (!_isLive || _capture is null)
                     throw new InvalidOperationException("Sesi ditutup saat rekaman disiapkan. Mulai kembali untuk merekam.");
             }

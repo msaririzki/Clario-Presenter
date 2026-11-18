@@ -6,7 +6,7 @@ namespace Clario_Presenter.Audio;
 public sealed record RecordingAudioOptions(
     bool ComputerAudioEnabled = false, string PlaybackDeviceId = "",
     bool MicrophoneEnabled = false, string MicrophoneDeviceId = "", bool MicrophoneSpeechProfile = true,
-    bool WarmNarration = false, bool ReduceFanNoise = false)
+    bool WarmNarration = false, bool ReduceFanNoise = false, string[]? BoostedMicrophones = null)
 {
     public bool Enabled => ComputerAudioEnabled || MicrophoneEnabled;
 }
@@ -79,6 +79,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
     {
         short[] pcm = [];
         var clock = new CapturePacketClock();
+        QuietMicBoost? boost = null;
         var voice = !track.Loopback && options.WarmNarration ? new WarmVoiceProcessor() : null;
         using var noise = !track.Loopback && options.ReduceFanNoise && FanNoiseReducer.Supported ? new FanNoiseReducer() : null;
         try
@@ -101,6 +102,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                         RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin)));
                     if (muted())
                     {
+                        boost?.Reset();
                         voice?.Reset();
                         noise?.Reset();
                         track.PacketReceived(frames);
@@ -108,6 +110,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     }
                     if ((flags & Wasapi.Discontinuity) != 0)
                     {
+                        boost?.Reset();
                         voice?.Reset();
                         noise?.Reset();
                     }
@@ -115,19 +118,23 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
                     if (data == 0 || (flags & Wasapi.Silent) != 0)
                     {
+                        boost?.Reset();
                         count = noise?.Drain(pcm.AsSpan(0, count), channels) ?? 0;
                         if (count == 0) voice?.Reset();
                     }
                     else
                     {
                         Marshal.Copy(data, pcm, 0, count);
+                        boost?.Process(pcm.AsSpan(0, count), channels);
                         noise?.Process(pcm.AsSpan(0, count), channels);
                     }
                     voice?.Process(pcm.AsSpan(0, count), channels);
                     if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count), !track.Loopback);
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
                     track.PacketReceived(frames);
-                }, token, options.MicrophoneSpeechProfile && !options.WarmNarration);
+                }, token, options.MicrophoneSpeechProfile && !options.WarmNarration,
+                !track.Loopback && options.BoostedMicrophones is { Length: > 0 } ids
+                    ? endpoint => boost = QuietMicBoost.ForEndpoint(endpoint, ids) : null);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {

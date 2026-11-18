@@ -93,6 +93,8 @@ Jika dengung kipas ikut terdengar, aktifkan **Redam suara kipas** di bagian **Mi
 
 Untuk narasi, pilih **Profil suara mikrofon → Narasi (Windows)**. Windows meminta pemrosesan suara yang tersedia pada driver mikrofon. Jika karakter suara dari mikrofon atau mixer USB lebih cocok dengan pengaturan biasanya, pilih **Standar perangkat**. Kedua pilihan memakai mikrofon yang Anda pilih.
 
+Jika headset terdengar pelan, pilih input headset di **Pengaturan → Audio**, lalu aktifkan **Perkuat mic pelan** dan klik **Simpan**. Clario mengingat pilihan ini untuk input tersebut, termasuk saat input yang sama dipilih lewat **Otomatis**. Jika headset dan mikrofon laptop memakai satu nama input Windows, keduanya berbagi pilihan ini.
+
 Pilih **Narasi hangat** jika ingin suara lebih berisi dan lembut. Clario memakai input standar perangkat, memperkuat nada rendah suara secara ringan, dan meratakan bagian yang keras. Suku kata pelan setelah jeda tetap diproses. Efek hanya diterapkan pada mikrofon. Mulailah bicara saat **Stop rekam** muncul. Pada titik itu Clario sudah menerima data dari mikrofon.
 
 Klik **Perbarui perangkat audio** jika perangkat baru belum muncul. Saat **Suara komputer** aktif, semua bunyi dari speaker atau headphone yang dipilih bisa masuk ke video, termasuk notifikasi atau suara dari aplikasi yang gambarnya disembunyikan.

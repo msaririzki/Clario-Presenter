@@ -126,7 +126,7 @@ public sealed partial class MainPage
             if (settings is null || token.IsCancellationRequested) return;
             if (settings.ComputerAudioEnabled) _studioPlayback = new(settings.PlaybackDeviceId, true);
             if (settings.MicrophoneEnabled) _studioMic = new(settings.MicrophoneDeviceId, false,
-                settings.MicrophoneSpeechProfile, settings.WarmNarration, settings.ReduceFanNoise);
+                settings.MicrophoneSpeechProfile, settings.WarmNarration, settings.ReduceFanNoise, settings.BoostedMicrophones);
             if (settings.CameraEnabled)
             {
                 var candidate = new CameraCaptureService();
