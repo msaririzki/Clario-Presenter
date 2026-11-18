@@ -50,7 +50,7 @@ public sealed partial class MainPage : Page
     private bool _refreshingDisplays;
     private bool _sourceDisplayNeedsSelection;
     private bool _audienceDisplayNeedsSelection;
-    private string? _lastSavedRecordingFolder;
+    private StorageFile? _lastSavedRecording;
     private string? _lastRecordingWarning;
 
     private SolidColorBrush LiveBrush => ResourceBrush("ClarioLiveBrush");
@@ -307,10 +307,11 @@ public sealed partial class MainPage : Page
         }
 
         var startedCapture = !_isLive;
-        if (startedCapture && !TryStartSession()) return;
-        if (await RunRecordingChangeAsync(StartRecordingAsync, "Menyiapkan rekaman…"))
+        if (await RunRecordingChangeAsync(async () =>
+            (!startedCapture || TryStartSession()) && await StartRecordingAsync(), "Menyiapkan rekaman…"))
         {
-            MinimizeForScreenSession();
+            if (_displays.Count == 1 || _isSafeMirrorSession)
+                (App.MainWindow as MainWindow)?.MinimizeForPresentation();
         }
         else if (startedCapture && _isLive)
         {
@@ -323,7 +324,15 @@ public sealed partial class MainPage : Page
     private async void PreviewButton_Click(object sender, RoutedEventArgs e)
     {
         if (_sessionTransition || _settingsDialogOpen) return;
-        if (_isLive) await StopSessionAsync();
+        if (_recorder is not null)
+        {
+            _recordingPreviewOpen = !_recordingPreviewOpen;
+            UpdateSessionActions();
+            UpdatePreview();
+            await SyncStudioPreviewAsync();
+            if (ShowStudioInputs) LivePreviewCanvas.Invalidate();
+        }
+        else if (_isLive) await StopSessionAsync();
         else TryStartSession();
     }
 
@@ -357,7 +366,6 @@ public sealed partial class MainPage : Page
             return false;
         }
 
-        _lastSavedRecordingFolder = null;
         try
         {
             StartPresentation(source, monitor, target);
@@ -373,7 +381,6 @@ public sealed partial class MainPage : Page
         _isLive = true;
         NotesButton.IsChecked = false;
         SetNotesVisible(false);
-        _sessionTimer.Start();
         UpdateCaptureModeUi();
         return true;
     }
@@ -560,6 +567,7 @@ public sealed partial class MainPage : Page
         {
             _sessionTransition = false;
             UpdateSessionActions();
+            UpdatePreview();
             await SyncStudioPreviewAsync();
         }
     }
@@ -567,8 +575,7 @@ public sealed partial class MainPage : Page
     private async Task<bool> StartRecordingAsync()
     {
         if (!_isLive || _capture is null) return false;
-        _lastSavedRecordingFolder = null;
-        OpenRecordingFolderButton.Visibility = Visibility.Collapsed;
+        _recordingPreviewOpen = false;
         StorageFile? pendingFile = null;
         var pendingFileWasAutoCreated = false;
         try
@@ -643,7 +650,7 @@ public sealed partial class MainPage : Page
         try
         {
             await recorder.DisposeAsync();
-            _lastSavedRecordingFolder = Path.GetDirectoryName(file?.Path);
+            _lastSavedRecording = file;
             return file is null ? "Rekaman selesai." : $"Rekaman tersimpan · {file.Name}";
         }
         catch (Exception exception)
@@ -654,7 +661,7 @@ public sealed partial class MainPage : Page
 
     private async void OpenRecordingFolder_Click(object sender, RoutedEventArgs e)
     {
-        if (_lastSavedRecordingFolder is not { } path) return;
+        if (_lastSavedRecording is not { } file || Path.GetDirectoryName(file.Path) is not { } path) return;
         try
         {
             var folder = await StorageFolder.GetFolderFromPathAsync(path);
@@ -664,6 +671,20 @@ public sealed partial class MainPage : Page
         catch (Exception exception)
         {
             FooterStatusText.Text = $"Folder belum dapat dibuka. {exception.Message}";
+        }
+    }
+
+    private async void PlayRecording_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastSavedRecording is not { } file) return;
+        try
+        {
+            if (!await Windows.System.Launcher.LaunchFileAsync(file))
+                FooterStatusText.Text = "Video belum bisa diputar. Klik Buka folder untuk melihat filenya.";
+        }
+        catch (Exception exception)
+        {
+            FooterStatusText.Text = $"Video belum bisa diputar. {exception.Message}";
         }
     }
 
@@ -836,11 +857,12 @@ public sealed partial class MainPage : Page
     {
         if (!_isSafeMirrorSession || _isFrozen || _capture is null || _presenterDisplay is null) return;
 
+        var protectedViewNeeded = HasPrivateView();
+        if (!protectedViewNeeded && !_isProtectedPublicCapture && !_isAutoHeld && _privateWindows.Count == 0) return;
         var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
         var presenterActive = foregroundWindow == GetPresenterWindowHandle();
         var privateWindowActive = WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
             && WindowCatalogService.IsWindowPresentable(foregroundWindow);
-        var protectedViewNeeded = HasPrivateView();
         var switcherActive = WindowCatalogService.IsApplicationSwitcherActive();
 
         if (!presenterActive && !privateWindowActive
@@ -933,9 +955,7 @@ public sealed partial class MainPage : Page
 
     private void Capture_FrameAvailable(object? sender, EventArgs e)
     {
-        if (!_isLive || !_studioWindowVisible || PreviewPanel.Visibility != Visibility.Visible) return;
-        if (!_isPrivacy && ClientStateOverlay.Visibility == Visibility.Visible) UpdatePreview();
-        LivePreviewCanvas.Invalidate();
+        _studioFramePending = true;
     }
 
     private void Capture_SourceClosed(object? sender, EventArgs e)
@@ -1046,10 +1066,10 @@ public sealed partial class MainPage : Page
         PreviewButton.IsEnabled = !_sessionTransition;
         SettingsButton.IsEnabled = !_sessionTransition;
         RecordButton.IsEnabled = !_sessionTransition;
-        OpenRecordingFolderButton.Visibility = !_sessionTransition && _lastSavedRecordingFolder is not null
+        SavedRecordingActions.Visibility = !_sessionTransition && !recording && _lastSavedRecording is not null
             ? Visibility.Visible : Visibility.Collapsed;
-        PreviewButton.Visibility = IsRecordingOnly && !recording ? Visibility.Visible : Visibility.Collapsed;
-        PreviewButton.Content = _isLive ? "Tutup preview" : "Buka preview";
+        PreviewButton.Visibility = IsRecordingOnly ? Visibility.Visible : Visibility.Collapsed;
+        PreviewButton.Content = _isLive && !RecordingPreviewHidden ? "Tutup preview" : "Buka preview";
         SessionControls.Visibility = _isLive ? Visibility.Visible : Visibility.Collapsed;
         RecordButton.Visibility = IsRecordingOnly ? Visibility.Collapsed : Visibility.Visible;
         FreezeButton.Content = _isFrozen ? "Lanjutkan tampilan" : "Freeze";
@@ -1064,7 +1084,7 @@ public sealed partial class MainPage : Page
 
     private void UpdatePreview()
     {
-        var frameVisible = _isLive && !_isPrivacy && _capture?.HasFrame == true;
+        var frameVisible = _isLive && !_isPrivacy && !RecordingPreviewHidden && _capture?.HasFrame == true;
         LivePreviewCanvas.Visibility = frameVisible ? Visibility.Visible : Visibility.Collapsed;
         ClientStateOverlay.Visibility = frameVisible ? Visibility.Collapsed : Visibility.Visible;
         if (frameVisible) return;
@@ -1078,6 +1098,12 @@ public sealed partial class MainPage : Page
         }
 
         ClientStateIcon.Glyph = "\uE7F4";
+        if (RecordingPreviewHidden)
+        {
+            ClientStateTitle.Text = "Sedang merekam";
+            ClientStateSubtitle.Text = "Klik Buka preview jika ingin memeriksa gambar dan suara.";
+            return;
+        }
         ClientStateTitle.Text = _isLive ? "Menyiapkan tampilan…" : IsRecordingOnly ? "Siap merekam" : "Siap presentasi";
         ClientStateSubtitle.Text = _isLive
             ? "Buka layar atau aplikasi yang ingin ditampilkan."

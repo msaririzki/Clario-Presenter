@@ -268,8 +268,10 @@
             <TextBlock x:Name="FooterStatusText" Grid.Column="1" Text="Pilih sumber untuk memulai."
                        TextWrapping="Wrap" MaxLines="2" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis"
                        Foreground="{StaticResource ClarioSecondaryTextBrush}" ToolTipService.ToolTip="{Binding Text, ElementName=FooterStatusText}" />
-            <Button x:Name="OpenRecordingFolderButton" Grid.Column="2" Content="Buka folder" Visibility="Collapsed"
-                    Style="{StaticResource ClarioButtonStyle}" Click="OpenRecordingFolder_Click" />
+            <StackPanel x:Name="SavedRecordingActions" Grid.Column="2" Orientation="Horizontal" Spacing="6" Visibility="Collapsed">
+                <Button Content="Putar rekaman" Style="{StaticResource ClarioButtonStyle}" Click="PlayRecording_Click" />
+                <Button Content="Buka folder" Style="{StaticResource ClarioButtonStyle}" Click="OpenRecordingFolder_Click" />
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

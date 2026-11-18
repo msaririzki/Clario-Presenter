@@ -12,7 +12,7 @@ namespace Clario_Presenter;
 
 public sealed partial class MainPage
 {
-    private readonly DispatcherTimer _studioTimer = new();
+    private readonly DispatcherTimer _studioTimer = new() { Interval = TimeSpan.FromMilliseconds(67) };
     private readonly SemaphoreSlim _studioGate = new(1);
     private PresenterSettings? _studioInputSettings;
     private CameraOverlayOptions? _studioCameraOptions;
@@ -24,8 +24,11 @@ public sealed partial class MainPage
     private long _lastMeterTick;
 
     private bool _studioWindowVisible;
+    private bool _recordingPreviewOpen;
+    private bool _studioFramePending;
+    private bool RecordingPreviewHidden => _isRecordingOnlySession && _recorder is not null && !_recordingPreviewOpen;
     private bool ShowStudioInputs => _isLoaded && _studioWindowVisible && PreviewPanel.Visibility == Visibility.Visible && _isLive && !_isPrivacy
-        && !_settingsDialogOpen && !_sessionTransition;
+        && !_settingsDialogOpen && !_sessionTransition && !RecordingPreviewHidden;
 
     private void StudioWindow_Changed(AppWindow window, AppWindowChangedEventArgs args)
     {
@@ -37,8 +40,18 @@ public sealed partial class MainPage
         var visible = window.IsVisible && window.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Minimized };
         if (_studioWindowVisible == visible) return;
         _studioWindowVisible = visible;
+        if (!visible)
+        {
+            _recordingPreviewOpen = false;
+            if (_isRecordingOnlySession && _isLive && _recorder is null && !_sessionTransition && !_settingsDialogOpen)
+            {
+                StopPresentation();
+                return;
+            }
+        }
+        if (_isLoaded) UpdateSessionActions();
         _ = SyncStudioPreviewAsync();
-        if (ShowStudioInputs)
+        if (visible && _isLive)
         {
             UpdatePreview();
             LivePreviewCanvas.Invalidate();
@@ -55,16 +68,11 @@ public sealed partial class MainPage
     private Task SyncStudioPreviewAsync()
     {
         var show = ShowStudioInputs;
-        StudioMeters.Visibility = _isLive ? Visibility.Visible : Visibility.Collapsed;
+        StudioMeters.Visibility = _isLive && !RecordingPreviewHidden ? Visibility.Visible : Visibility.Collapsed;
         _recorder?.SetPreviewMeters(show);
-        var settings = _settingsService.Current;
-        var cameraEnabled = _recorder?.IncludesCamera ?? settings.CameraEnabled;
-        var audioEnabled = _recorder?.IncludesAudio ?? (settings.ComputerAudioEnabled || settings.MicrophoneEnabled);
-        if (show && (cameraEnabled || audioEnabled))
-        {
-            _studioTimer.Interval = TimeSpan.FromMilliseconds(cameraEnabled ? 33 : 100);
-            _studioTimer.Start();
-        }
+        if (_isLoaded && _studioWindowVisible && _recorder is not null) _sessionTimer.Start();
+        else _sessionTimer.Stop();
+        if (show) _studioTimer.Start();
         else _studioTimer.Stop();
 
         // While recording the preview reads the recorder's existing camera and PCM tracks.
@@ -127,7 +135,12 @@ public sealed partial class MainPage
     private void StudioTimer_Tick(object? sender, object args)
     {
         if (!ShowStudioInputs) return;
-        if (_studioCamera is not null || _recorder?.IncludesCamera == true) LivePreviewCanvas.Invalidate();
+        if (_studioFramePending || _studioCamera is not null || _recorder?.IncludesCamera == true)
+        {
+            _studioFramePending = false;
+            if (ClientStateOverlay.Visibility == Visibility.Visible) UpdatePreview();
+            LivePreviewCanvas.Invalidate();
+        }
         if (Environment.TickCount64 - _lastMeterTick < 100) return;
         _lastMeterTick = Environment.TickCount64;
         UpdateStudioMeters();
@@ -168,7 +181,7 @@ public sealed partial class MainPage
 
     private void DrawStudioPreview(CanvasControl canvas, CanvasDrawEventArgs args)
     {
-        if (_capture is null || _isPrivacy || !_isLive || !_studioWindowVisible) return;
+        if (_capture is null || !ShowStudioInputs) return;
         const float width = OutputRecordingService.OutputWidth, height = OutputRecordingService.OutputHeight;
         var scale = (float)Math.Min(canvas.ActualWidth / width, canvas.ActualHeight / height);
         if (scale <= 0) return;

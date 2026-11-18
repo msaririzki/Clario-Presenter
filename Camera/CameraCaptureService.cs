@@ -21,6 +21,7 @@ public sealed class CameraCaptureService : IAsyncDisposable
     private MediaFrameReader? _reader;
     private CanvasBitmap? _bitmap;
     private long _lastFrameTick;
+    private bool _previewOnly;
     private int _processing;
     private volatile bool _stopping;
     private bool _disposed;
@@ -83,8 +84,9 @@ public sealed class CameraCaptureService : IAsyncDisposable
             var format = source.CurrentFormat.VideoFormat;
             var sourceWidth = Math.Max(1u, format.Width);
             var sourceHeight = Math.Max(1u, format.Height);
-            var captureWidth = Math.Max(960, recordingBounds?.Width ?? 0);
-            var captureHeight = Math.Max(720, recordingBounds?.Height ?? 0);
+            _previewOnly = recordingBounds is null;
+            var captureWidth = _previewOnly ? 640 : Math.Max(960, recordingBounds!.Value.Width);
+            var captureHeight = _previewOnly ? 480 : Math.Max(720, recordingBounds!.Value.Height);
             var ratio = Math.Min(1d, Math.Min(captureWidth / sourceWidth, captureHeight / sourceHeight));
             var outputSize = new BitmapSize
             {
@@ -120,6 +122,7 @@ public sealed class CameraCaptureService : IAsyncDisposable
         try
         {
             using var frame = sender.TryAcquireLatestFrame();
+            if (_previewOnly && Environment.TickCount64 - Volatile.Read(ref _lastFrameTick) < 65) return;
             // Both the frame reference and the bitmap must be explicitly released.
             using var softwareBitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
             if (softwareBitmap is null) return;
