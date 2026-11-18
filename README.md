@@ -1,34 +1,28 @@
 # Clario Presenter
 
-Tampilkan demo di proyektor sambil membaca catatan di laptop. Clario bisa membagikan satu layar atau jendela aplikasi, menyembunyikan jendela pilihan, dan menyimpan tampilan audiens sebagai video MP4.
+Anda mengoperasikan Canva, situs web, atau Cisco Packet Tracer langsung dari laptop, di jendela yang biasa Anda pakai. Clario menampilkan demo itu di proyektor atau menyimpannya sebagai video. Catatan yang Anda sematkan di laptop hanya terlihat oleh Anda.
 
-**[Unduh Clario untuk Windows x64](https://github.com/msaririzki/Clario-Presenter/releases/latest/download/Clario-Presenter-Setup-x64.exe)** · [Catatan rilis](https://github.com/msaririzki/Clario-Presenter/releases/latest) · [Panduan penggunaan](docs/panduan.md)
+**[Unduh Clario untuk Windows](https://github.com/msaririzki/Clario-Presenter/releases/latest/download/Clario-Presenter-Setup-x64.exe)** · [Panduan pemakaian](docs/panduan.md) · [Lihat versi terbaru](https://github.com/msaririzki/Clario-Presenter/releases/latest)
 
-## Pasang dan mulai
+## Fitur unggulan
 
-1. Buka installer di Windows 10 versi 2004 (build 19041) ke atas atau Windows 11 dengan prosesor Intel atau AMD 64-bit.
-2. Klik **Pasang**, lalu buka **Clario Presenter** dari menu **Mulai**.
-3. Pilih mode sesuai kebutuhan.
+- **Sembunyikan jendela pribadi.** Sebelum mulai, pilih pembaca PDF di **Sembunyikan aplikasi**. Saat Anda beralih membaca PDF, proyektor dan rekaman tetap menampilkan materi. Untuk menyembunyikan satu tab Chrome, pindahkan tab itu ke jendela sendiri dahulu.
+- **Baca naskah di atas aplikasi.** Atur ukuran dan transparansi catatan. Dengan **Klik tembus**, Anda bisa membaca perintah sambil mengetiknya di jendela router di belakang catatan. Buka naskah teks atau Markdown. Jika Markdown memiliki judul per langkah, klik **Daftar** untuk pindah bagian.
+- **Tampilkan beberapa jendela sekaligus.** Pilih **Layar** untuk menampilkan topologi Packet Tracer beserta jendela router dan switch pada posisi aslinya. Gambar otomatis disesuaikan agar seluruh layar laptop muat di proyektor, termasuk bilah tugas Windows jika terlihat.
+- **Rekam satu layar bersama wajah Anda.** Walau dua monitor terhubung, Anda bisa merekam satu monitor atau satu jendela saja. Hasilnya video MP4 Full HD 1080p, dengan pilihan 30 atau 60 fps. Tambahkan webcam laptop atau USB, lalu pilih ukuran dan posisi wajah di video.
+- **Pilih suara yang masuk ke video.** Rekam suara dari komputer, narasi dari mikrofon laptop, mikrofon USB atau mixer, atau gabungkan keduanya. Saat **Suara komputer** aktif, bunyi dari jendela yang disembunyikan juga bisa ikut terdengar.
+- **Beri waktu kelas untuk menyalin perintah.** Klik **Freeze** untuk menahan gambar terakhir. Jika Anda perlu jeda pribadi, klik **Privasi**. Proyektor akan menampilkan pesan jeda, sementara kamera dan suara disembunyikan dari rekaman.
 
-| Tujuan | Langkah pertama |
+![Tampilan Clario di laptop saat memilih layar untuk direkam, dengan panel Catatan pribadi di sebelah kanan.](clario-presenter-preview.png)
+
+## Cara mulai
+
+Unduh dan buka file pemasangan, klik **Pasang**, lalu cari **Clario Presenter** di menu **Mulai**. Clario tersedia untuk Windows 10 versi 2004 ke atas dan Windows 11 pada PC Intel atau AMD 64-bit. Windows mungkin menampilkan peringatan SmartScreen karena installer v1.0.1 belum ditandatangani secara digital. [Cara memeriksa unduhan](docs/panduan.md#pemasangan).
+
+| Saya ingin… | Langkah di Clario |
 | --- | --- |
-| Merekam satu layar | Pilih **Rekam → Layar** dan tentukan monitornya. Buka **Sembunyikan aplikasi** untuk memilih jendela pribadi, lalu klik **Mulai rekam**. |
-| Presentasi ke proyektor | Tekan **Win+P → Extend (Perluas)** di Windows. Pilih **Presentasi**, tentukan sumber dan **Layar audiens**, lalu klik **Mulai presentasi**. |
-| Menampilkan catatan di atas aplikasi | Buka **Catatan**, ketik teks atau buka file Markdown, lalu klik **Sematkan**. Dengan **Klik tembus** aktif, Anda tetap bisa mengeklik aplikasi di belakang catatan. |
+| Presentasi ke proyektor | Tekan **Win+P → Extend (Perluas)** di Windows. Pilih **Presentasi**, tentukan layar laptop dan **Layar audiens**, lalu klik **Mulai presentasi**. |
+| Merekam tugas | Pilih **Rekam → Layar**, pilih monitor, lalu klik **Mulai rekam**. Klik **Stop rekam → Buka folder** untuk melihat hasilnya. |
+| Menyiapkan naskah praktik | Pilih **Catatan → Buka file**, lalu **Sematkan**. [Contoh naskah praktik Cisco](Examples/Praktik-Cisco.md). |
 
-Windows dapat menampilkan peringatan SmartScreen untuk installer v1.0.1 karena berkasnya belum ditandatangani dengan sertifikat penerbit. [Cara memeriksa unduhan](docs/panduan.md#pemasangan).
-
-![Mode Rekam di Clario dengan Layar 1 sebagai sumber, tombol Sembunyikan aplikasi, dan editor Catatan pribadi di sebelah kanan.](clario-presenter-preview.png)
-
-## Kamera, suara, dan hasil rekaman
-
-Clario merekam MP4 H.264 **1920×1080** dengan pilihan **30 atau 60 fps**. Di **Pengaturan**, Anda bisa menambahkan webcam, memilih mikrofon laptop atau USB, dan mencampur suara komputer dengan narasi. Hasil rekaman secara bawaan tersimpan di folder **Video → Clario Presenter**.
-
-**Saat gambar aplikasi disembunyikan, suaranya masih bisa terdengar** jika **Suara komputer** aktif. Gunakan **Privasi** untuk menjeda tampilan audiens dan membisukan rekaman sementara.
-
-## Bantuan dan kontribusi
-
-- [Panduan pengguna](docs/panduan.md) mencakup pemasangan, pengaturan kamera dan mikrofon, serta navigasi catatan panjang.
-- [Contoh catatan Markdown](Examples/Praktik-Cisco.md) bisa langsung dibuka lewat **Catatan → Buka file**.
-- [Laporkan masalah atau usulkan fitur](https://github.com/msaririzki/Clario-Presenter/issues/new/choose).
-- [Panduan kontribusi](CONTRIBUTING.md) menjelaskan cara membangun aplikasi dan menjalankan pengujian.
+Ada kendala atau ide fitur? [Kirim laporan atau usulan](https://github.com/msaririzki/Clario-Presenter/issues/new/choose). Untuk pengembang, tersedia [panduan kontribusi](CONTRIBUTING.md).

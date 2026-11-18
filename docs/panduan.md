@@ -4,62 +4,81 @@
 
 ## Pemasangan
 
-Unduh **Clario-Presenter-Setup-x64.exe**, buka installer, lalu klik **Pasang** dan **Selesai**. Aplikasi tersedia di menu **Mulai → Clario Presenter**. Runtime sudah termasuk di dalam installer. [Unduh dari GitHub Releases](https://github.com/msaririzki/Clario-Presenter/releases/latest).
+1. Unduh **Clario-Presenter-Setup-x64.exe** dari [halaman unduhan](https://github.com/msaririzki/Clario-Presenter/releases/latest).
+2. Buka file yang sudah diunduh. Klik **Pasang**, lalu **Selesai**.
+3. Buka menu **Mulai** di Windows dan cari **Clario Presenter**.
 
-Gunakan Windows 10 build 19041 atau lebih baru, atau Windows 11, pada PC Intel atau AMD x64. Installer v1.0.1 belum memiliki tanda tangan digital penerbit sehingga Windows dapat menampilkan peringatan SmartScreen. Untuk memeriksa integritas file, jalankan perintah berikut dari folder unduhan dan cocokkan hasilnya dengan `SHA256SUMS.txt` pada rilis yang sama.
+Clario dapat dipasang di PC Intel atau AMD 64-bit dengan Windows 10 versi 2004 (build 19041) ke atas atau Windows 11. Installer sudah menyertakan komponen yang dibutuhkan.
+
+<details>
+<summary>Mengapa Windows menampilkan peringatan SmartScreen?</summary>
+
+Installer v1.0.1 belum ditandatangani dengan sertifikat penerbit. Untuk memeriksa apakah file Anda sama dengan yang diterbitkan di GitHub, buka PowerShell di folder unduhan dan jalankan perintah berikut. Cocokkan hasilnya dengan kode dalam file `SHA256SUMS.txt` dari rilis yang sama.
 
 ```powershell
 Get-FileHash .\Clario-Presenter-Setup-x64.exe -Algorithm SHA256
 ```
 
-Untuk memperbarui, selesaikan rekaman, tutup Clario, lalu jalankan installer baru. Untuk menghapus aplikasi, buka **Pengaturan Windows → Aplikasi**, pilih **Clario Presenter**, lalu **Hapus instalan**. Video yang sudah disimpan tetap tersedia di folder rekaman.
+</details>
+
+Untuk memperbarui aplikasi, selesaikan rekaman, tutup Clario, lalu jalankan installer versi terbaru. Untuk menghapus Clario, buka **Pengaturan Windows → Aplikasi**, pilih **Clario Presenter**, lalu **Hapus instalan**. Video Anda tetap tersimpan di folder rekaman.
 
 ## Rekam layar
 
-1. Pilih mode **Rekam**. Gunakan sumber **Layar** untuk berpindah di antara beberapa aplikasi atau membuka dialog tambahan seperti konfigurasi router. Gunakan **Aplikasi** untuk merekam satu jendela tertentu.
-2. Pilih monitor atau jendela yang ingin direkam. Untuk sumber **Layar**, buka **Sembunyikan aplikasi**, centang jendela pribadi, lalu klik **Terapkan**. Jika ingin menyembunyikan satu tab Chrome, pindahkan tab itu ke jendela Chrome tersendiri terlebih dahulu.
-3. Klik **Lihat pratinjau** untuk memeriksa gambar sebelum mulai. Klik **Mulai rekam** saat siap. Jika Clario mengecil ke taskbar, klik ikonnya untuk membuka kontrol kembali.
-4. Klik **Stop rekam**, lalu **Buka folder** untuk melihat MP4. Lokasi bawaan adalah folder **Video → Clario Presenter**. Di **Pengaturan**, Anda bisa mengganti folder atau meminta Clario menanyakan lokasi setiap kali merekam.
+1. Pilih **Rekam**. Pilih **Layar** untuk merekam satu monitor beserta jendela yang Anda buka di sana. Pilih **Aplikasi** jika hanya satu jendela yang ingin Anda rekam.
+2. Pilih monitor atau jendelanya. Jika memakai **Layar**, buka **Sembunyikan aplikasi**, centang jendela pribadi seperti PDF berisi naskah, lalu klik **Terapkan**. Untuk satu tab Chrome, seret tab itu ke jendela baru dahulu, lalu centang jendela baru tersebut.
+3. Klik **Lihat pratinjau** dan coba buka jendela yang Anda sembunyikan. Setelah gambar sesuai, klik **Mulai rekam**. Jika Clario mengecil, klik ikonnya di bilah tugas Windows untuk membuka tombol **Stop rekam**.
+4. Klik **Stop rekam**, lalu **Buka folder** untuk melihat hasilnya. Biasanya video tersimpan di **Video → Clario Presenter**. Anda bisa mengganti folder atau memilih lokasi setiap kali merekam lewat **Pengaturan**.
 
-Untuk praktik dengan beberapa jendela, tempatkan jendela utama dan dialog yang ingin ditampilkan di monitor sumber yang sama. Lakukan rekaman singkat untuk memeriksa perpindahan jendela dan suara sebelum mulai mengerjakan materi.
+Saat Anda membuka jendela yang disembunyikan, Clario tetap menampilkan materi di belakangnya. Jika aplikasi yang ditampilkan belum mengirim gambar baru, gambar terakhir bisa bertahan sejenak.
+
+**Contoh saat mengerjakan soal Cisco.** Pilih **Layar** dan letakkan Packet Tracer di monitor itu. Buka catatan perintah di Clario lalu klik **Sematkan**. Sekarang Anda bisa membuka jendela router, mengetik perintah, lalu membuka jendela switch. Dialog yang Anda buka di monitor itu ikut masuk ke video. Jika naskahnya berupa PDF, buka di aplikasi pembaca PDF dan sembunyikan jendelanya pada langkah kedua. [Contoh catatan router dan switch](../Examples/Praktik-Cisco.md).
 
 ## Presentasi dua layar
 
-1. Sambungkan monitor kedua atau proyektor. Tekan **Win+P** lalu pilih **Extend (Perluas)**.
-2. Di Clario, pilih **Presentasi**. Pilih sumber di laptop dan tetapkan proyektor sebagai **Layar audiens**. Untuk sumber **Layar**, terapkan pilihan jendela yang ingin disembunyikan.
-3. Klik **Mulai presentasi** dan operasikan materi dari laptop. Klik **Rekam** jika Anda juga ingin menyimpan sesi. **Stop rekam** menyimpan video sambil meneruskan presentasi. **Stop presentasi** mengakhiri sesi dan menyimpan video yang sedang berjalan.
+1. Sambungkan proyektor atau monitor kedua. Tekan **Win+P** di Windows dan pilih **Extend (Perluas)**.
+2. Di Clario, pilih **Presentasi**. Untuk demo Canva atau situs web, pilih **Aplikasi** lalu pilih jendela browser. Jika Anda akan berpindah aplikasi, pilih **Layar**, tentukan layar laptop, lalu pilih jendela yang ingin disembunyikan.
+3. Di **Layar audiens**, pilih proyektor. Klik **Mulai presentasi**. Anda tetap mengoperasikan materi di jendela aslinya di laptop.
+4. Untuk menyimpan video sambil presentasi, klik **Rekam**. Klik **Stop rekam** untuk menyimpan video dan meneruskan presentasi. **Stop presentasi** mengakhiri sesi sekaligus menyimpan rekaman yang masih berjalan.
 
-| Kontrol | Dampak pada presentasi dan rekaman |
+| Tombol | Kapan digunakan |
 | --- | --- |
-| **Freeze** | Gambar layar bertahan pada frame terakhir. Jika sedang merekam, audio berlanjut dan kamera yang aktif tetap bergerak di video. |
-| **Privasi** | Layar audiens menampilkan pesan jeda. Jika sedang merekam, audio dibisukan dan kamera disembunyikan dari video selama Privasi aktif. |
+| **Freeze** | Saat kelas perlu waktu untuk membaca. Gambar di proyektor bertahan pada tampilan terakhir. Suara dan webcam yang aktif tetap berjalan di rekaman. |
+| **Privasi** | Saat ingin jeda. Proyektor menampilkan pesan jeda. Selama tombol ini aktif, suara rekaman dibisukan dan wajah dari webcam disembunyikan dari video. |
 
-**Jika tepi tampilan terpotong**, periksa jenis sumber. Untuk sumber **Aplikasi**, pilih **Opsi tampilan → Ukuran gambar → Seluruh gambar**. Pilihan **Perbesar** dan **Isi layar** bisa memotong tepi. Sumber **Layar** selalu menampilkan seluruh gambar dengan proporsi aslinya.
+**Jika proyektor dan laptop berbeda ukuran**, sumber **Layar** akan menyesuaikan gambar agar seluruh layar terlihat. Jika Anda memakai sumber **Aplikasi** dan tepi jendela terpotong, pilih **Opsi tampilan → Ukuran gambar → Seluruh gambar**. Pilihan **Perbesar** dan **Isi layar** bisa memotong tepi.
 
 ## Catatan pribadi
 
-Buka **Catatan** untuk mengetik atau menempelkan teks. **Buka file** menerima `.txt`, `.md`, dan `.markdown` hingga 200.000 karakter. Untuk catatan panjang, simpan sebagai Markdown UTF-8 dan awali setiap bagian dengan judul `##`. Tombol **Daftar** pada panel melayang membantu Anda langsung menuju bagian tertentu. [Contoh catatan siap pakai](../Examples/Praktik-Cisco.md).
+Buka **Catatan** untuk mengetik atau menempelkan naskah. Untuk naskah yang sudah disiapkan, klik **Buka file**. Clario menerima file teks (`.txt`) dan Markdown (`.md` atau `.markdown`) hingga 200.000 karakter. Untuk catatan yang disiapkan sendiri atau dengan bantuan AI, simpan sebagai Markdown UTF-8 dan awali tiap langkah dengan judul seperti `## 1. Periksa router`. Tombol **Daftar** di panel melayang bisa langsung membuka langkah yang dipilih.
 
-Klik **Sematkan** untuk menampilkan panel di atas aplikasi. Saat **Klik tembus** aktif, kursor dapat mengoperasikan jendela di belakang panel. Tekan **Ctrl+Shift+F9** untuk mematikan Klik tembus ketika ingin memindahkan panel, menarik tepi atau sudutnya, menggunakan scrollbar, atau membuka **Daftar**. Lebar, tinggi, opasitas, dan ukuran teks juga tersedia melalui **Atur catatan**.
+Klik **Sematkan** agar naskah tetap terlihat di atas aplikasi. Di **Atur catatan**, Anda bisa mengganti ukuran panel, ukuran tulisan, dan tingkat transparansi. Aktifkan **Klik tembus** untuk mengeklik aplikasi di belakang catatan. Tekan **Ctrl+Shift+F9** untuk mematikannya saat ingin menggeser panel, menarik sudutnya, atau memilih bagian dengan mouse.
 
-| Pintasan | Fungsi pada panel |
+| Pintasan | Fungsi pada catatan |
 | --- | --- |
 | **Ctrl+Shift+F8** | Tampilkan atau sembunyikan catatan |
-| **Ctrl+Shift+F9** | Ganti mode Klik tembus |
+| **Ctrl+Shift+F9** | Aktifkan atau matikan Klik tembus |
 | **Ctrl+Shift+F10 / F11** | Bagian sebelumnya / berikutnya |
-| **Ctrl+Shift+↑ / ↓** | Gulir beberapa baris |
+| **Ctrl+Shift+↑ / ↓** | Gulir sedikit ke atas / bawah |
 | **Ctrl+Shift+Page Up / Page Down** | Gulir hampir satu halaman |
-| **Ctrl+Shift+Home / End** | Awal / akhir bagian |
+| **Ctrl+Shift+Home / End** | Lompat ke awal / akhir bagian |
 
-Clario memeriksa apakah Windows dapat mengecualikan panel dari tangkapan. Jika pengecualian gagal, Clario mencoba memindahkan panel ke monitor lain yang aman atau menyembunyikannya. Jika memakai aplikasi perekam lain, periksa hasilnya lewat rekaman uji di aplikasi tersebut.
+Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Jika pemeriksaan gagal, Clario mencoba memindahkan panel ke monitor lain yang aman atau menyembunyikannya. Jika Anda menggunakan perekam lain, periksa hasilnya dengan rekaman singkat di aplikasi tersebut.
 
 ## Kamera dan suara
 
-- **Webcam laptop, USB, atau virtual.** Di **Pengaturan**, aktifkan **Sertakan kamera dalam video**, pilih perangkat, lalu klik **Tes kamera**. Atur posisi, ukuran, dan opsi cermin, lalu klik **Simpan**. Kamera muncul di hasil rekaman. Untuk kamera virtual, aktifkan output kamera di aplikasi penyedia dan perbarui daftar di Clario.
-- **Mikrofon.** Di bagian **Audio**, aktifkan **Mikrofon** dan pilih mikrofon laptop, USB, atau mixer yang terdaftar di Windows. Pakai **Perbarui perangkat audio** setelah menyambungkan perangkat baru.
-- **Suara komputer.** Pilih perangkat keluaran yang memutar suara, misalnya speaker atau headphone. Semua aplikasi yang terdengar melalui keluaran itu dapat masuk ke video, termasuk aplikasi yang gambarnya disembunyikan. Pilih mikrofon saja jika Anda hanya ingin merekam narasi.
-- **Keduanya sekaligus.** Aktifkan **Suara komputer** dan **Mikrofon** untuk mencampur keduanya dalam satu trek AAC stereo 48 kHz. Kedua pilihan mati pada pemasangan baru.
+**Untuk menampilkan wajah di video**, sambungkan webcam USB atau gunakan kamera laptop. Buka **Pengaturan**, aktifkan **Sertakan kamera dalam video**, pilih kamera, lalu klik **Tes kamera**. Pilih posisi, ukuran, dan apakah gambar perlu dicerminkan. Klik **Simpan**. Jika memakai aplikasi kamera pihak ketiga, aktifkan kamera virtual di aplikasi tersebut, lalu perbarui daftar kamera di Clario.
 
-Video disimpan sebagai MP4 H.264 1920×1080. Pilih **30 fps** atau **60 fps** di **Pengaturan → Kelancaran**. Kelancaran kamera juga bergantung pada perangkat dan drivernya.
+**Untuk memilih suara**, buka **Pengaturan → Audio**. Suara komputer dan mikrofon sama-sama mati saat pertama dipasang.
 
-Masih ada kendala? Sertakan versi Clario dan Windows serta lokasi gejalanya, misalnya di laptop, proyektor, atau video. [Laporkan masalah](https://github.com/msaririzki/Clario-Presenter/issues/new?template=bug.yml).
+| Suara yang diinginkan | Yang perlu diaktifkan |
+| --- | --- |
+| Hanya suara Anda | Aktifkan **Mikrofon**. Pilih mikrofon laptop, USB, atau mixer yang muncul di daftar. |
+| Hanya suara video atau musik | Aktifkan **Suara komputer**. Pilih speaker atau headphone tempat suara diputar. |
+| Suara Anda dan suara video | Aktifkan **Mikrofon** dan **Suara komputer**. Keduanya disimpan bersama dalam satu video. |
+
+Klik **Perbarui perangkat audio** jika perangkat baru belum muncul. Saat **Suara komputer** aktif, semua bunyi dari speaker atau headphone yang dipilih bisa masuk ke video, termasuk notifikasi atau suara dari aplikasi yang gambarnya disembunyikan.
+
+Video disimpan sebagai MP4 Full HD (1920×1080). Di **Pengaturan → Kelancaran**, pilih **30 fps** untuk meringankan kerja komputer atau **60 fps** untuk gerakan yang lebih halus. Kelancaran hasil juga bergantung pada komputer dan kamera yang dipakai.
+
+Jika ada kendala, ceritakan kejadian yang Anda lihat di laptop, proyektor, atau video dan sertakan versi Clario serta Windows yang dipakai. [Laporkan masalah](https://github.com/msaririzki/Clario-Presenter/issues/new?template=bug.yml).
