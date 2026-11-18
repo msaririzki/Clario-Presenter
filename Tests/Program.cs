@@ -61,7 +61,12 @@ foreach (var position in Enum.GetValues<CameraOverlayPosition>())
 }
 var small = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = -10 });
 var large = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = 200 });
-Check(small.Width == 288 && large.Width == 672, "Out-of-range camera sizes are clamped.");
+Check(small.Width == 96 && large.Width == 1728, "Out-of-range camera sizes are clamped.");
+Check(small.Height == 54 && large.Height == 972 && large.Y >= 32 && large.Y + large.Height <= 1016,
+    "Minimum and maximum camera sizes preserve the aspect ratio and safe area.");
+var custom = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = 47 });
+Check(Math.Abs(custom.Width - 902.4) < 0.001 && Math.Abs(custom.Height - 507.6) < 0.001,
+    "Custom camera size follows the selected percentage.");
 var fourByThree = CameraOverlayLayout.Fit(640, 480, bottomRight);
 Check(Math.Abs(fourByThree.Width / fourByThree.Height - 4d / 3) < 0.001
     && fourByThree.X > bottomRight.X && fourByThree.Width < bottomRight.Width,

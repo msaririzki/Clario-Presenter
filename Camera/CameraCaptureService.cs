@@ -28,10 +28,17 @@ public sealed class CameraCaptureService : IAsyncDisposable
 
     public event EventHandler? FrameAvailable;
     public string DeviceName { get; private set; } = string.Empty;
-    public string? Warning => Volatile.Read(ref _failureMessage)
-        ?? (Volatile.Read(ref _lastFrameTick) > 0
-            && Environment.TickCount64 - Volatile.Read(ref _lastFrameTick) > 3000
-                ? "Kamera tidak mengirim gambar" : null);
+    public string? Warning
+    {
+        get
+        {
+            var lastFrameTick = Volatile.Read(ref _lastFrameTick);
+            if (lastFrameTick == 0) return Volatile.Read(ref _failureMessage);
+            return Environment.TickCount64 - lastFrameTick > 3000
+                ? Volatile.Read(ref _failureMessage) ?? "Kamera tidak mengirim gambar"
+                : null;
+        }
+    }
 
     public static async Task<IReadOnlyList<CameraDevice>> GetDevicesAsync()
     {
@@ -39,7 +46,8 @@ public sealed class CameraCaptureService : IAsyncDisposable
         return devices.Select(device => new CameraDevice(device.Id, device.Name)).ToArray();
     }
 
-    public async Task StartAsync(string deviceId, CancellationToken cancellationToken = default)
+    public async Task StartAsync(string deviceId, CancellationToken cancellationToken = default,
+        CameraRectangle? recordingBounds = null)
     {
         await _lifecycleGate.WaitAsync(cancellationToken);
         try
@@ -71,12 +79,13 @@ public sealed class CameraCaptureService : IAsyncDisposable
                 .FirstOrDefault()
                 ?? throw new InvalidOperationException("Gambar dari kamera ini belum dapat digunakan. Pilih kamera lain di Pengaturan.");
 
-            // The camera overlay needs at most 672 pixels across in a 1080p video.
-            // Resize during acquisition instead of uploading a full 4K frame.
+            // Cap the preview upload and request more detail for larger recording overlays.
             var format = source.CurrentFormat.VideoFormat;
             var sourceWidth = Math.Max(1u, format.Width);
             var sourceHeight = Math.Max(1u, format.Height);
-            var ratio = Math.Min(1d, Math.Min(960d / sourceWidth, 720d / sourceHeight));
+            var captureWidth = Math.Max(960, recordingBounds?.Width ?? 0);
+            var captureHeight = Math.Max(720, recordingBounds?.Height ?? 0);
+            var ratio = Math.Min(1d, Math.Min(captureWidth / sourceWidth, captureHeight / sourceHeight));
             var outputSize = new BitmapSize
             {
                 Width = Math.Max(2u, (uint)(sourceWidth * ratio) / 2 * 2),
@@ -126,6 +135,7 @@ public sealed class CameraCaptureService : IAsyncDisposable
                 previous = _bitmap;
                 _bitmap = next;
                 next = null;
+                Volatile.Write(ref _failureMessage, null);
                 Volatile.Write(ref _lastFrameTick, Environment.TickCount64);
             }
             previous?.Dispose();
@@ -154,8 +164,9 @@ public sealed class CameraCaptureService : IAsyncDisposable
         lock (_frameGate)
         {
             if (_bitmap is null || Warning is not null) return false;
-            var bounds = CameraOverlayLayout.Fit(_bitmap.SizeInPixels.Width, _bitmap.SizeInPixels.Height, destination);
-            var oldTransform = drawingSession.Transform;
+            var size = _bitmap.SizeInPixels;
+            var bounds = CameraOverlayLayout.Fit(size.Width, size.Height, destination);
+            var oldTransform = mirror ? drawingSession.Transform : default;
             try
             {
                 if (mirror)
@@ -164,13 +175,13 @@ public sealed class CameraCaptureService : IAsyncDisposable
                         * oldTransform;
                 drawingSession.DrawImage(_bitmap,
                     new Windows.Foundation.Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height),
-                    new Windows.Foundation.Rect(0, 0, _bitmap.SizeInPixels.Width, _bitmap.SizeInPixels.Height),
+                    new Windows.Foundation.Rect(0, 0, size.Width, size.Height),
                     1, CanvasImageInterpolation.Linear);
                 return true;
             }
             finally
             {
-                drawingSession.Transform = oldTransform;
+                if (mirror) drawingSession.Transform = oldTransform;
             }
         }
     }

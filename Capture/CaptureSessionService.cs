@@ -29,7 +29,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     private SizeInt32 _lastSize;
     private volatile bool _isFrozen;
     private volatile bool _desktopProtected;
-    public bool IsDesktopProtected { get => _desktopProtected; set => _desktopProtected = value; }
+    public bool IsDesktopProtected => _desktopProtected;
     private bool _disposed;
     public int PublicCaptureStartCount { get; private set; }
     public int PreparedWindowCount => _layerCache.Count;
@@ -79,8 +79,14 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
             previous = _frontBuffer;
             _frontBuffer = safeBackground;
             _frontBufferSize = new SizeInt32(bounds.Width, bounds.Height);
+            _desktopProtected = true;
         }
         previous?.Dispose();
+    }
+
+    public void ProtectDesktop()
+    {
+        lock (_frameLock) _desktopProtected = true;
     }
 
     public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles, bool retainSceneIfEmpty = false)
@@ -133,7 +139,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         PublicWindowLayer[] active;
         lock (_frameLock) active = _publicLayers;
         var removable = _layerCache.Values.Where(layer => !nextLayers.Contains(layer)
-            && !active.Contains(layer)).OrderBy(layer => layer.LastRequestedTick).ToArray();
+            && (layer.Faulted || !active.Contains(layer))).OrderBy(layer => layer.LastRequestedTick).ToArray();
         foreach (var layer in removable)
         {
             if (_layerCache.Count <= 12 && Environment.TickCount64 - layer.LastRequestedTick < 3000) continue;
@@ -145,11 +151,17 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
 
     private void PublishReadyLayers()
     {
-        // Do not replace the current scene by an empty/partially initialized
-        // capture. Publish the next scene after every new window has a real frame.
-        if (!_isFrozen && _requestedLayers.Length > 0
-            && _requestedLayers.All(layer => layer.Faulted || layer.Capture.HasFrame))
-            _publicLayers = _requestedLayers.Where(layer => !layer.Faulted).ToArray();
+        if (_isFrozen || _requestedLayers.Length == 0 || ReferenceEquals(_publicLayers, _requestedLayers)) return;
+
+        // Publish the next scene only after its live window captures have a frame.
+        var hasFaults = false;
+        foreach (var layer in _requestedLayers)
+        {
+            if (layer.Faulted) hasFaults = true;
+            else if (!layer.Capture.HasFrame) return;
+        }
+
+        _publicLayers = hasFaults ? _requestedLayers.Where(layer => !layer.Faulted).ToArray() : _requestedLayers;
     }
 
     private void DisposeLayer(PublicWindowLayer layer)
@@ -337,12 +349,17 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
 
                     sizeChanged = nextSize.Width != _lastSize.Width || nextSize.Height != _lastSize.Height;
                     var holdFrame = FrameHoldPredicate?.Invoke() ?? false;
-                    if (_desktopLayout is not null && !_isFrozen && IsDesktopProtected != holdFrame)
+                    if (_desktopLayout is not null && !_isFrozen && holdFrame)
                     {
-                        IsDesktopProtected = holdFrame;
-                        frameReady = true;
+                        lock (_frameLock)
+                        {
+                            frameReady = !_desktopProtected;
+                            _desktopProtected = true;
+                        }
                     }
-                    if (!_isFrozen && !holdFrame)
+                    // A frame that outgrows the pool is clipped to the old surface.
+                    // Keep the complete frame on screen while the pool is resized.
+                    if (!_isFrozen && !holdFrame && nextSize.Width <= _lastSize.Width && nextSize.Height <= _lastSize.Height)
                     {
                         var writeTarget = GetWriteTarget(nextSize);
                         using var capturedSurface = CanvasBitmap.CreateFromDirect3D11Surface(_canvasDevice, frame.Surface);
@@ -358,6 +375,9 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                         {
                             (_frontBuffer, _backBuffer) = (_backBuffer, _frontBuffer);
                             (_frontBufferSize, _backBufferSize) = (_backBufferSize, _frontBufferSize);
+                            // The public-window layers cover the held backdrop until
+                            // there is a complete monitor frame to replace it.
+                            _desktopProtected = false;
                         }
 
                         frameReady = true;

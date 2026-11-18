@@ -1,3 +1,4 @@
+using Clario_Presenter.Camera;
 using Clario_Presenter.Capture;
 using Clario_Presenter.Recording;
 using Clario_Presenter.Services;
@@ -11,7 +12,7 @@ namespace Clario_Presenter;
 
 internal static class DesktopSwitchChecks
 {
-    public static async Task RunAsync(string reportPath)
+    public static async Task RunAsync(string reportPath, bool includeCamera = false)
     {
         try
         {
@@ -23,27 +24,40 @@ internal static class DesktopSwitchChecks
             backdrop.Show();
             publicApp.Show();
             secondApp.Show();
+            var desktopBounds = new DisplayBounds(origin.X, origin.Y, 640, 360);
+            if (WindowCatalogService.HasPrivateWindowOnDisplay(desktopBounds, [])
+                || !WindowCatalogService.HasPrivateWindowOnDisplay(desktopBounds, [backdrop.Handle]))
+                throw new InvalidOperationException("Private window detection must respect the selected window list.");
             using var capture = new CaptureSessionService();
             var held = false;
-            capture.ConfigureDesktop(new(origin.X, origin.Y, 640, 360), new(origin.X, origin.Y, 640, 320));
+            capture.ConfigureDesktop(desktopBounds, new(origin.X, origin.Y, 640, 320));
             capture.FrameHoldPredicate = () => held;
             capture.Start(backdrop.Handle, keepLastFrame: true, captureCursor: false);
             var publicHandles = new[] { publicApp.Handle, secondApp.Handle };
             capture.SetProtectedWindows(publicHandles);
             await Task.Delay(750);
-            var folder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("DesktopSwitchSmoke",
+            var temp = await StorageFolder.GetFolderFromPathAsync(Path.GetTempPath());
+            var folder = await temp.CreateFolderAsync("DesktopSwitchSmoke",
                 CreationCollisionOption.OpenIfExists);
             var file = await folder.CreateFileAsync("switches.mp4", CreationCollisionOption.GenerateUniqueName);
             await using var recorder = new OutputRecordingService();
+            CameraOverlayOptions? cameraOptions = null;
+            if (includeCamera)
+            {
+                var devices = await CameraCaptureService.GetDevicesAsync();
+                var device = devices.FirstOrDefault() ?? throw new InvalidOperationException("No connected camera.");
+                cameraOptions = new CameraOverlayOptions { Enabled = true, DeviceId = device.Id };
+            }
             await recorder.StartAsync(capture, CaptureScaleMode.Fit, 1, () => ClientOutputMode.Live,
-                await file.OpenAsync(FileAccessMode.ReadWrite), new RecordingOptions(60, 10));
+                await file.OpenAsync(FileAccessMode.ReadWrite), new RecordingOptions(60, 10, cameraOptions));
             using var inspection = new CanvasRenderTarget(CanvasDevice.GetSharedDevice(), 640, 360, 96);
             var checks = 0;
             var publicFrameSignatures = new HashSet<int>();
             for (var pass = 0; pass < 10; pass++)
             {
                 held = true;
-                capture.IsDesktopProtected = true;
+                capture.ProtectDesktop();
+                backdrop.Activate();
                 backdrop.PrivatePattern = true;
                 backdrop.Invalidate();
                 capture.SetProtectedWindows(publicHandles, retainSceneIfEmpty: true);
@@ -67,9 +81,12 @@ internal static class DesktopSwitchChecks
                 backdrop.Invalidate();
                 await Task.Delay(100);
                 held = false;
-                capture.IsDesktopProtected = false;
+                if (!capture.IsDesktopProtected)
+                    throw new InvalidOperationException("Desktop protection was released before a fresh frame arrived.");
+                publicApp.Activate();
                 capture.SetProtectedWindows(publicHandles);
                 await Task.Delay(120);
+                if (recorder.CameraWarning is { } warning) throw new InvalidOperationException(warning);
             }
             await recorder.StopAsync();
             if (recorder.Failure is not null) throw recorder.Failure;
@@ -81,7 +98,7 @@ internal static class DesktopSwitchChecks
             {
                 Passed = true, PrivateSwitches = checks, PublicCaptureStarts = capture.PublicCaptureStartCount,
                 DistinctPublicFrames = publicFrameSignatures.Count, Recording = file.Path,
-                Bytes = (await file.GetBasicPropertiesAsync()).Size
+                Bytes = (await file.GetBasicPropertiesAsync()).Size, WithCamera = recorder.IncludesCamera
             }, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception exception)

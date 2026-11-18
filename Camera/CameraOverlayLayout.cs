@@ -15,6 +15,9 @@ public readonly record struct CameraRectangle(double X, double Y, double Width, 
 
 public static class CameraOverlayLayout
 {
+    public const int MinWidthPercent = 5;
+    public const int MaxWidthPercent = 90;
+
     public static CameraRectangle GetBounds(double outputWidth, double outputHeight, CameraOverlayOptions options)
     {
         if (outputWidth <= 0 || outputHeight <= 0) return default;
@@ -22,7 +25,7 @@ public static class CameraOverlayLayout
         var margin = 32 * scale;
         // Reserve space for the taskbar even when the camera is in a bottom corner.
         var bottomMargin = 64 * scale;
-        var width = Math.Min(outputWidth * Math.Clamp(options.WidthPercent, 15, 35) / 100,
+        var width = Math.Min(outputWidth * Math.Clamp(options.WidthPercent, MinWidthPercent, MaxWidthPercent) / 100,
             (outputHeight - margin - bottomMargin) * 16 / 9);
         var height = width * 9 / 16;
         var left = options.Position is CameraOverlayPosition.BottomLeft or CameraOverlayPosition.TopLeft;

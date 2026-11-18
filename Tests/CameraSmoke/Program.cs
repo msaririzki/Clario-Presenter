@@ -27,7 +27,8 @@ internal static class Program
             {
                 SynchronizationContext.SetSynchronizationContext(
                     new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-                if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
+                if (args.Contains("--desktop-camera")) await DesktopSwitchChecks.RunAsync(reportPath, includeCamera: true);
+                else if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
                 else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
                 else if (args.Contains("--audio")) await AudioChecks.RunAsync(reportPath);
                 else if (args.Contains("--audio-input-open-only")) await AudioChecks.OpenInputOnlyAsync(reportPath);
@@ -78,7 +79,8 @@ internal static class Program
 
             stage = "recording";
             File.WriteAllText(reportPath, JsonSerializer.Serialize(new { Running = true, Stage = stage }));
-            var folder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("CameraSmoke",
+            var temp = await StorageFolder.GetFolderFromPathAsync(Path.GetTempPath());
+            var folder = await temp.CreateFolderAsync("CameraSmoke",
                 CreationCollisionOption.OpenIfExists);
             var file = await folder.CreateFileAsync("camera-smoke.mp4", CreationCollisionOption.GenerateUniqueName);
             await using var recorder = new OutputRecordingService();

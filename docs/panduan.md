@@ -76,7 +76,7 @@ Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Ji
 
 ## Kamera dan suara
 
-**Untuk menampilkan wajah di video**, sambungkan webcam USB atau gunakan kamera laptop. Buka **Pengaturan**, aktifkan **Sertakan kamera dalam video**, pilih kamera, lalu klik **Tes kamera**. Pilih posisi, ukuran, dan apakah gambar perlu dicerminkan. Klik **Simpan**. Jika memakai aplikasi kamera pihak ketiga, aktifkan kamera virtual di aplikasi tersebut, lalu perbarui daftar kamera di Clario.
+**Untuk menampilkan wajah di video**, sambungkan webcam USB atau gunakan kamera laptop. Buka **Pengaturan**, aktifkan **Sertakan kamera**, pilih kamera, lalu klik **Tes kamera**. Pilih posisi dan ukuran kamera. Untuk menentukan ukuran sendiri, pilih **Kustom** dan masukkan 5–90% dari lebar video. Klik **Simpan**. Jika memakai aplikasi kamera pihak ketiga, aktifkan kamera virtual di aplikasi tersebut, lalu perbarui daftar kamera di Clario.
 
 **Untuk memilih suara**, buka **Pengaturan → Audio**. Suara komputer dan mikrofon sama-sama mati saat pertama dipasang.
 
@@ -88,6 +88,6 @@ Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Ji
 
 Klik **Perbarui perangkat audio** jika perangkat baru belum muncul. Saat **Suara komputer** aktif, semua bunyi dari speaker atau headphone yang dipilih bisa masuk ke video, termasuk notifikasi atau suara dari aplikasi yang gambarnya disembunyikan.
 
-Video disimpan sebagai MP4 Full HD (1920×1080). Di **Pengaturan → Kelancaran**, pilih **30 fps** untuk meringankan kerja komputer atau **60 fps** untuk gerakan yang lebih halus. Kelancaran hasil juga bergantung pada komputer dan kamera yang dipakai.
+Video disimpan sebagai MP4 Full HD (1920×1080). Di **Pengaturan → Video**, pilih **30 fps** untuk meringankan kerja komputer atau **60 fps** untuk gerakan yang lebih halus. Kelancaran hasil juga bergantung pada komputer dan kamera yang dipakai.
 
 Jika ada kendala, ceritakan kejadian yang Anda lihat di laptop, proyektor, atau video dan sertakan versi Clario serta Windows yang dipakai. [Laporkan masalah](https://github.com/msaririzki/Clario-Presenter/issues/new?template=bug.yml).

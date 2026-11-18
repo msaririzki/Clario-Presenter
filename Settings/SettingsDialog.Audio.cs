@@ -28,7 +28,7 @@ public sealed partial class SettingsDialog
 
     private void UpdateAudioOptions()
     {
-        ComputerAudioOptions.Visibility = ComputerAudioToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        PlaybackAudioComboBox.Visibility = ComputerAudioToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
         MicrophoneAudioComboBox.Visibility = MicrophoneAudioToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
         AudioDeviceActions.Visibility = AudioEnabled ? Visibility.Visible : Visibility.Collapsed;
     }

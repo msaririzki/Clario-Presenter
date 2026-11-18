@@ -42,6 +42,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private Func<ClientOutputMode>? _modeProvider;
     private CameraCaptureService? _camera;
     private CameraOverlayOptions? _cameraOptions;
+    private CameraRectangle _cameraBounds;
     private readonly IRecordingAudioSource? _suppliedAudio;
     private IRecordingAudioSource? _audio;
     private long _clockStart;
@@ -99,11 +100,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
         _cameraOptions = options.Camera;
         if (_cameraOptions?.Enabled == true)
         {
+            _cameraBounds = CameraOverlayLayout.GetBounds(OutputWidth, OutputHeight, _cameraOptions);
             _camera = new CameraCaptureService();
             // Start on the UI thread so Windows can request camera access.
             // Do not create an apparently successful camera recording without
             // first receiving a real frame from the selected device.
-            await _camera.StartAsync(_cameraOptions.DeviceId);
+            await _camera.StartAsync(_cameraOptions.DeviceId, recordingBounds: _cameraBounds);
         }
 
         var inputProperties = VideoEncodingProperties.CreateUncompressed(
@@ -221,6 +223,16 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
         try
         {
+            // Only the producer uses this target. The encoder reads the copied
+            // CPU buffer, which remains reserved until the sample is processed.
+            using var renderTarget = new CanvasRenderTarget(
+                _canvasDevice,
+                OutputWidth,
+                OutputHeight,
+                96,
+                Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                CanvasAlphaMode.Ignore);
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 // Keep timestamps tied to real elapsed time. When a slower GPU
@@ -231,7 +243,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
                 if (!RefreshPendingFrameTimestamp(frameIndex))
                 {
-                    RenderFrame(frameIndex);
+                    RenderFrame(renderTarget, frameIndex);
                 }
 
                 nextFrameIndex = frameIndex + 1;
@@ -273,12 +285,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private void RenderFrame(long frameIndex)
+    private void RenderFrame(CanvasRenderTarget renderTarget, long frameIndex)
     {
         var frame = RentFrame();
         try
         {
-            using (var drawingSession = frame.RenderTarget.CreateDrawingSession())
+            using (var drawingSession = renderTarget.CreateDrawingSession())
             {
                 // Media Foundation interprets packed RGB rows bottom-up. Render
                 // the intermediate target upside-down so the encoded MP4 is upright.
@@ -298,22 +310,14 @@ public sealed class OutputRecordingService : IAsyncDisposable
                         OutputHeight,
                         _scaleMode,
                         _adaptiveZoom);
-                }
 
-                // The camera is added only to the recording, after the clean
-                // client frame. Privacy/source loss suppress both screen and face.
-                if (_camera is not null && _cameraOptions is { Enabled: true }
-                    && _capture is { HasFrame: true }
-                    && mode is ClientOutputMode.Live or ClientOutputMode.Frozen)
-                {
-                    CameraOverlayRenderer.Draw(drawingSession, _camera,
-                        CameraOverlayLayout.GetBounds(OutputWidth, OutputHeight, _cameraOptions),
-                        _cameraOptions.Mirror);
+                    if (_camera is not null && _cameraOptions is { Enabled: true })
+                        CameraOverlayRenderer.Draw(drawingSession, _camera, _cameraBounds, _cameraOptions.Mirror);
                 }
             }
 
             frame.Buffer.Length = frame.Buffer.Capacity;
-            frame.RenderTarget.GetPixelBytes(frame.Buffer);
+            renderTarget.GetPixelBytes(frame.Buffer);
             frame.Timestamp = TimeSpan.FromTicks(frameIndex * _frameDuration.Ticks);
 
             lock (_frameGate)
@@ -355,18 +359,11 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
         try
         {
-            var renderTarget = new CanvasRenderTarget(
-                _canvasDevice,
-                OutputWidth,
-                OutputHeight,
-                96,
-                Windows.Graphics.DirectX.DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                CanvasAlphaMode.Ignore);
             var buffer = new Windows.Storage.Streams.Buffer(OutputWidth * OutputHeight * BytesPerPixel)
             {
                 Length = OutputWidth * OutputHeight * BytesPerPixel
             };
-            return new StableCpuFrame(renderTarget, buffer);
+            return new StableCpuFrame(buffer);
         }
         catch
         {
@@ -428,18 +425,20 @@ public sealed class OutputRecordingService : IAsyncDisposable
             return;
         }
 
+        var tracked = false;
         try
         {
             var sample = MediaStreamSample.CreateFromBuffer(frame.Buffer, frame.Timestamp);
             sample.Duration = _frameDuration;
-            _outstandingFrames.TryAdd(frame, 0);
+            tracked = _outstandingFrames.TryAdd(frame, 0);
             sample.Processed += (_, _) => ReleaseOutstandingFrame(frame);
             args.Request.Sample = sample;
         }
         catch (Exception exception)
         {
             Failure = exception;
-            RecycleFrame(frame);
+            if (tracked) ReleaseOutstandingFrame(frame);
+            else RecycleFrame(frame);
             args.Request.Sample = null;
         }
     }
@@ -578,9 +577,8 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
         _mediaSource = null;
 
-        foreach (var frame in _outstandingFrames.Keys) ReleaseOutstandingFrame(frame);
-        while (_availableFrames.TryTake(out var availableFrame)) availableFrame.Dispose();
-        _pendingFrame?.Dispose();
+        _outstandingFrames.Clear();
+        _availableFrames.Clear();
         _pendingFrame = null;
         _audio = null;
         _capture = null;
@@ -604,15 +602,10 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private sealed class StableCpuFrame(
-        CanvasRenderTarget renderTarget,
-        Windows.Storage.Streams.Buffer buffer) : IDisposable
+    private sealed class StableCpuFrame(Windows.Storage.Streams.Buffer buffer)
     {
-        public CanvasRenderTarget RenderTarget { get; } = renderTarget;
         public Windows.Storage.Streams.Buffer Buffer { get; } = buffer;
         public TimeSpan Timestamp { get; set; }
-
-        public void Dispose() => RenderTarget.Dispose();
     }
 }
 

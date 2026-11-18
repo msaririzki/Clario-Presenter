@@ -8,7 +8,7 @@ namespace Clario_Presenter.Camera;
 
 public static class CameraOverlayRenderer
 {
-    public static void Draw(CanvasDrawingSession session, CameraCaptureService camera,
+    public static void Draw(CanvasDrawingSession session, CameraCaptureService? camera,
         CameraRectangle bounds, bool mirror)
     {
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
@@ -18,15 +18,16 @@ public static class CameraOverlayRenderer
         using (var clip = CanvasGeometry.CreateRoundedRectangle(session.Device, rect, radius, radius))
         using (session.CreateLayer(1, clip))
         {
-            if (!camera.Draw(session, bounds, mirror))
+            if (camera?.Draw(session, bounds, mirror) != true)
             {
                 using var format = new CanvasTextFormat
                 {
-                    FontSize = (float)(bounds.Width / 24),
+                    FontSize = camera is null ? 10 : (float)(bounds.Width / 24),
                     HorizontalAlignment = CanvasHorizontalAlignment.Center,
                     VerticalAlignment = CanvasVerticalAlignment.Center
                 };
-                session.DrawText("Kamera tidak tersedia", rect, Color.FromArgb(255, 156, 167, 183), format);
+                session.DrawText(camera is null ? "Kamera" : "Kamera tidak tersedia",
+                    rect, Color.FromArgb(255, 156, 167, 183), format);
             }
         }
         session.DrawRoundedRectangle(rect, radius, radius, Color.FromArgb(255, 156, 167, 183),

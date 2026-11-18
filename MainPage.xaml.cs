@@ -513,14 +513,13 @@ public sealed partial class MainPage : Page
 
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsDialog(_settingsService.Current)
+        var dialog = new SettingsDialog(_settingsService.Current, XamlRoot)
         {
-            XamlRoot = XamlRoot,
             RequestedTheme = ActualTheme
         };
-        var result = await dialog.ShowAsync();
+        await dialog.ShowAsync();
         SettingsButton.Focus(FocusState.Programmatic);
-        if (result != ContentDialogResult.Primary) return;
+        if (!dialog.IsSaved) return;
 
         _settingsService.Save(dialog.GetSettings());
         var settings = _settingsService.Current;
@@ -866,6 +865,7 @@ public sealed partial class MainPage : Page
 
         var wasProtected = _isProtectedPublicCapture;
         var wasHeld = _isAutoHeld;
+        if (protectedViewNeeded) _capture.ProtectDesktop();
         // Keep public captures prepared in BOTH states. Opening a private app
         // changes only whether the monitor backdrop is held, never the source
         // dimensions, window capture sessions, or the recorder's Live state.
@@ -874,7 +874,6 @@ public sealed partial class MainPage : Page
             TryUpdateProtectedDesktop(protectedViewNeeded);
         }
         _isProtectedPublicCapture = protectedViewNeeded;
-        _capture.IsDesktopProtected = protectedViewNeeded;
         _isAutoHeld = false;
 
         if (wasProtected != _isProtectedPublicCapture || wasHeld != _isAutoHeld)

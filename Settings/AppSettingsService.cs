@@ -1,3 +1,4 @@
+using Clario_Presenter.Camera;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using Windows.Storage.Pickers;
@@ -62,7 +63,7 @@ public sealed class AppSettingsService
         RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
         RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
         CameraPosition = Math.Clamp(settings.CameraPosition, 0, 3),
-        CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, 15, 35)
+        CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent)
     };
 
     public async Task<StorageFolder> GetRecordingFolderAsync()
@@ -142,7 +143,8 @@ public sealed class AppSettingsService
             CameraEnabled = ReadBool(values, nameof(PresenterSettings.CameraEnabled)),
             CameraDeviceId = values[nameof(PresenterSettings.CameraDeviceId)] as string ?? string.Empty,
             CameraPosition = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraPosition), 0), 0, 3),
-            CameraWidthPercent = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24), 15, 35),
+            CameraWidthPercent = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24),
+                CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent),
             CameraMirror = ReadBool(values, nameof(PresenterSettings.CameraMirror)),
             ComputerAudioEnabled = ReadBool(values, nameof(PresenterSettings.ComputerAudioEnabled)),
             PlaybackDeviceId = values[nameof(PresenterSettings.PlaybackDeviceId)] as string ?? string.Empty,

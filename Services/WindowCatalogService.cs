@@ -106,6 +106,8 @@ public static class WindowCatalogService
 
     public static bool HasPrivateWindowOnDisplay(DisplayBounds bounds, IEnumerable<nint> privateWindows)
     {
+        if (privateWindows.TryGetNonEnumeratedCount(out var count) && count == 0) return false;
+
         var found = false;
         EnumWindows((handle, _) =>
         {
@@ -130,7 +132,7 @@ public static class WindowCatalogService
 
     public static bool IsInWindowFamily(nint handle, IEnumerable<nint> selectedWindows)
     {
-        if (handle == nint.Zero) return false;
+        if (handle == nint.Zero || (selectedWindows.TryGetNonEnumeratedCount(out var count) && count == 0)) return false;
         var root = GetRootOwner(handle);
         return selectedWindows.Any(selected => selected == handle
             || (root != nint.Zero && GetRootOwner(selected) == root));
