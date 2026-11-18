@@ -79,6 +79,7 @@ public sealed partial class MainPage : Page
         _isLoaded = true;
         if (App.MainWindow is { } window)
         {
+            window.AppWindow.Closing += PresenterWindow_Closing;
             window.AppWindow.Changed += StudioWindow_Changed;
             UpdateStudioWindowVisibility(window.AppWindow);
         }
@@ -295,7 +296,8 @@ public sealed partial class MainPage : Page
         if (_sessionTransition || _settingsDialogOpen) return;
         if (!IsRecordingOnly)
         {
-            if (_isLive) await StopSessionAsync();
+            if (_recorder is not null && _outputWindow is not null) _outputWindow.Close();
+            else if (_isLive) await StopSessionAsync();
             else TryStartSession();
             return;
         }
@@ -977,12 +979,30 @@ public sealed partial class MainPage : Page
         FooterStatusText.Text = $"Tampilan terputus. {detail}";
     }
 
-    private async void OutputWindow_Closed(object sender, WindowEventArgs args)
+    private void OutputWindow_Closed(object sender, WindowEventArgs args)
     {
         _outputWindow = null;
-        var status = await StopRecordingAsync();
+        if (_recorder is not null || _sessionTransition)
+        {
+            _windowRescueTimer.Stop();
+            _clientDisplay = null;
+            _notesAudience = null;
+            _isRecordingOnlySession = true;
+            _recordingPreviewOpen = true;
+            ApplyNoteCaptureRules();
+            SessionModePicker.SelectedIndex = 0;
+            FooterStatusText.Text = "Layar audiens ditutup. Klik Stop rekam jika ingin mengakhiri rekaman.";
+            return;
+        }
         StopPresentation();
-        if (status is not null) FooterStatusText.Text = status;
+    }
+
+    private void PresenterWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    {
+        if (_recorder is null && !_sessionTransition) return;
+        args.Cancel = true;
+        FooterStatusText.Text = _sessionTransition ? "Tunggu sampai rekaman selesai disiapkan atau disimpan."
+            : "Rekaman masih berjalan. Klik Stop rekam dahulu untuk menutup Clario.";
     }
 
     private void LivePreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) => DrawStudioPreview(sender, args);
@@ -990,7 +1010,11 @@ public sealed partial class MainPage : Page
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = false;
-        if (App.MainWindow is { } window) window.AppWindow.Changed -= StudioWindow_Changed;
+        if (App.MainWindow is { } window)
+        {
+            window.AppWindow.Closing -= PresenterWindow_Closing;
+            window.AppWindow.Changed -= StudioWindow_Changed;
+        }
         await SyncStudioPreviewAsync();
         DisposeFloatingNotes();
         await StopRecordingAsync();

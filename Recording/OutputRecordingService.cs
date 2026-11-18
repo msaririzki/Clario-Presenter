@@ -313,9 +313,12 @@ public sealed class OutputRecordingService : IAsyncDisposable
             // The encoder can temporarily retain every sample. Drop this time slot
             // and retry on the next producer tick, without growing the buffer pool.
             if (_waitingForBufferSince == 0) _waitingForBufferSince = Stopwatch.GetTimestamp();
-            else if (Stopwatch.GetElapsedTime(_waitingForBufferSince) >= TimeSpan.FromSeconds(15))
-                throw new InvalidOperationException("Encoder video berhenti merespons selama 15 detik. Coba 30 fps di Pengaturan.");
-            return;
+            if (Stopwatch.GetElapsedTime(_waitingForBufferSince) < TimeSpan.FromMilliseconds(200)) return;
+
+            // Some encoders need another sample before they release an old one.
+            // Give the encoder its own buffer at a reduced rate until recycling
+            // resumes. Clario never retains these buffers after handoff.
+            frame = AllocateFrame(pooled: false);
         }
         _waitingForBufferSince = 0;
         try
@@ -388,11 +391,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
         try
         {
-            var buffer = new Windows.Storage.Streams.Buffer(OutputWidth * OutputHeight * BytesPerPixel)
-            {
-                Length = OutputWidth * OutputHeight * BytesPerPixel
-            };
-            return new StableCpuFrame(buffer);
+            return AllocateFrame(pooled: true);
         }
         catch
         {
@@ -400,6 +399,9 @@ public sealed class OutputRecordingService : IAsyncDisposable
             throw;
         }
     }
+
+    private static StableCpuFrame AllocateFrame(bool pooled) =>
+        new(new Windows.Storage.Streams.Buffer(OutputWidth * OutputHeight * BytesPerPixel), pooled);
 
     private static void DrawPrivacySlate(CanvasDrawingSession drawingSession, ClientOutputMode mode)
     {
@@ -459,8 +461,11 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             var sample = MediaStreamSample.CreateFromBuffer(frame.Buffer, frame.Timestamp);
             sample.Duration = _frameDuration;
-            tracked = _outstandingFrames.TryAdd(frame, sample);
-            sample.Processed += (_, _) => ReleaseOutstandingFrame(frame);
+            if (frame.Pooled)
+            {
+                tracked = _outstandingFrames.TryAdd(frame, sample);
+                sample.Processed += (_, _) => ReleaseOutstandingFrame(frame);
+            }
             args.Request.Sample = sample;
         }
         catch (Exception exception)
@@ -580,7 +585,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
     private void RecycleFrame(StableCpuFrame? frame)
     {
-        if (frame is not null && !_disposed) _availableFrames.Add(frame);
+        if (frame is { Pooled: true } && !_disposed) _availableFrames.Add(frame);
     }
 
     private void SignalEndOfStream()
@@ -631,8 +636,9 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private sealed class StableCpuFrame(Windows.Storage.Streams.Buffer buffer)
+    private sealed class StableCpuFrame(Windows.Storage.Streams.Buffer buffer, bool pooled)
     {
+        public bool Pooled { get; } = pooled;
         public Windows.Storage.Streams.Buffer Buffer { get; } = buffer;
         public TimeSpan Timestamp { get; set; }
     }
