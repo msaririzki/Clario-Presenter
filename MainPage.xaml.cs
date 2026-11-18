@@ -77,6 +77,11 @@ public sealed partial class MainPage : Page
     private void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = true;
+        if (App.MainWindow is { } window)
+        {
+            window.AppWindow.Changed += StudioWindow_Changed;
+            UpdateStudioWindowVisibility(window.AppWindow);
+        }
         RefreshDisplays();
         UpdateCaptureModeUi();
     }
@@ -319,7 +324,7 @@ public sealed partial class MainPage : Page
     {
         if (_sessionTransition || _settingsDialogOpen) return;
         if (_isLive) await StopSessionAsync();
-        else if (TryStartSession() && !DetailedPreview) MinimizeForScreenSession();
+        else TryStartSession();
     }
 
     private bool TryStartSession()
@@ -459,8 +464,18 @@ public sealed partial class MainPage : Page
         var setupVisibility = _isLive || noteOverlay ? Visibility.Collapsed : Visibility.Visible;
         CaptureModePicker.Visibility = setupVisibility;
         SourceOptions.Visibility = setupVisibility;
-        PreviewPanel.Visibility = noteOverlay || (!_isLive && StudioGrid.ActualHeight < 120)
+        var previewVisibility = noteOverlay || (!_isLive && StudioGrid.ActualHeight < 120)
             ? Visibility.Collapsed : Visibility.Visible;
+        if (PreviewPanel.Visibility != previewVisibility)
+        {
+            PreviewPanel.Visibility = previewVisibility;
+            if (_isLoaded) _ = SyncStudioPreviewAsync();
+            if (ShowStudioInputs)
+            {
+                UpdatePreview();
+                LivePreviewCanvas.Invalidate();
+            }
+        }
         PreviewHeading.Visibility = noteOverlay ? Visibility.Collapsed : Visibility.Visible;
         NotesColumn.Width = new GridLength(docked ? 320 : 0);
         StudioGrid.ColumnSpacing = docked ? 12 : 0;
@@ -918,7 +933,7 @@ public sealed partial class MainPage : Page
 
     private void Capture_FrameAvailable(object? sender, EventArgs e)
     {
-        if (!_isLive) return;
+        if (!_isLive || !_studioWindowVisible || PreviewPanel.Visibility != Visibility.Visible) return;
         if (!_isPrivacy && ClientStateOverlay.Visibility == Visibility.Visible) UpdatePreview();
         LivePreviewCanvas.Invalidate();
     }
@@ -960,6 +975,7 @@ public sealed partial class MainPage : Page
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = false;
+        if (App.MainWindow is { } window) window.AppWindow.Changed -= StudioWindow_Changed;
         await SyncStudioPreviewAsync();
         DisposeFloatingNotes();
         await StopRecordingAsync();
@@ -1028,7 +1044,6 @@ public sealed partial class MainPage : Page
         var recording = _recorder is not null;
         PrimaryButton.IsEnabled = !_sessionTransition;
         PreviewButton.IsEnabled = !_sessionTransition;
-        PreviewModePicker.IsEnabled = !_sessionTransition;
         SettingsButton.IsEnabled = !_sessionTransition;
         RecordButton.IsEnabled = !_sessionTransition;
         OpenRecordingFolderButton.Visibility = !_sessionTransition && _lastSavedRecordingFolder is not null
@@ -1067,7 +1082,7 @@ public sealed partial class MainPage : Page
         ClientStateSubtitle.Text = _isLive
             ? "Buka layar atau aplikasi yang ingin ditampilkan."
             : IsRecordingOnly
-                ? "Tampilan sumber akan terlihat di sini saat preview atau rekaman berjalan."
+                ? "Klik Buka preview untuk memeriksa gambar, kamera, dan suara."
                 : "Sumber presentasi akan terlihat di sini.";
     }
 

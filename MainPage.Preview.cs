@@ -4,6 +4,7 @@ using Clario_Presenter.Camera;
 using Clario_Presenter.Recording;
 using Clario_Presenter.Settings;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -11,7 +12,7 @@ namespace Clario_Presenter;
 
 public sealed partial class MainPage
 {
-    private readonly DispatcherTimer _studioTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private readonly DispatcherTimer _studioTimer = new();
     private readonly SemaphoreSlim _studioGate = new(1);
     private PresenterSettings? _studioInputSettings;
     private CameraOverlayOptions? _studioCameraOptions;
@@ -22,16 +23,26 @@ public sealed partial class MainPage
     private string? _studioCameraError;
     private long _lastMeterTick;
 
-    private bool DetailedPreview => PreviewModePicker.SelectedIndex == 1;
-    private bool ShowStudioInputs => _isLoaded && DetailedPreview && _isLive && !_isPrivacy
+    private bool _studioWindowVisible;
+    private bool ShowStudioInputs => _isLoaded && _studioWindowVisible && PreviewPanel.Visibility == Visibility.Visible && _isLive && !_isPrivacy
         && !_settingsDialogOpen && !_sessionTransition;
 
-    private async void PreviewMode_Changed(object sender, SelectionChangedEventArgs e)
+    private void StudioWindow_Changed(AppWindow window, AppWindowChangedEventArgs args)
     {
-        if (!_isLoaded) return;
-        if (DetailedPreview && IsRecordingOnly && !_isLive) TryStartSession();
-        await SyncStudioPreviewAsync();
-        LivePreviewCanvas.Invalidate();
+        UpdateStudioWindowVisibility(window);
+    }
+
+    private void UpdateStudioWindowVisibility(AppWindow window)
+    {
+        var visible = window.IsVisible && window.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+        if (_studioWindowVisible == visible) return;
+        _studioWindowVisible = visible;
+        _ = SyncStudioPreviewAsync();
+        if (ShowStudioInputs)
+        {
+            UpdatePreview();
+            LivePreviewCanvas.Invalidate();
+        }
     }
 
     private static CameraOverlayOptions PreviewCameraOptions(PresenterSettings settings) => new()
@@ -44,9 +55,16 @@ public sealed partial class MainPage
     private Task SyncStudioPreviewAsync()
     {
         var show = ShowStudioInputs;
-        StudioMeters.Visibility = DetailedPreview && _isLoaded ? Visibility.Visible : Visibility.Collapsed;
+        StudioMeters.Visibility = _isLive ? Visibility.Visible : Visibility.Collapsed;
         _recorder?.SetPreviewMeters(show);
-        if (show) _studioTimer.Start();
+        var settings = _settingsService.Current;
+        var cameraEnabled = _recorder?.IncludesCamera ?? settings.CameraEnabled;
+        var audioEnabled = _recorder?.IncludesAudio ?? (settings.ComputerAudioEnabled || settings.MicrophoneEnabled);
+        if (show && (cameraEnabled || audioEnabled))
+        {
+            _studioTimer.Interval = TimeSpan.FromMilliseconds(cameraEnabled ? 33 : 100);
+            _studioTimer.Start();
+        }
         else _studioTimer.Stop();
 
         // While recording the preview reads the recorder's existing camera and PCM tracks.
@@ -117,7 +135,6 @@ public sealed partial class MainPage
 
     private void UpdateStudioMeters()
     {
-        if (!DetailedPreview) return;
         var show = ShowStudioInputs;
         var idle = _isPrivacy ? "Dibisukan" : "Preview berhenti";
         var settings = _settingsService.Current;
@@ -151,8 +168,7 @@ public sealed partial class MainPage
 
     private void DrawStudioPreview(CanvasControl canvas, CanvasDrawEventArgs args)
     {
-        if (_capture is null || _isPrivacy || !_isLive) return;
-        if (!DetailedPreview) { _capture.Draw(canvas, args); return; }
+        if (_capture is null || _isPrivacy || !_isLive || !_studioWindowVisible) return;
         const float width = OutputRecordingService.OutputWidth, height = OutputRecordingService.OutputHeight;
         var scale = (float)Math.Min(canvas.ActualWidth / width, canvas.ActualHeight / height);
         if (scale <= 0) return;
