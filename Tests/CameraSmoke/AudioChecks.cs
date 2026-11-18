@@ -89,6 +89,7 @@ internal static class AudioChecks
                 CreationCollisionOption.OpenIfExists);
             var mixedFile = await folder.CreateFileAsync("audio-mix.mp4", CreationCollisionOption.ReplaceExisting);
             var silentFile = await folder.CreateFileAsync("video-only.mp4", CreationCollisionOption.ReplaceExisting);
+            var warmFile = await folder.CreateFileAsync("audio-warm.mp4", CreationCollisionOption.ReplaceExisting);
             stage = "AAC recording with privacy";
             Progress();
             var mode = (int)ClientOutputMode.Live;
@@ -118,11 +119,22 @@ internal static class AudioChecks
                 if (recorder.Failure is not null) throw recorder.Failure;
             }
 
+            stage = "warm narration AAC";
+            Progress();
+            await using (var recorder = new OutputRecordingService(new SyntheticAudio(warm: true)))
+            {
+                await recorder.StartAsync(new SyntheticFrame(), CaptureScaleMode.Fit, 1, () => ClientOutputMode.Live,
+                    await warmFile.OpenAsync(FileAccessMode.ReadWrite));
+                await Task.Delay(1000);
+                await recorder.StopAsync().WaitAsync(TimeSpan.FromSeconds(12));
+                if (recorder.Failure is not null) throw recorder.Failure;
+            }
+
             File.WriteAllText(report, JsonSerializer.Serialize(new
             {
                 Passed = true, Inputs = devices.Inputs.Count, Outputs = devices.Outputs.Count,
                 NativeLoopbackOpened = devices.Outputs.Count > 0, MissingInputRejected = true,
-                Mixed = mixedFile.Path, VideoOnly = silentFile.Path
+                Mixed = mixedFile.Path, VideoOnly = silentFile.Path, Warm = warmFile.Path
             }));
         }
         catch (Exception error)
@@ -133,6 +145,17 @@ internal static class AudioChecks
 
     private static void VerifyMixer()
     {
+        var voice = new WarmVoiceProcessor();
+        var stereo = new short[960];
+        for (int i = 0; i < stereo.Length; i += 2) stereo[i] = short.MaxValue;
+        voice.Process(stereo, 2);
+        for (int i = 0; i < stereo.Length; i += 2)
+            if (Math.Abs((int)stereo[i]) > 28700 || stereo[i + 1] != 0)
+                throw new InvalidOperationException("Warm narration exceeded its peak ceiling or leaked across channels.");
+        voice.Reset();
+        Array.Clear(stereo);
+        voice.Process(stereo, 1);
+        if (stereo.Any(sample => sample != 0)) throw new InvalidOperationException("Filter history survived a reset.");
         var accumulated = 0;
         AudioLevelMonitor.Accumulate(ref accumulated, [0, -1024]);
         AudioLevelMonitor.Accumulate(ref accumulated, [512, 127]);
@@ -176,8 +199,9 @@ internal static class AudioChecks
             throw new InvalidOperationException("A real capture discontinuity must keep its position on the video clock.");
     }
 
-    private sealed class SyntheticAudio : IRecordingAudioSource
+    private sealed class SyntheticAudio(bool warm = false) : IRecordingAudioSource
     {
+        private readonly WarmVoiceProcessor? _voice = warm ? new() : null;
         public Task StartAsync(CancellationToken token) => Task.CompletedTask;
         public void StartClock(long timestamp) { }
         public string? Warning => null;
@@ -193,6 +217,7 @@ internal static class AudioChecks
                 samples[index] = input;
                 samples[index + 1] = input;
             }
+            _voice?.Process(samples, 2);
         }
     }
 

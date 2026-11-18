@@ -324,6 +324,7 @@
                                               SelectionChanged="AudioDevice_SelectionChanged">
                                         <ComboBoxItem Content="Narasi (Windows)" />
                                         <ComboBoxItem Content="Standar perangkat" />
+                                        <ComboBoxItem Content="Narasi hangat" />
                                     </ComboBox>
                                 </Grid>
                             </StackPanel>

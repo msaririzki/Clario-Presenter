@@ -20,5 +20,6 @@ public sealed record PresenterSettings
     public string PlaybackDeviceId { get; init; } = string.Empty;
     public bool MicrophoneEnabled { get; init; }
     public bool MicrophoneSpeechProfile { get; init; } = true;
+    public bool WarmNarration { get; init; }
     public string MicrophoneDeviceId { get; init; } = Wasapi.AutomaticInputId;
 }

@@ -608,7 +608,7 @@ public sealed partial class MainPage : Page
                     new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps,
                         PreviewCameraOptions(settings),
                         new RecordingAudioOptions(settings.ComputerAudioEnabled, settings.PlaybackDeviceId,
-                            settings.MicrophoneEnabled, settings.MicrophoneDeviceId, settings.MicrophoneSpeechProfile)));
+                            settings.MicrophoneEnabled, settings.MicrophoneDeviceId, settings.MicrophoneSpeechProfile, settings.WarmNarration)));
                 if (!_isLive || _capture is null)
                     throw new InvalidOperationException("Sesi ditutup saat rekaman disiapkan. Mulai kembali untuk merekam.");
             }

@@ -5,7 +5,8 @@ namespace Clario_Presenter.Audio;
 
 public sealed record RecordingAudioOptions(
     bool ComputerAudioEnabled = false, string PlaybackDeviceId = "",
-    bool MicrophoneEnabled = false, string MicrophoneDeviceId = "", bool MicrophoneSpeechProfile = true)
+    bool MicrophoneEnabled = false, string MicrophoneDeviceId = "", bool MicrophoneSpeechProfile = true,
+    bool WarmNarration = false)
 {
     public bool Enabled => ComputerAudioEnabled || MicrophoneEnabled;
 }
@@ -70,6 +71,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
     {
         short[] pcm = [];
         var clock = new CapturePacketClock();
+        var voice = !track.Loopback && options.WarmNarration ? new WarmVoiceProcessor() : null;
         try
         {
             Wasapi.Capture(track.DeviceId, track.Loopback, () => track.Started.TrySetResult(),
@@ -82,10 +84,16 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                             * RecordingAudioFormat.SampleRate / TimeSpan.TicksPerSecond);
                     var firstFrame = clock.Place(frames, position, flags, timestampFrame,
                         RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin)));
-                    if (muted() || data == 0 || (flags & Wasapi.Silent) != 0) return;
+                    if (muted() || data == 0 || (flags & Wasapi.Silent) != 0)
+                    {
+                        voice?.Reset();
+                        return;
+                    }
+                    if ((flags & Wasapi.Discontinuity) != 0) voice?.Reset();
                     var count = frames * channels;
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
                     Marshal.Copy(data, pcm, 0, count);
+                    voice?.Process(pcm.AsSpan(0, count), channels);
                     if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count));
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
                 }, token, options.MicrophoneSpeechProfile);

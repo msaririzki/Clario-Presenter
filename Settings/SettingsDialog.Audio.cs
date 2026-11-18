@@ -20,7 +20,7 @@ public sealed partial class SettingsDialog
     {
         ComputerAudioToggle.IsOn = settings.ComputerAudioEnabled;
         MicrophoneAudioToggle.IsOn = settings.MicrophoneEnabled;
-        MicrophoneProfilePicker.SelectedIndex = settings.MicrophoneSpeechProfile ? 0 : 1;
+        MicrophoneProfilePicker.SelectedIndex = settings.WarmNarration ? 2 : settings.MicrophoneSpeechProfile ? 0 : 1;
         UpdateAudioOptions();
         _audioMeterTimer.Tick += AudioMeterTimer_Tick;
     }
@@ -106,12 +106,15 @@ public sealed partial class SettingsDialog
         ToggleSwitch toggle, ComboBox picker, ProgressBar bar, bool loopback)
     {
         var desired = DesiredAudioDevice(toggle, picker);
-        var speech = !loopback && MicrophoneProfilePicker.SelectedIndex == 0;
-        if (monitor is { HasStopped: false } && desired?.EndpointId == monitor.DeviceId && monitor.SpeechProfile == speech) return monitor;
+        var speech = !loopback && MicrophoneProfilePicker.SelectedIndex != 1;
+        var warm = !loopback && MicrophoneProfilePicker.SelectedIndex == 2;
+        if (monitor is { HasStopped: false } && desired?.EndpointId == monitor.DeviceId
+            && monitor.SpeechProfile == speech && monitor.WarmNarration == warm) return monitor;
         if (monitor is not null) await monitor.DisposeAsync();
         bar.Value = 0;
         return DesiredAudioDevice(toggle, picker) is { } next
-            ? new AudioLevelMonitor(next.EndpointId, loopback, !loopback && MicrophoneProfilePicker.SelectedIndex == 0) : null;
+            ? new AudioLevelMonitor(next.EndpointId, loopback, !loopback && MicrophoneProfilePicker.SelectedIndex != 1,
+                !loopback && MicrophoneProfilePicker.SelectedIndex == 2) : null;
     }
 
     private AudioDevice? DesiredAudioDevice(ToggleSwitch toggle, ComboBox picker) =>

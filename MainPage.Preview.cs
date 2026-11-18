@@ -107,7 +107,8 @@ public sealed partial class MainPage
             if (mic is not null) await mic.DisposeAsync();
             if (settings is null || token.IsCancellationRequested) return;
             if (settings.ComputerAudioEnabled) _studioPlayback = new(settings.PlaybackDeviceId, true);
-            if (settings.MicrophoneEnabled) _studioMic = new(settings.MicrophoneDeviceId, false, settings.MicrophoneSpeechProfile);
+            if (settings.MicrophoneEnabled) _studioMic = new(settings.MicrophoneDeviceId, false,
+                settings.MicrophoneSpeechProfile, settings.WarmNarration);
             if (settings.CameraEnabled)
             {
                 var candidate = new CameraCaptureService();
