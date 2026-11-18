@@ -46,6 +46,7 @@ Baca laporan JSON dan periksa nilai `Passed` setelah pengujian selesai. Uji reka
 | Tanpa argumen mode | Menyalakan kamera pertama, menguji pratinjau, membuka kembali kamera, merekam pola uji 1080p60, dan memeriksa transisi Privasi |
 | `--desktop-only` | Berpindah di antara jendela uji publik dan privat sambil memeriksa pembaruan frame |
 | `--floating-notes` | Menjangkau catatan panjang, mengubah ukuran, memilih bagian, menjaga fokus, dan memeriksa pengecualian panel dari tangkapan |
+| `--recording-stability` | Menjalankan perekam selama tiga menit pada 1080p60 dengan gambar bergerak, audio sintetis, dan pengumpulan memori berkala. MP4 disimpan di sebelah laporan. |
 | `--audio` | Membuka keluaran WASAPI dan membuat MP4 uji dengan suara sintetis serta segmen Privasi |
 | `--audio-input-open-only` | Membuka input mikrofon tanpa membaca sampel audio |
 

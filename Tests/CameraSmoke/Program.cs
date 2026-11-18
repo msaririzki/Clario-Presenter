@@ -30,6 +30,7 @@ internal static class Program
                 if (args.Contains("--desktop-camera")) await DesktopSwitchChecks.RunAsync(reportPath, includeCamera: true);
                 else if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
                 else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
+                else if (args.Contains("--recording-stability")) await AudioChecks.RunStabilityAsync(reportPath);
                 else if (args.Contains("--audio")) await AudioChecks.RunAsync(reportPath);
                 else if (args.Contains("--audio-input-open-only")) await AudioChecks.OpenInputOnlyAsync(reportPath);
                 else await RunChecksAsync(reportPath);

@@ -711,12 +711,13 @@ public sealed partial class MainPage : Page
         {
             failure ??= exception;
         }
+        failure = recorder.Failure ?? failure;
         if (fileWasAutoCreated) await DeleteEmptyRecordingAsync(file);
         await SyncStudioPreviewAsync();
         UpdateSessionActions();
         UpdateRecordingStatusLabels();
         FooterStatusText.Text = failure is null
-            ? "Rekaman terhenti. Tekan Rekam untuk memulai video baru."
+            ? "Encoder mengakhiri rekaman sebelum Stop rekam ditekan. Periksa video di folder rekaman."
             : $"Rekaman terhenti. {failure.Message}";
     }
 

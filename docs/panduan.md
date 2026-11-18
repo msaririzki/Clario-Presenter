@@ -31,6 +31,8 @@ Untuk memperbarui aplikasi, selesaikan rekaman, tutup Clario, lalu jalankan inst
 4. Saat rekaman dimulai, Clario tetap terbuka dan preview langsung terlihat. Jika Anda mengecilkan jendela, preview dijeda untuk menghemat daya. Buka kembali Clario dari bilah tugas dan preview akan muncul lagi. Ini juga berlaku saat mengecek preview sebelum merekam. Jika Anda memilih **Tutup preview** saat merekam, preview tetap tertutup sampai Anda membukanya sendiri.
 5. Setelah **Stop rekam**, klik **Putar rekaman** untuk menonton video atau **Buka folder** untuk melihat filenya. Biasanya video tersimpan di **Video → Clario Presenter**. Anda bisa mengganti folder atau memilih lokasi setiap kali merekam lewat **Pengaturan**.
 
+Pintasan catatan hanya mengendalikan catatan. Di mode **Rekam**, gunakan **Stop rekam** untuk mengakhiri video. Di mode **Presentasi**, tombol **Esc** saat jendela audiens sedang aktif menutup presentasi beserta rekaman yang sedang berjalan.
+
 Untuk demo menu Start, perpindahan aplikasi dengan **Alt+Tab**, atau perpindahan tab browser dengan **Ctrl+Tab**, pilih **Layar**. Jika yang Anda perlukan hanya catatan pribadi, gunakan **Catatan → Sematkan** dan biarkan daftar **Sembunyikan aplikasi** kosong. Jika Anda menyembunyikan jendela lain, Clario sementara melindungi pemilih aplikasi dan thumbnail bilah tugas yang bisa memperlihatkan isinya.
 
 Saat Anda membuka jendela yang disembunyikan, Clario tetap menampilkan materi di belakangnya. Jika aplikasi yang ditampilkan belum mengirim gambar baru, gambar terakhir bisa bertahan sejenak.

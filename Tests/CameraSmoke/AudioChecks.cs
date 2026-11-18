@@ -159,6 +159,32 @@ internal static class AudioChecks
         }
     }
 
+    internal static async Task RunStabilityAsync(string report)
+    {
+        try
+        {
+            var directory = await StorageFolder.GetFolderFromPathAsync(Path.GetDirectoryName(Path.GetFullPath(report))!);
+            var file = await directory.CreateFileAsync("stability.mp4", CreationCollisionOption.GenerateUniqueName);
+            await using var recorder = new OutputRecordingService(new SyntheticAudio());
+            await recorder.StartAsync(new MovingFrame(), CaptureScaleMode.Fit, 1, () => ClientOutputMode.Live,
+                await file.OpenAsync(FileAccessMode.ReadWrite));
+            for (var i = 0; i < 36; i++)
+            {
+                if (await Task.WhenAny(Task.Delay(5000), recorder.Completion) == recorder.Completion)
+                    throw recorder.Failure ?? new InvalidOperationException($"Encoder ended unexpectedly after about {5 * i} seconds.");
+                // Exercise sample ownership across collections and encoder delays.
+                await Task.Run(() => { GC.Collect(); GC.WaitForPendingFinalizers(); });
+            }
+            await recorder.StopAsync().WaitAsync(TimeSpan.FromSeconds(20));
+            if (recorder.Failure is not null) throw recorder.Failure;
+            File.WriteAllText(report, JsonSerializer.Serialize(new { Passed = true, Video = file.Path }));
+        }
+        catch (Exception error)
+        {
+            File.WriteAllText(report, JsonSerializer.Serialize(new { Passed = false, Error = error.ToString() }));
+        }
+    }
+
     private static void VerifyMixer()
     {
         string[] boosted = ["headset"];
@@ -309,6 +335,17 @@ internal static class AudioChecks
             _timeline.Store(0, pcm, 1);
         }
         public void Read(long firstFrame, Span<short> samples) => _timeline.Read(firstFrame, samples);
+    }
+
+    private sealed class MovingFrame : IRecordingFrameSource
+    {
+        public bool HasFrame => true;
+        public void DrawRecordingFrame(CanvasDrawingSession session, float width, float height,
+            CaptureScaleMode scaleMode = CaptureScaleMode.Fit, float adaptiveZoom = 1.15f)
+        {
+            session.Clear(Color.FromArgb(255, 29, 45, 70));
+            session.FillRectangle(Environment.TickCount64 % (int)width, height / 3, 80, 80, Color.FromArgb(255, 255, 255, 255));
+        }
     }
 
     private sealed class SyntheticFrame : IRecordingFrameSource

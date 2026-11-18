@@ -31,7 +31,8 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
     private readonly object _frameGate = new();
     private readonly ConcurrentBag<StableCpuFrame> _availableFrames = [];
-    private readonly ConcurrentDictionary<StableCpuFrame, byte> _outstandingFrames = new();
+    // Keep the managed event source alive until Media Foundation returns the buffer.
+    private readonly ConcurrentDictionary<StableCpuFrame, MediaStreamSample> _outstandingFrames = new();
     private readonly CanvasDevice _canvasDevice = CanvasDevice.GetSharedDevice();
     private readonly CancellationTokenSource _producerCancellation = new();
     private readonly SemaphoreSlim _stopGate = new(1, 1);
@@ -59,6 +60,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
     private TimeSpan _frameDuration;
     private uint _frameRate;
     private int _allocatedFrameCount;
+    private long _waitingForBufferSince;
     private volatile bool _stopping;
     private bool _stopCompleted;
     private bool _disposed;
@@ -305,7 +307,17 @@ public sealed class OutputRecordingService : IAsyncDisposable
 
     private void RenderFrame(CanvasRenderTarget renderTarget, long frameIndex)
     {
-        var frame = RentFrame();
+        var frame = TryRentFrame();
+        if (frame is null)
+        {
+            // The encoder can temporarily retain every sample. Drop this time slot
+            // and retry on the next producer tick, without growing the buffer pool.
+            if (_waitingForBufferSince == 0) _waitingForBufferSince = Stopwatch.GetTimestamp();
+            else if (Stopwatch.GetElapsedTime(_waitingForBufferSince) >= TimeSpan.FromSeconds(15))
+                throw new InvalidOperationException("Encoder video berhenti merespons selama 15 detik. Coba 30 fps di Pengaturan.");
+            return;
+        }
+        _waitingForBufferSince = 0;
         try
         {
             using (var drawingSession = renderTarget.CreateDrawingSession())
@@ -365,13 +377,13 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private StableCpuFrame RentFrame()
+    private StableCpuFrame? TryRentFrame()
     {
         if (_availableFrames.TryTake(out var reusable)) return reusable;
         if (Interlocked.Increment(ref _allocatedFrameCount) > MaximumFrameCount)
         {
             Interlocked.Decrement(ref _allocatedFrameCount);
-            throw new InvalidOperationException("Perangkat tidak dapat memproses rekaman tepat waktu. Coba pilih 30 fps di Pengaturan.");
+            return null;
         }
 
         try
@@ -447,7 +459,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
         {
             var sample = MediaStreamSample.CreateFromBuffer(frame.Buffer, frame.Timestamp);
             sample.Duration = _frameDuration;
-            tracked = _outstandingFrames.TryAdd(frame, 0);
+            tracked = _outstandingFrames.TryAdd(frame, sample);
             sample.Processed += (_, _) => ReleaseOutstandingFrame(frame);
             args.Request.Sample = sample;
         }
@@ -457,6 +469,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
             if (tracked) ReleaseOutstandingFrame(frame);
             else RecycleFrame(frame);
             args.Request.Sample = null;
+            SignalEndOfStream();
         }
     }
 
