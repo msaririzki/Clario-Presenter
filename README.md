@@ -7,7 +7,7 @@ Anda mengoperasikan Canva, situs web, atau Cisco Packet Tracer langsung dari lap
 ## Fitur unggulan
 
 - **Sembunyikan jendela pribadi.** Sebelum mulai, pilih pembaca PDF di **Sembunyikan aplikasi**. Saat Anda beralih membaca PDF, proyektor dan rekaman tetap menampilkan materi. Untuk menyembunyikan satu tab Chrome, pindahkan tab itu ke jendela sendiri dahulu.
-- **Baca naskah di atas aplikasi.** Atur ukuran dan transparansi catatan. Dengan **Klik tembus**, Anda bisa membaca perintah sambil mengetiknya di jendela router di belakang catatan. Buka naskah teks atau Markdown. Jika Markdown memiliki judul per langkah, klik **Daftar** untuk pindah bagian.
+- **Baca naskah sambil menjalankan demo.** Sematkan catatan teks atau Markdown di atas Packet Tracer. Anda bisa mengetik di jendela router, lalu klik **Turun** di bawah catatan untuk membaca perintah berikutnya. Perbesar panel untuk melihat lebih banyak baris, atau klik **Daftar** untuk langsung membuka bagian tertentu.
 - **Tampilkan beberapa jendela sekaligus.** Pilih **Layar** untuk menampilkan topologi Packet Tracer beserta jendela router dan switch pada posisi aslinya. Gambar otomatis disesuaikan agar seluruh layar laptop muat di proyektor, termasuk bilah tugas Windows jika terlihat.
 - **Rekam satu layar bersama wajah Anda.** Walau dua monitor terhubung, Anda bisa merekam satu monitor atau satu jendela saja. Hasilnya video MP4 Full HD 1080p, dengan pilihan 30 atau 60 fps. Tambahkan webcam laptop atau USB, lalu pilih ukuran dan posisi wajah di video.
 - **Pilih suara yang masuk ke video.** Rekam suara dari komputer, narasi dari mikrofon laptop, mikrofon USB atau mixer, atau gabungkan keduanya. Saat **Suara komputer** aktif, bunyi dari jendela yang disembunyikan juga bisa ikut terdengar.
@@ -17,7 +17,7 @@ Anda mengoperasikan Canva, situs web, atau Cisco Packet Tracer langsung dari lap
 
 ## Cara mulai
 
-Unduh dan buka file pemasangan, klik **Pasang**, lalu cari **Clario Presenter** di menu **Mulai**. Clario tersedia untuk Windows 10 versi 2004 ke atas dan Windows 11 pada PC Intel atau AMD 64-bit. Windows mungkin menampilkan peringatan SmartScreen karena installer v1.0.1 belum ditandatangani secara digital. [Cara memeriksa unduhan](docs/panduan.md#pemasangan).
+Unduh dan buka file pemasangan, klik **Pasang**, lalu cari **Clario Presenter** di menu **Mulai**. Clario tersedia untuk Windows 10 versi 2004 ke atas dan Windows 11 pada PC Intel atau AMD 64-bit. Windows mungkin menampilkan peringatan SmartScreen karena installer belum ditandatangani secara digital. [Cara memeriksa unduhan](docs/panduan.md#pemasangan).
 
 | Saya ingin… | Langkah di Clario |
 | --- | --- |

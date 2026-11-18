@@ -23,6 +23,7 @@ internal static class FloatingNotesChecks
             var longBody = string.Concat(Enumerable.Repeat(line, (NoteDocument.MaximumLength - 128) / line.Length));
             AssertTailRendered(marker => NoteDocument.Parse(longBody + marker, false));
             AssertTailRendered(marker => NoteDocument.Parse($"## Router\n\n```\n{longBody}{marker}\n```", true));
+            AssertContinuousLayout();
 
             stage = "navigation and resize";
             CheckNavigation(notes, display, longBody);
@@ -32,7 +33,7 @@ internal static class FloatingNotesChecks
             if (!notes.IsShowing) throw new InvalidOperationException(notes.Status);
             var area = notes.Bounds;
             using var router = PatternWindow(area.Left + 15, area.Top + 100, 150, 100, Color.FromArgb(30, 170, 60));
-            using var switchDialog = PatternWindow(area.Left + 175, area.Top + 100, 150, 100, Color.FromArgb(45, 90, 214));
+            using var switchDialog = PatternWindow(area.Left + 175, area.Top + 100, 150, area.Height - 100, Color.FromArgb(45, 90, 214));
             notes.Hide();
             router.Show();
             switchDialog.Show();
@@ -45,8 +46,10 @@ internal static class FloatingNotesChecks
             stage = "baseline";
             var routerPoint = new NativePoint(area.Left + 75, area.Top + 145);
             var switchPoint = new NativePoint(area.Left + 250, area.Top + 145);
+            var footerPoint = new NativePoint(area.Left + 250, area.Top + area.Height - 20);
             var routerPixels = ReadPixel(capture, display.Bounds, routerPoint);
             var switchPixels = ReadPixel(capture, display.Bounds, switchPoint);
+            AssertUnchanged(ReadPixel(capture, display.Bounds, footerPoint), switchPixels);
             if (routerPixels is not { G: > 150, B: < 100 } || switchPixels is not { B: > 180, R: < 80 })
                 throw new InvalidOperationException($"Expected synthetic dialogs below the panel, got {routerPixels} and {switchPixels}.");
 
@@ -67,6 +70,7 @@ internal static class FloatingNotesChecks
             await Task.Delay(450);
             AssertUnchanged(ReadPixel(capture, display.Bounds, routerPoint), routerPixels);
             AssertUnchanged(ReadPixel(capture, display.Bounds, switchPoint), switchPixels);
+            AssertUnchanged(ReadPixel(capture, display.Bounds, footerPoint), switchPixels);
             // Assert a fresh frame while the notes are visible, not a stale baseline.
             router.BackColor = Color.FromArgb(220, 145, 27);
             switchDialog.BackColor = Color.FromArgb(166, 48, 189);
@@ -77,12 +81,14 @@ internal static class FloatingNotesChecks
             if (ReadPixel(capture, display.Bounds, routerPoint) is not { R: > 200, G: > 125, B: < 65 }
                 || ReadPixel(capture, display.Bounds, switchPoint) is not { R: > 145, G: < 70, B: > 165 })
                 throw new InvalidOperationException("A dialog was hidden or obscured after changing the note and opacity.");
+            AssertUnchanged(ReadPixel(capture, display.Bounds, footerPoint), ReadPixel(capture, display.Bounds, switchPoint));
 
             File.WriteAllText(reportPath, JsonSerializer.Serialize(new
             {
                 Passed = true, WindowsGraphicsCapture = true, ClickThrough = true,
                 FocusPreserved = true, FreshDialogFrames = 2, CaptureExclusion = true,
-                LongPlainText = true, LongFencedCode = true, Resizing = true, SectionIndex = true, ScrollShortcuts = true
+                LongPlainText = true, LongFencedCode = true, Resizing = true, SectionIndex = true, ScrollShortcuts = true,
+                ContinuousLayout = true, ClickThroughFooter = true
             }));
         }
         catch (Exception exception)
@@ -100,7 +106,8 @@ internal static class FloatingNotesChecks
         byte[] RenderTail(string marker)
         {
             var document = build(marker);
-            var height = renderer.Measure(device, document[0], (float)geometry.Body.Width, 16);
+            var scroll = 0f;
+            var height = renderer.Measure(device, document, (float)geometry.Body.Width, 16, ref scroll);
             if (height < 30_000) throw new InvalidOperationException($"Long content was measured as only {height}.");
             using (var session = output.CreateDrawingSession())
                 renderer.Draw(session, geometry, document, 0, false, false, geometry.ScrollLimit(height), height);
@@ -110,6 +117,32 @@ internal static class FloatingNotesChecks
 
         if (RenderTail("END WWWWWWWW").AsSpan().SequenceEqual(RenderTail("END iiiiiiii")))
             throw new InvalidOperationException("Changing the final line did not change the rendered bottom of the note.");
+    }
+
+    private static void AssertContinuousLayout()
+    {
+        var device = CanvasDevice.GetSharedDevice();
+        using var renderer = new NoteOverlayRenderer();
+        const string commands = "show ip interface brief  show running-config  show interfaces status";
+        var document = NoteDocument.Parse($"## Router\n{commands}\n## Switch\n{commands}\n## Selesai\nPeriksa hasil", true);
+        var shortPanel = new NoteOverlayGeometry(270, 168);
+        var tallPanel = new NoteOverlayGeometry(270, 530);
+        var scroll = 0f;
+        var narrowHeight = renderer.Measure(device, document, (float)shortPanel.Body.Width, 16, ref scroll);
+        var second = renderer.SectionTop(1);
+        if (second < shortPanel.Body.Height || second + 24 >= tallPanel.Body.Height || renderer.SectionAt(second) != 1)
+            throw new InvalidOperationException("The next section should enter the expanded viewport without navigation.");
+        using var image = new CanvasRenderTarget(device, tallPanel.Width, tallPanel.Height, 96);
+        using (var drawing = image.CreateDrawingSession())
+            renderer.Draw(drawing, tallPanel, document, 0, false, true, 0, narrowHeight);
+        var pixels = image.GetPixelBytes((int)tallPanel.Body.X, (int)(tallPanel.Body.Y + second),
+            (int)tallPanel.Body.Width, 24);
+        if (!Enumerable.Range(0, pixels.Length / 4).Any(i => pixels[i * 4 + 2] > 150))
+            throw new InvalidOperationException("The next section was measured but not drawn in the extra space.");
+        scroll = second;
+        var wideHeight = renderer.Measure(device, document, 650, 16, ref scroll);
+        if (wideHeight >= narrowHeight || renderer.SectionTop(1) >= second || Math.Abs(scroll - renderer.SectionTop(1)) > 1)
+            throw new InvalidOperationException("Widening the note failed to rewrap text at the current reading position.");
     }
 
     private static void CheckNavigation(FloatingNoteWindow notes, DisplayTarget display, string longBody)
@@ -152,10 +185,36 @@ internal static class FloatingNotesChecks
 
         var sections = string.Join("\n", Enumerable.Range(1, 80).Select(index => $"## Bagian {index}\nIsi {index}\n"));
         notes.SetDocument(NoteDocument.Parse(sections, true), true);
-        Click(new(geometry.Index.X + geometry.Index.Width / 2, geometry.Index.Y + 12));
-        Hotkey(notes, 10);
+        notes.SetClickThrough(true);
+        void ClickFooter(Windows.Foundation.Rect button)
+        {
+            var point = new NativePoint(notes.Bounds.Left + (int)((button.X + button.Width / 2) * scale),
+                notes.Bounds.Top + (int)((button.Y + button.Height / 2) * scale));
+            var target = WindowFromPoint(point);
+            if (target != notes.Handle && (target == 0 || GetWindow(target, 4) != notes.Handle))
+                throw new InvalidOperationException("The visible footer was not clickable.");
+            if (!ScreenToClient(target, ref point)) throw new InvalidOperationException("Footer hit test failed.");
+            SendMessage(target, 0x201, 1, PointParameter(point.X, point.Y));
+            SendMessage(target, 0x202, 0, PointParameter(point.X, point.Y));
+        }
+        ClickFooter(geometry.Next);
+        if (notes.ScrollOffset <= 0 || notes.StepIndex == 0) throw new InvalidOperationException("Turun failed in Click-through mode.");
+        ClickFooter(geometry.Previous);
+        if (notes.ScrollOffset != 0) throw new InvalidOperationException("Naik failed in Click-through mode.");
+        var wheelPoint = new NativePoint(notes.Bounds.Left + 25, notes.Bounds.Top + notes.Bounds.Height - 20);
+        SendMessage(WindowFromPoint(wheelPoint), 0x20A, (nint)(-120 << 16), PointParameter(wheelPoint.X, wheelPoint.Y));
+        if (notes.ScrollOffset <= 0) throw new InvalidOperationException("The wheel over the footer did not scroll the note.");
+        ClickFooter(geometry.Mode);
+        if (notes.ClickThrough) throw new InvalidOperationException("Atur failed.");
+        ClickFooter(geometry.Mode);
+        if (!notes.ClickThrough) throw new InvalidOperationException("Selesai failed.");
+        ClickFooter(geometry.Index);
+        for (var page = 0; page < 12; page++) ClickFooter(geometry.Next);
         Click(new(geometry.Body.X + 30, geometry.Body.Bottom - 12));
         if (notes.StepIndex != 79) throw new InvalidOperationException("The final section could not be selected from the index.");
+        if (!notes.ClickThrough || GetForegroundWindow() != foreground)
+            throw new InvalidOperationException("Mouse navigation changed keyboard focus or the chosen click-through mode.");
+        notes.SetClickThrough(false);
     }
 
     private static nint PointParameter(int x, int y) => (nint)((y << 16) | (x & 0xffff));
@@ -187,6 +246,10 @@ internal static class FloatingNotesChecks
     private readonly record struct NativePoint(int X, int Y);
     [DllImport("user32.dll")]
     private static extern nint WindowFromPoint(NativePoint point);
+    [DllImport("user32.dll")]
+    private static extern nint GetWindow(nint hwnd, uint command);
+    [DllImport("user32.dll")]
+    private static extern bool ScreenToClient(nint hwnd, ref NativePoint point);
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
     [DllImport("user32.dll", EntryPoint = "SendMessageW")]

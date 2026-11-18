@@ -4,7 +4,7 @@ namespace Clario_Presenter.Notes;
 
 internal readonly record struct NoteOverlayGeometry(float Width, float Height)
 {
-    internal const float HeaderHeight = 66;
+    internal const float HeaderHeight = 36;
     internal const float FooterHeight = 42;
     internal const float IndexRowHeight = 36;
     internal const int MinimumWidth = 264;
@@ -12,10 +12,12 @@ internal readonly record struct NoteOverlayGeometry(float Width, float Height)
 
     internal Rect Body => new(14, HeaderHeight, Math.Max(1, Width - 42), Math.Max(1, Height - HeaderHeight - FooterHeight));
     internal Rect Track => new(Width - 25, HeaderHeight, 14, Body.Height);
-    internal Rect Previous => new(16, Height - 33, 70, 24);
-    internal Rect Next => new(Width - 86, Height - 33, 70, 24);
-    internal Rect Index => new(90, Height - 33, Math.Max(1, Width - 180), 24);
-    internal Rect Mode => new(Width - 112, 7, 100, 23);
+    private float ButtonWidth => (Width - 32) / 4;
+    private Rect FooterButton(int column) => new(10 + column * (ButtonWidth + 4), Height - 35, ButtonWidth, 27);
+    internal Rect Previous => FooterButton(0);
+    internal Rect Next => FooterButton(1);
+    internal Rect Index => FooterButton(2);
+    internal Rect Mode => FooterButton(3);
 
     internal float ScrollLimit(float contentHeight) => Math.Max(0, contentHeight - (float)Body.Height);
 

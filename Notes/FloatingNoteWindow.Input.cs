@@ -34,7 +34,6 @@ internal sealed partial class FloatingNoteWindow
         }
         if (!_shown) return;
 
-        var page = Math.Max(_fontSize, (float)Geometry.Body.Height * .9f);
         switch (id)
         {
             case 2: SetClickThrough(!ClickThrough); break;
@@ -42,8 +41,8 @@ internal sealed partial class FloatingNoteWindow
             case 4: Go(1); break;
             case 5: ScrollTo(ScrollOffset - _fontSize * 3.5f); break;
             case 6: ScrollTo(ScrollOffset + _fontSize * 3.5f); break;
-            case 7: ScrollTo(ScrollOffset - page); break;
-            case 8: ScrollTo(ScrollOffset + page); break;
+            case 7: ScrollPage(-1); break;
+            case 8: ScrollPage(1); break;
             case 9: ScrollTo(0); break;
             case 10: ScrollTo(_maxScroll); break;
         }
@@ -51,6 +50,25 @@ internal sealed partial class FloatingNoteWindow
 
     private static Point MousePoint(nint value) => new() { X = (short)value, Y = (short)((long)value >> 16) };
     private Windows.Foundation.Point LogicalPoint(Point point) => new(point.X / _scale, point.Y / _scale);
+
+    private void ScrollPage(int direction) =>
+        ScrollTo(ScrollOffset + direction * Math.Max(_fontSize, (float)Geometry.Body.Height * .9f));
+
+    private void ScrollWheel(nint wParam) =>
+        ScrollTo(ScrollOffset - (short)((long)wParam >> 16) / 120f * _fontSize * 3.5f);
+
+    private void ActivateFooter(Windows.Foundation.Point point)
+    {
+        var geometry = Geometry;
+        if (geometry.Previous.Contains(point)) ScrollPage(-1);
+        else if (geometry.Next.Contains(point)) ScrollPage(1);
+        else if (geometry.Index.Contains(point)) ToggleIndex();
+        else if (geometry.Mode.Contains(point))
+        {
+            _indexOpen = false;
+            SetClickThrough(!ClickThrough);
+        }
+    }
 
     private void BeginPointer(nint window, Point location)
     {
@@ -62,9 +80,9 @@ internal sealed partial class FloatingNoteWindow
             _resizeEdges = edges;
             StartPointer(window, location, PointerAction.Resize);
         }
-        else if (geometry.Mode.Contains(point))
+        else if (point.Y >= geometry.Body.Bottom)
         {
-            SetClickThrough(true);
+            ActivateFooter(point);
         }
         else if (_maxScroll > 0 && geometry.Track.Contains(point))
         {
@@ -72,20 +90,6 @@ internal sealed partial class FloatingNoteWindow
             _thumbOffset = thumb.Contains(point) ? (float)(point.Y - thumb.Y) : (float)thumb.Height / 2;
             StartPointer(window, location, PointerAction.Scroll);
             ScrollTo(geometry.ScrollAt(_contentHeight, (float)point.Y - _thumbOffset));
-        }
-        else if (geometry.Index.Contains(point))
-        {
-            ToggleIndex();
-        }
-        else if (geometry.Previous.Contains(point))
-        {
-            if (_indexOpen || _steps.Count == 1) ScrollTo(0);
-            else Go(-1);
-        }
-        else if (geometry.Next.Contains(point))
-        {
-            if (_indexOpen || _steps.Count == 1) ScrollTo(_maxScroll);
-            else Go(1);
         }
         else if (_indexOpen && geometry.Body.Contains(point))
         {
@@ -192,7 +196,7 @@ internal sealed partial class FloatingNoteWindow
             NoteResizeEdge.Top or NoteResizeEdge.Bottom => 32645,
             (NoteResizeEdge.Left | NoteResizeEdge.Top) or (NoteResizeEdge.Right | NoteResizeEdge.Bottom) => 32642,
             (NoteResizeEdge.Right | NoteResizeEdge.Top) or (NoteResizeEdge.Left | NoteResizeEdge.Bottom) => 32643,
-            _ => position.Y < NoteOverlayGeometry.HeaderHeight && !Geometry.Mode.Contains(position) ? 32646 : 32512
+            _ => position.Y < NoteOverlayGeometry.HeaderHeight ? 32646 : 32512
         };
         SetCursor(LoadCursor(0, cursorId));
     }

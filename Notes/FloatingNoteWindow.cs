@@ -16,6 +16,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     private readonly string _className = $"ClarioFloatingNote_{Guid.NewGuid():N}";
     private readonly nint _instance = GetModuleHandle(null);
     private nint _window;
+    private nint _footerInput;
     private bool _shown;
     private bool _requested;
     private DisplayTarget? _placement;
@@ -61,7 +62,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         var windowClass = new WindowClass
         {
             Instance = _instance, ClassName = _className,
-            Procedure = _wndProc, Cursor = LoadCursor(0, 32512)
+            Procedure = _wndProc, Cursor = LoadCursor(0, 32512), Background = 6 // COLOR_WINDOW + 1
         };
         if (RegisterClass(ref windowClass) == 0) throw new Win32Exception();
         _window = CreateWindowEx(BaseStyles, _className, "Catatan mengambang · Clario",
@@ -80,6 +81,16 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             Dispose();
             throw error;
         }
+        // WS_EX_TRANSPARENT passes the entire layered window through, even across processes.
+        // A nearly transparent, owned strip handles just the footer. It never paints note text.
+        _footerInput = CreateWindowEx(BaseStyles, _className, "", 0x80000000, 0, 0, 1, 1, _window, 0, _instance, 0);
+        if (_footerInput == 0 || !SetLayeredWindowAttributes(_footerInput, 0, 1, 2))
+        {
+            var error = new Win32Exception();
+            Dispose();
+            throw error;
+        }
+        SetWindowDisplayAffinity(_footerInput, ExcludeFromCapture);
         ShortcutsAvailable = registerShortcuts && RegisterShortcuts();
     }
 
@@ -93,7 +104,11 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             _indexScroll = 0;
         }
         if (reset) _scroll = 0;
-        if (_shown) Refresh();
+        if (_shown)
+        {
+            Refresh();
+            UpdateInputMode();
+        }
     }
 
     internal void SetAppearance(float opacity, float fontSize, float width, float height)
@@ -167,6 +182,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             if (!SetWindowPos(_window, -1, _bounds.Left, _bounds.Top, _bounds.Width, _bounds.Height, NoActivate | 0x40))
                 throw new Win32Exception();
             _shown = true;
+            UpdateInputMode();
             Status = preferred?.DeviceName == target.DeviceName || preferred is null
                 ? $"Catatan disematkan di Layar {target.Index}."
                 : $"Catatan dipindah ke Layar {target.Index} agar tidak ikut tampil.";
@@ -185,6 +201,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     private void HideWindow()
     {
         _shown = false;
+        if (_footerInput != 0) ShowWindow(_footerInput, 0);
         CancelResizeRender();
         EndPointer(release: true);
         ShowWindow(_window, 0);
@@ -193,24 +210,37 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     internal void SetClickThrough(bool enabled)
     {
         if (_window == 0 || enabled == ClickThrough) return;
-        // GWL_EXSTYLE is a 32-bit value on both x64 and x86.
-        if (SetWindowLong(_window, -20, BaseStyles | (enabled ? Transparent : 0)) == 0
+        ClickThrough = enabled;
+        UpdateInputMode();
+        if (_shown) Refresh();
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private int FooterTop => (int)Math.Floor(_bounds.Height - NoteOverlayGeometry.FooterHeight * _scale);
+
+    private void UpdateInputMode()
+    {
+        var passThrough = ClickThrough && !_indexOpen;
+        if (SetWindowLong(_window, -20, BaseStyles | (passThrough ? Transparent : 0)) == 0
             && Marshal.GetLastWin32Error() != 0)
             throw new Win32Exception();
-        ClickThrough = enabled;
-        if (_shown) Show(_placement);
-        else Changed?.Invoke(this, EventArgs.Empty);
+        if (!_shown || !passThrough)
+            ShowWindow(_footerInput, 0);
+        else if (!SetWindowPos(_footerInput, -1, _bounds.Left, _bounds.Top + FooterTop, _bounds.Width,
+            _bounds.Height - FooterTop, NoActivate | 0x40))
+            throw new Win32Exception();
     }
 
     internal void Go(int direction) => SelectStep(Math.Clamp(_step + direction, 0, _steps.Count - 1));
 
     private void SelectStep(int index)
     {
-        if (_step == index && !_indexOpen) return;
-        if (_step != index) _scroll = 0;
+        if (!_shown) return;
         _step = index;
         _indexOpen = false;
-        if (_shown) Refresh();
+        _scroll = _renderer.SectionTop(index);
+        Refresh();
+        UpdateInputMode();
     }
 
     private void ToggleIndex()
@@ -223,6 +253,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             _indexScroll = Math.Max(0, row - (float)Geometry.Body.Height / 3);
         }
         Refresh();
+        UpdateInputMode();
     }
 
     private void ScrollTo(float offset)
@@ -230,7 +261,11 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         offset = Math.Clamp(offset, 0, _maxScroll);
         if (offset == ScrollOffset) return;
         if (_indexOpen) _indexScroll = offset;
-        else _scroll = offset;
+        else
+        {
+            _scroll = offset;
+            _step = _renderer.SectionAt(offset);
+        }
         Refresh();
     }
 
@@ -251,12 +286,14 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         if (!KeepVisibleIfProtected()) return;
         var device = CanvasDevice.GetSharedDevice();
         var geometry = Geometry;
-        _contentHeight = _indexOpen
-            ? _steps.Count * NoteOverlayGeometry.IndexRowHeight
-            : _renderer.Measure(device, _steps[_step], (float)geometry.Body.Width, _fontSize);
+        var documentHeight = _renderer.Measure(device, _steps, (float)geometry.Body.Width, _fontSize, ref _scroll);
+        _scroll = Math.Clamp(_scroll, 0, geometry.ScrollLimit(documentHeight));
+        var sectionTop = _renderer.SectionTop(_step);
+        if (sectionTop < _scroll || sectionTop >= _scroll + geometry.Body.Height)
+            _step = _renderer.SectionAt(_scroll);
+        _contentHeight = _indexOpen ? _steps.Count * NoteOverlayGeometry.IndexRowHeight : documentHeight;
         _maxScroll = geometry.ScrollLimit(_contentHeight);
         if (_indexOpen) _indexScroll = Math.Clamp(_indexScroll, 0, _maxScroll);
-        else _scroll = Math.Clamp(_scroll, 0, _maxScroll);
 
         if (_renderTarget is null || _renderTarget.SizeInPixels.Width != _bounds.Width
             || _renderTarget.SizeInPixels.Height != _bounds.Height || _renderTarget.Dpi != 96 * _scale
@@ -307,9 +344,26 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     {
         try
         {
+            if (hwnd == _footerInput)
+            {
+                switch (message)
+                {
+                    case 0x21: return 3; // MA_NOACTIVATE
+                    case 0x201 when _shown && ClickThrough && !_indexOpen:
+                        var location = MousePoint(lParam);
+                        location.Y += FooterTop;
+                        ActivateFooter(LogicalPoint(location));
+                        return 0;
+                    case 0x20A when _shown:
+                        ScrollWheel(wParam);
+                        return 0;
+                }
+                return DefWindowProc(hwnd, message, wParam, lParam);
+            }
             switch (message)
             {
                 case 0xF: Paint(hwnd); return 0; // WM_PAINT
+                case 0x14: return 1; // WM_ERASEBKGND: Paint covers the panel, including during resize.
                 case 0x10: Hide(); return 0; // WM_CLOSE: keep shortcuts available.
                 case 0x21: return 3; // MA_NOACTIVATE
                 case 0x7E: // WM_DISPLAYCHANGE
@@ -329,10 +383,10 @@ internal sealed partial class FloatingNoteWindow : IDisposable
                 case 0x113 when wParam == PointerTimer:
                     TrackPointer();
                     return 0;
-                case 0x20 when !ClickThrough && _shown && (short)lParam == 1: // WM_SETCURSOR, HTCLIENT
+                case 0x20 when (!ClickThrough || _indexOpen) && _shown && (short)lParam == 1: // WM_SETCURSOR, HTCLIENT
                     UpdatePointerCursor();
                     return 1;
-                case 0x201 when !ClickThrough && _shown: // WM_LBUTTONDOWN
+                case 0x201 when (!ClickThrough || _indexOpen) && _shown: // WM_LBUTTONDOWN
                     BeginPointer(hwnd, MousePoint(lParam));
                     return 0;
                 case 0x200 when _pointerAction != PointerAction.None: // WM_MOUSEMOVE
@@ -342,8 +396,8 @@ internal sealed partial class FloatingNoteWindow : IDisposable
                     EndPointer(release: true);
                     return 0;
                 case 0x215 when !_trackingPointer: EndPointer(release: false); break; // WM_CAPTURECHANGED
-                case 0x20A when !ClickThrough && _shown: // WM_MOUSEWHEEL
-                    ScrollTo(ScrollOffset - (short)((long)wParam >> 16) / 120f * _fontSize * 3.5f);
+                case 0x20A when (!ClickThrough || _indexOpen) && _shown: // WM_MOUSEWHEEL
+                    ScrollWheel(wParam);
                     return 0;
             }
         }
@@ -364,6 +418,8 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         _renderer.Dispose();
         _renderTarget?.Dispose();
         _pixels = null;
+        if (_footerInput != 0) DestroyWindow(_footerInput);
+        _footerInput = 0;
         DestroyWindow(_window);
         _window = 0;
         UnregisterClass(_className, _instance);

@@ -218,15 +218,13 @@
                                                               ToolTipService.ToolTip="Judul dengan ## menjadi langkah terpisah. Letakkan perintah di blok kode." />
                                                     <ComboBox x:Name="NotesMonitorComboBox" Header="Layar catatan" DisplayMemberPath="ShortDisplayName"
                                                               Style="{StaticResource ClarioPickerStyle}" SelectionChanged="NoteAppearance_Changed" />
-                                                    <ToggleSwitch x:Name="NotesClickThroughToggle" Header="Klik tembus" IsOn="True" OnContent="Klik masuk ke aplikasi di belakang" OffContent="Atur ukuran dan navigasi" Toggled="NoteAppearance_Changed" />
+                                                    <ToggleSwitch x:Name="NotesClickThroughToggle" Header="Klik tembus" IsOn="True" OnContent="Klik isi catatan untuk memakai aplikasi di belakang" OffContent="Geser panel atau tarik tepinya" Toggled="NoteAppearance_Changed" />
                                                     <Slider x:Name="NotesOpacitySlider" Header="Opasitas catatan (%)" Minimum="25" Maximum="100" Value="82" StepFrequency="5" ValueChanged="NoteAppearance_Changed" />
                                                     <Slider x:Name="NotesFontSizeSlider" Header="Ukuran teks" Minimum="12" Maximum="26" Value="16" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
                                                     <Slider x:Name="NotesWidthSlider" Header="Lebar panel" Minimum="264" Maximum="1600" Value="440" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
                                                     <Slider x:Name="NotesHeightSlider" Header="Tinggi panel" Minimum="168" Maximum="1200" Value="360" StepFrequency="1" ValueChanged="NoteAppearance_Changed" />
-                                                    <TextBlock Text="Matikan Klik tembus untuk menarik sisi panel, scrollbar, atau membuka Daftar."
+                                                    <TextBlock Text="Klik Naik atau Turun untuk membaca. Pilih Daftar untuk lompat ke bagian lain. Klik Atur untuk menggeser atau mengubah ukuran panel."
                                                                TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
-                                                    <TextBlock Text="Ctrl+Shift+F8 · tampil atau sembunyi&#xA;Ctrl+Shift+F9 · ubah Klik tembus&#xA;Ctrl+Shift+F10/F11 · pindah bagian&#xA;Ctrl+Shift+↑/↓ · gulir&#xA;Ctrl+Shift+Page Up/Page Down · gulir satu layar&#xA;Ctrl+Shift+Home/End · awal atau akhir"
-                                                               TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource ClarioSecondaryTextBrush}" />
                                                 </StackPanel>
                                             </ScrollViewer>
                                         </Flyout>

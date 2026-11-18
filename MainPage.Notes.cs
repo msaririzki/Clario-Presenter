@@ -161,7 +161,7 @@ public sealed partial class MainPage
         }
         finally { _syncingNotesControls = false; }
         NoteStatusText.Text = _floatingNotes.Status +
-            (_floatingNotes.ShortcutsAvailable ? "" : " Sebagian shortcut tidak tersedia.");
+            (_floatingNotes.ShortcutsAvailable ? "" : " Gunakan tombol di bawah catatan untuk membaca.");
     }
 
     private void FreeNotesTextBox_TextChanged(object sender, RoutedEventArgs args) => QueueNotesUpdate();

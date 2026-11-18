@@ -17,51 +17,106 @@ internal sealed class NoteOverlayRenderer : IDisposable
     private static readonly Color Selection = Color.FromArgb(255, 47, 54, 88);
     private readonly List<BlockLayout> _blocks = [];
     private CanvasDevice? _device;
-    private NoteStep? _step;
+    private IReadOnlyList<NoteStep>? _document;
+    private int[] _firstBlock = [];
+    private float[] _sectionTops = [];
     private float _width;
     private float _textSize;
     private float _contentHeight;
 
-    internal float Measure(CanvasDevice device, NoteStep step, float width, float textSize)
+    internal float Measure(CanvasDevice device, IReadOnlyList<NoteStep> document, float width, float textSize, ref float scroll)
     {
-        if (ReferenceEquals(_device, device) && ReferenceEquals(_step, step) && width == _width && textSize == _textSize)
-            return _contentHeight;
+        var sameDocument = ReferenceEquals(_document, document);
+        var rebuild = !sameDocument || !ReferenceEquals(_device, device) || textSize != _textSize;
+        if (!rebuild && width == _width) return _contentHeight;
 
-        Dispose();
-        foreach (var block in step.Blocks)
+        // Remember the text at the top, even when a single paragraph wraps across many screens.
+        var anchor = sameDocument && scroll > 0 ? FirstVisibleBlock(scroll) : -1;
+        var character = 0;
+        var lineOffset = 0f;
+        if (anchor >= 0 && anchor < _blocks.Count)
         {
-            var content = string.Concat(block.Runs.Select(run => run.Text));
-            if (content.Length == 0) continue;
+            var block = _blocks[anchor];
+            var y = scroll - block.Top - (block.IsCode ? 9 : 0);
+            block.Layout.HitTest(0, Math.Max(0, y), out var region);
+            character = region.CharacterIndex;
+            lineOffset = y - (float)region.LayoutBounds.Y;
+        }
 
-            var code = block.Kind == NoteBlockKind.Code;
-            using var format = new CanvasTextFormat
+        if (rebuild)
+        {
+            Dispose();
+            _firstBlock = new int[document.Count];
+            _sectionTops = new float[document.Count];
+            for (var i = 0; i < document.Count; i++)
             {
-                FontFamily = code ? CodeFont : BodyFont,
-                FontSize = block.Kind == NoteBlockKind.Heading ? textSize + 1 : textSize,
-                FontWeight = new Windows.UI.Text.FontWeight { Weight = block.Kind == NoteBlockKind.Heading ? (ushort)600 : (ushort)400 },
-                WordWrapping = CanvasWordWrapping.Wrap
-            };
-            var layout = new CanvasTextLayout(device, content, format, Math.Max(1, width - (code ? 20 : 0)), 0);
-            var top = _contentHeight;
-            _blocks.Add(new(layout, code, top, 0));
-            var offset = 0;
-            foreach (var run in block.Runs)
-            {
-                if (run.Text.Length == 0) continue;
-                if (run.Bold) layout.SetFontWeight(offset, run.Text.Length, new Windows.UI.Text.FontWeight { Weight = 700 });
-                if (!code && run.Monospace) layout.SetFontFamily(offset, run.Text.Length, CodeFont);
-                offset += run.Text.Length;
+                var section = document[i];
+                _firstBlock[i] = _blocks.Count;
+                if (document.Count > 1 || section.Title != "Catatan")
+                    AddBlock(device, new(NoteBlockKind.Heading, [new(section.Title)]), width, textSize);
+                foreach (var block in section.Blocks) AddBlock(device, block, width, textSize);
             }
-            var height = (float)Math.Ceiling(layout.LayoutBoundsIncludingTrailingWhitespace.Height) + (code ? 18 : 0);
-            _blocks[^1] = new(layout, code, top, height);
-            _contentHeight = top + height + BlockGap;
+        }
+
+        _contentHeight = 0;
+        for (var i = 0; i < _blocks.Count; i++)
+        {
+            var block = _blocks[i];
+            if (!rebuild)
+                block.Layout.RequestedSize = new Size(Math.Max(1, width - (block.IsCode ? 20 : 0)), 0);
+            var height = (float)Math.Ceiling(block.Layout.LayoutBoundsIncludingTrailingWhitespace.Height)
+                + (block.IsCode ? 18 : 0);
+            _blocks[i] = block with { Top = _contentHeight, Height = height };
+            _contentHeight += height + BlockGap;
+        }
+        if (_blocks.Count > 0) _contentHeight -= BlockGap;
+        for (var i = 0; i < _sectionTops.Length; i++)
+            _sectionTops[i] = _firstBlock[i] < _blocks.Count ? _blocks[_firstBlock[i]].Top : _contentHeight;
+
+        if (anchor >= 0 && anchor < _blocks.Count)
+        {
+            var block = _blocks[anchor];
+            block.Layout.GetCaretPosition(character, false, out var region);
+            scroll = block.Top + (block.IsCode ? 9 : 0) + (float)region.LayoutBounds.Y + lineOffset;
         }
 
         _device = device;
-        _step = step;
+        _document = document;
         _width = width;
         _textSize = textSize;
         return _contentHeight;
+    }
+
+    internal float SectionTop(int section) => _sectionTops[section];
+
+    internal int SectionAt(float scroll)
+    {
+        var found = Array.BinarySearch(_sectionTops, scroll);
+        return found >= 0 ? found : Math.Max(0, ~found - 1);
+    }
+
+    private void AddBlock(CanvasDevice device, NoteBlock block, float width, float textSize)
+    {
+        var content = string.Concat(block.Runs.Select(run => run.Text));
+        if (content.Length == 0) return;
+        var code = block.Kind == NoteBlockKind.Code;
+        using var format = new CanvasTextFormat
+        {
+            FontFamily = code ? CodeFont : BodyFont,
+            FontSize = block.Kind == NoteBlockKind.Heading ? textSize + 2 : textSize,
+            FontWeight = new Windows.UI.Text.FontWeight { Weight = block.Kind == NoteBlockKind.Heading ? (ushort)600 : (ushort)400 },
+            WordWrapping = CanvasWordWrapping.Wrap
+        };
+        var layout = new CanvasTextLayout(device, content, format, Math.Max(1, width - (code ? 20 : 0)), 0);
+        _blocks.Add(new(layout, code, 0, 0));
+        var offset = 0;
+        foreach (var run in block.Runs)
+        {
+            if (run.Text.Length == 0) continue;
+            if (run.Bold) layout.SetFontWeight(offset, run.Text.Length, new Windows.UI.Text.FontWeight { Weight = 700 });
+            if (!code && run.Monospace) layout.SetFontFamily(offset, run.Text.Length, CodeFont);
+            offset += run.Text.Length;
+        }
     }
 
     internal void Draw(CanvasDrawingSession session, NoteOverlayGeometry geometry, IReadOnlyList<NoteStep> steps,
@@ -87,22 +142,17 @@ internal sealed class NoteOverlayRenderer : IDisposable
             session.FillRoundedRectangle((float)thumb.X + 3, (float)thumb.Y, 8, (float)thumb.Height, 4, 4, Muted);
         }
 
-        DrawLine(session, $"BAGIAN {index + 1}/{steps.Count}", new Rect(14, 8, Math.Max(1, geometry.Width - 127), 22), 11, Muted);
-        DrawButton(session, clickThrough ? "Klik tembus" : "Aktifkan tembus", geometry.Mode, true);
-        DrawLine(session, indexOpen ? "Daftar bagian" : steps[index].Title,
-            new Rect(14, 31, Math.Max(1, geometry.Width - 28), 28), 19, White);
-        session.DrawLine(14, geometry.Height - NoteOverlayGeometry.FooterHeight,
-            geometry.Width - 14, geometry.Height - NoteOverlayGeometry.FooterHeight, Outline);
-
-        var sectionNavigation = steps.Count > 1 && !indexOpen;
-        DrawButton(session, sectionNavigation ? "‹ Sebelum" : "Awal", geometry.Previous,
-            sectionNavigation ? index > 0 : scroll > 0);
-        DrawButton(session, sectionNavigation ? "Lanjut ›" : "Akhir", geometry.Next,
-            sectionNavigation ? index + 1 < steps.Count : scroll < maxScroll);
+        DrawLine(session, indexOpen ? "Daftar bagian" : "Catatan", new Rect(14, 4, geometry.Width / 2, 27), 15, White);
+        if (steps.Count > 1)
+            DrawLine(session, $"Bagian {index + 1}/{steps.Count}", new Rect(geometry.Width / 2, 4, geometry.Width / 2 - 14, 27),
+                12, Muted, alignment: CanvasHorizontalAlignment.Right);
+        session.DrawLine(10, geometry.Height - NoteOverlayGeometry.FooterHeight,
+            geometry.Width - 10, geometry.Height - NoteOverlayGeometry.FooterHeight, Outline);
+        DrawButton(session, "↑ Naik", geometry.Previous, scroll > 0);
+        DrawButton(session, "↓ Turun", geometry.Next, scroll < maxScroll);
         if (steps.Count > 1)
             DrawButton(session, indexOpen ? "Kembali" : "Daftar", geometry.Index, true);
-        else if (maxScroll > 0)
-            DrawLine(session, $"{Math.Round(scroll * 100 / maxScroll)}%", geometry.Index, 12, Muted, centered: true);
+        DrawButton(session, clickThrough ? "Atur" : "Selesai", geometry.Mode, true);
 
         if (!clickThrough)
         {
@@ -119,6 +169,18 @@ internal sealed class NoteOverlayRenderer : IDisposable
     {
         // Blocks below the viewport need no drawing. Reuse the measured layouts while scrolling.
         var bottom = scroll + body.Height;
+        for (var index = FirstVisibleBlock(scroll); index < _blocks.Count && _blocks[index].Top < bottom; index++)
+        {
+            var block = _blocks[index];
+            var y = (float)body.Y + block.Top - scroll;
+            if (block.IsCode)
+                session.FillRoundedRectangle((float)body.X, y, (float)body.Width, block.Height, 5, 5, Surface);
+            session.DrawTextLayout(block.Layout, (float)body.X + (block.IsCode ? 10 : 0), y + (block.IsCode ? 9 : 0), White);
+        }
+    }
+
+    private int FirstVisibleBlock(float scroll)
+    {
         var low = 0;
         var high = _blocks.Count;
         while (low < high)
@@ -129,14 +191,7 @@ internal sealed class NoteOverlayRenderer : IDisposable
             else high = middle;
         }
 
-        for (var index = low; index < _blocks.Count && _blocks[index].Top < bottom; index++)
-        {
-            var block = _blocks[index];
-            var y = (float)body.Y + block.Top - scroll;
-            if (block.IsCode)
-                session.FillRoundedRectangle((float)body.X, y, (float)body.Width, block.Height, 5, 5, Surface);
-            session.DrawTextLayout(block.Layout, (float)body.X + (block.IsCode ? 10 : 0), y + (block.IsCode ? 9 : 0), White);
-        }
+        return low;
     }
 
     private static void DrawIndex(CanvasDrawingSession session, Rect body, IReadOnlyList<NoteStep> steps,
@@ -158,16 +213,16 @@ internal sealed class NoteOverlayRenderer : IDisposable
     private static void DrawButton(CanvasDrawingSession session, string label, Rect rect, bool enabled)
     {
         session.FillRoundedRectangle(rect, 5, 5, Surface);
-        DrawLine(session, label, rect, 12, enabled ? White : Outline, centered: true);
+        DrawLine(session, label, rect, 12, enabled ? White : Outline, alignment: CanvasHorizontalAlignment.Center);
     }
 
-    private static void DrawLine(CanvasDrawingSession session, string text, Rect rect, float size, Color color, bool centered = false)
+    private static void DrawLine(CanvasDrawingSession session, string text, Rect rect, float size, Color color, CanvasHorizontalAlignment alignment = CanvasHorizontalAlignment.Left)
     {
         using var format = new CanvasTextFormat
         {
             FontFamily = BodyFont,
             FontSize = size,
-            HorizontalAlignment = centered ? CanvasHorizontalAlignment.Center : CanvasHorizontalAlignment.Left,
+            HorizontalAlignment = alignment,
             VerticalAlignment = CanvasVerticalAlignment.Center,
             WordWrapping = CanvasWordWrapping.NoWrap,
             TrimmingGranularity = CanvasTextTrimmingGranularity.Character,
@@ -180,7 +235,7 @@ internal sealed class NoteOverlayRenderer : IDisposable
     {
         foreach (var block in _blocks) block.Layout.Dispose();
         _blocks.Clear();
-        _step = null;
+        _document = null;
         _device = null;
         _contentHeight = 0;
     }

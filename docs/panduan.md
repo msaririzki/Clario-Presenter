@@ -13,7 +13,7 @@ Clario dapat dipasang di PC Intel atau AMD 64-bit dengan Windows 10 versi 2004 (
 <details>
 <summary>Mengapa Windows menampilkan peringatan SmartScreen?</summary>
 
-Installer v1.0.1 belum ditandatangani dengan sertifikat penerbit. Untuk memeriksa apakah file Anda sama dengan yang diterbitkan di GitHub, buka PowerShell di folder unduhan dan jalankan perintah berikut. Cocokkan hasilnya dengan kode dalam file `SHA256SUMS.txt` dari rilis yang sama.
+Installer belum ditandatangani dengan sertifikat penerbit. Untuk memeriksa apakah file Anda sama dengan yang diterbitkan di GitHub, buka PowerShell di folder unduhan dan jalankan perintah berikut. Cocokkan hasilnya dengan kode dalam file `SHA256SUMS.txt` dari rilis yang sama.
 
 ```powershell
 Get-FileHash .\Clario-Presenter-Setup-x64.exe -Algorithm SHA256
@@ -52,7 +52,14 @@ Saat Anda membuka jendela yang disembunyikan, Clario tetap menampilkan materi di
 
 Buka **Catatan** untuk mengetik atau menempelkan naskah. Untuk naskah yang sudah disiapkan, klik **Buka file**. Clario menerima file teks (`.txt`) dan Markdown (`.md` atau `.markdown`) hingga 200.000 karakter. Untuk catatan yang disiapkan sendiri atau dengan bantuan AI, simpan sebagai Markdown UTF-8 dan awali tiap langkah dengan judul seperti `## 1. Periksa router`. Tombol **Daftar** di panel melayang bisa langsung membuka langkah yang dipilih.
 
-Klik **Sematkan** agar naskah tetap terlihat di atas aplikasi. Di **Atur catatan**, Anda bisa mengganti ukuran panel, ukuran tulisan, dan tingkat transparansi. Aktifkan **Klik tembus** untuk mengeklik aplikasi di belakang catatan. Tekan **Ctrl+Shift+F9** untuk mematikannya saat ingin menggeser panel, menarik sudutnya, atau memilih bagian dengan mouse.
+Klik **Sematkan** agar naskah terlihat di atas aplikasi. Semua bagian tersambung seperti satu dokumen. Saat panel diperlebar, lebih banyak kata muat di tiap baris. Saat panel ditinggikan, baris dan bagian berikutnya langsung terlihat.
+
+- **Untuk membaca**, klik **↓ Turun** atau **↑ Naik** di bawah catatan. Arahkan penunjuk ke bilah tombol lalu gulir roda mouse untuk bergerak sedikit demi sedikit. Dengan **Klik tembus** aktif, Anda tetap bisa mengeklik dan mengetik di jendela router di balik teks.
+- **Untuk memilih langkah tertentu**, klik **Daftar**, lalu klik judulnya. Tombol ini muncul jika naskah memiliki beberapa bagian.
+- **Untuk memindahkan atau memperbesar panel**, klik **Atur**. Seret judul untuk memindahkan panel, atau tarik tepi dan sudutnya untuk mengubah ukuran. Klik **Selesai** untuk kembali mengoperasikan aplikasi di belakang teks. Ukuran huruf dan transparansi tersedia di **Atur catatan**.
+
+<details>
+<summary>Pintasan keyboard (opsional)</summary>
 
 | Pintasan | Fungsi pada catatan |
 | --- | --- |
@@ -61,7 +68,9 @@ Klik **Sematkan** agar naskah tetap terlihat di atas aplikasi. Di **Atur catatan
 | **Ctrl+Shift+F10 / F11** | Bagian sebelumnya / berikutnya |
 | **Ctrl+Shift+↑ / ↓** | Gulir sedikit ke atas / bawah |
 | **Ctrl+Shift+Page Up / Page Down** | Gulir hampir satu halaman |
-| **Ctrl+Shift+Home / End** | Lompat ke awal / akhir bagian |
+| **Ctrl+Shift+Home / End** | Lompat ke awal / akhir naskah atau daftar yang sedang terbuka |
+
+</details>
 
 Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Jika pemeriksaan gagal, Clario mencoba memindahkan panel ke monitor lain yang aman atau menyembunyikannya. Jika Anda menggunakan perekam lain, periksa hasilnya dengan rekaman singkat di aplikasi tersebut.
 
