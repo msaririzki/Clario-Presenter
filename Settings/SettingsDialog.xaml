@@ -319,13 +319,15 @@
                                                      Foreground="{StaticResource ClarioLiveBrush}" AutomationProperties.Name="Level mikrofon" />
                                         <TextBlock x:Name="MicrophoneLevelStatus" Style="{StaticResource SettingsHint}" />
                                     </StackPanel>
-                                    <ComboBox Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" x:Name="MicrophoneProfilePicker"
+                                    <ComboBox Grid.Row="1" Margin="0,10,0,0" x:Name="MicrophoneProfilePicker"
                                               Header="Profil suara mikrofon" Style="{StaticResource ClarioPickerStyle}"
                                               SelectionChanged="AudioDevice_SelectionChanged">
                                         <ComboBoxItem Content="Narasi (Windows)" />
                                         <ComboBoxItem Content="Standar perangkat" />
                                         <ComboBoxItem Content="Narasi hangat" />
                                     </ComboBox>
+                                    <ToggleSwitch x:Name="FanNoiseToggle" Grid.Row="1" Grid.Column="1" Header="Redam suara kipas"
+                                                  Margin="0,10,0,0" Style="{StaticResource SettingsSwitch}" Toggled="AudioSource_Changed" />
                                 </Grid>
                             </StackPanel>
                         </Border>

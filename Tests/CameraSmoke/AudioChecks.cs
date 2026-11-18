@@ -173,6 +173,30 @@ internal static class AudioChecks
         voice.Process(stereo, 1);
         if (stereo.Any(sample => sample != 0)) throw new InvalidOperationException("Filter history survived a reset.");
         var accumulated = 0;
+        using (var reducer = new FanNoiseReducer())
+        {
+            // Exercise the native dependency, partial packets, stereo and a privacy boundary.
+            var random = new Random(43);
+            var fan = new short[48000 * 2];
+            for (int i = 0; i < fan.Length; i++) fan[i] = (short)random.Next(-5500, 5501);
+            double Energy(short[] pcm) => pcm.Skip(pcm.Length / 2).Average(x => (double)x * x);
+            var before = Energy(fan);
+            for (int n = 0; n < fan.Length; n += 640)
+                reducer.Process(fan.AsSpan(n, Math.Min(640, fan.Length - n)), 2);
+            if (Energy(fan) > before / 4) throw new InvalidOperationException("Stationary noise was not attenuated.");
+            reducer.Reset();
+            Array.Clear(fan);
+            reducer.Process(fan.AsSpan(0, 4800), 1);
+            if (fan.Any(x => x != 0)) throw new InvalidOperationException("Private audio survived a reducer reset.");
+        }
+        var roomTone = Enumerable.Repeat((short)35, 480).ToArray();
+        roomTone[123] = 350;
+        AudioLevelMonitor.Accumulate(ref accumulated, roomTone, microphone: true);
+        if (accumulated != 0) throw new InvalidOperationException("Quiet microphone noise moved the RMS meter.");
+        roomTone[123] = short.MinValue;
+        AudioLevelMonitor.Accumulate(ref accumulated, roomTone, microphone: true);
+        if (accumulated != 32768) throw new InvalidOperationException("Lost a clipping warning.");
+        accumulated = 0;
         AudioLevelMonitor.Accumulate(ref accumulated, [0, -1024]);
         AudioLevelMonitor.Accumulate(ref accumulated, [512, 127]);
         if (accumulated != 1024) throw new InvalidOperationException("Lost the highest audio level between UI updates.");

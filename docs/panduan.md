@@ -83,6 +83,8 @@ Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Ji
 
 **Untuk memilih suara**, buka **Pengaturan → Audio**. Suara komputer dan mikrofon sama-sama mati saat pertama dipasang.
 
+Jika dengung kipas ikut terdengar, aktifkan **Redam suara kipas** di bagian **Mikrofon**. Clario meredam suara latar sebelum menghitung level mikrofon dan menyimpannya ke video. Meter membaca kekuatan rata-rata suara dalam potongan pendek dan tetap memberi peringatan saat puncaknya mendekati batas.
+
 | Suara yang diinginkan | Yang perlu diaktifkan |
 | --- | --- |
 | Hanya suara Anda | Aktifkan **Mikrofon**. Pilih mikrofon laptop, USB, atau mixer yang muncul di daftar. |

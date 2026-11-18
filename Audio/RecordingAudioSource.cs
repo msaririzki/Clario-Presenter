@@ -6,7 +6,7 @@ namespace Clario_Presenter.Audio;
 public sealed record RecordingAudioOptions(
     bool ComputerAudioEnabled = false, string PlaybackDeviceId = "",
     bool MicrophoneEnabled = false, string MicrophoneDeviceId = "", bool MicrophoneSpeechProfile = true,
-    bool WarmNarration = false)
+    bool WarmNarration = false, bool ReduceFanNoise = false)
 {
     public bool Enabled => ComputerAudioEnabled || MicrophoneEnabled;
 }
@@ -80,6 +80,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         short[] pcm = [];
         var clock = new CapturePacketClock();
         var voice = !track.Loopback && options.WarmNarration ? new WarmVoiceProcessor() : null;
+        using var noise = !track.Loopback && options.ReduceFanNoise && FanNoiseReducer.Supported ? new FanNoiseReducer() : null;
         try
         {
             // An idle loopback endpoint need not deliver packets. A microphone
@@ -101,15 +102,21 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     if (muted() || data == 0 || (flags & Wasapi.Silent) != 0)
                     {
                         voice?.Reset();
+                        noise?.Reset();
                         track.PacketReceived(frames);
                         return;
                     }
-                    if ((flags & Wasapi.Discontinuity) != 0) voice?.Reset();
+                    if ((flags & Wasapi.Discontinuity) != 0)
+                    {
+                        voice?.Reset();
+                        noise?.Reset();
+                    }
                     var count = frames * channels;
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
                     Marshal.Copy(data, pcm, 0, count);
+                    noise?.Process(pcm.AsSpan(0, count), channels);
                     voice?.Process(pcm.AsSpan(0, count), channels);
-                    if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count));
+                    if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count), !track.Loopback);
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
                     track.PacketReceived(frames);
                 }, token, options.MicrophoneSpeechProfile && !options.WarmNarration);

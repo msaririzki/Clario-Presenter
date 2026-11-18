@@ -12,17 +12,19 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
     private volatile bool _isReady;
     private volatile string? _error;
 
-    internal AudioLevelMonitor(string deviceId, bool loopback, bool speechProfile = false, bool warmNarration = false)
+    internal AudioLevelMonitor(string deviceId, bool loopback, bool speechProfile = false, bool warmNarration = false, bool reduceFanNoise = false)
     {
         DeviceId = deviceId;
         SpeechProfile = speechProfile;
         WarmNarration = !loopback && warmNarration;
+        ReduceFanNoise = !loopback && reduceFanNoise && FanNoiseReducer.Supported;
         _worker = Task.Run(() => ReadLevels(loopback, _stop.Token));
     }
 
     internal string DeviceId { get; }
     internal bool SpeechProfile { get; }
     internal bool WarmNarration { get; }
+    internal bool ReduceFanNoise { get; }
     internal bool HasStopped => _worker.IsCompleted;
 
     internal AudioLevelReading TakeReading() => new(_isReady, Interlocked.Exchange(ref _peak, 0), _error);
@@ -31,6 +33,7 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
     {
         short[] samples = [];
         var voice = WarmNarration ? new WarmVoiceProcessor() : null;
+        using var noise = ReduceFanNoise ? new FanNoiseReducer() : null;
         try
         {
             // Use the same endpoint and PCM format as the recorder. The meter
@@ -40,14 +43,20 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
                 if (data == nint.Zero || (flags & Wasapi.Silent) != 0)
                 {
                     voice?.Reset();
+                    noise?.Reset();
                     return;
                 }
-                if ((flags & Wasapi.Discontinuity) != 0) voice?.Reset();
+                if ((flags & Wasapi.Discontinuity) != 0)
+                {
+                    voice?.Reset();
+                    noise?.Reset();
+                }
                 var count = checked(frames * channels);
                 if (samples.Length < count) Array.Resize(ref samples, count);
                 Marshal.Copy(data, samples, 0, count);
+                noise?.Process(samples.AsSpan(0, count), channels);
                 voice?.Process(samples.AsSpan(0, count), channels);
-                Accumulate(ref _peak, samples.AsSpan(0, count));
+                Accumulate(ref _peak, samples.AsSpan(0, count), !loopback);
             }, token, SpeechProfile && !WarmNarration);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -60,9 +69,16 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
         }
     }
 
-    internal static void Accumulate(ref int accumulator, ReadOnlySpan<short> samples)
+    internal static void Accumulate(ref int accumulator, ReadOnlySpan<short> samples, bool microphone = false)
     {
         var peak = PeakOf(samples);
+        if (microphone && peak < 29204 && samples.Length > 0) // retain near-clipping warnings
+        {
+            long energy = 0;
+            foreach (var sample in samples) energy += sample * sample;
+            peak = (int)Math.Sqrt((double)energy / samples.Length);
+            if (peak < 65) peak = 0; // below -54 dBFS RMS: idle on the meter
+        }
         int previous;
         do
         {

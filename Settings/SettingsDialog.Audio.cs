@@ -20,6 +20,8 @@ public sealed partial class SettingsDialog
     {
         ComputerAudioToggle.IsOn = settings.ComputerAudioEnabled;
         MicrophoneAudioToggle.IsOn = settings.MicrophoneEnabled;
+        FanNoiseToggle.IsOn = settings.ReduceFanNoise && FanNoiseReducer.Supported;
+        FanNoiseToggle.Visibility = FanNoiseReducer.Supported ? Visibility.Visible : Visibility.Collapsed;
         MicrophoneProfilePicker.SelectedIndex = settings.WarmNarration ? 2 : settings.MicrophoneSpeechProfile ? 0 : 1;
         UpdateAudioOptions();
         _audioMeterTimer.Tick += AudioMeterTimer_Tick;
@@ -109,12 +111,13 @@ public sealed partial class SettingsDialog
         var speech = !loopback && MicrophoneProfilePicker.SelectedIndex != 1;
         var warm = !loopback && MicrophoneProfilePicker.SelectedIndex == 2;
         if (monitor is { HasStopped: false } && desired?.EndpointId == monitor.DeviceId
-            && monitor.SpeechProfile == speech && monitor.WarmNarration == warm) return monitor;
+            && monitor.SpeechProfile == speech && monitor.WarmNarration == warm
+            && monitor.ReduceFanNoise == (!loopback && FanNoiseToggle.IsOn)) return monitor;
         if (monitor is not null) await monitor.DisposeAsync();
         bar.Value = 0;
         return DesiredAudioDevice(toggle, picker) is { } next
             ? new AudioLevelMonitor(next.EndpointId, loopback, !loopback && MicrophoneProfilePicker.SelectedIndex != 1,
-                !loopback && MicrophoneProfilePicker.SelectedIndex == 2) : null;
+                !loopback && MicrophoneProfilePicker.SelectedIndex == 2, !loopback && FanNoiseToggle.IsOn) : null;
     }
 
     private AudioDevice? DesiredAudioDevice(ToggleSwitch toggle, ComboBox picker) =>
