@@ -27,7 +27,7 @@ Pada jendela lebar, mode dan sumber berada dalam satu baris di kiri, sedangkan a
 - **Freeze** dan **Privasi** muncul di bilah sesi. Saat Freeze aktif, beri aksi **Lanjutkan tampilan**. Saat Privasi aktif, pertahankan indikator dan label yang jelas, dengan aksi **Matikan privasi**. Selama video berjalan, status seperti **Sedang merekam · Privasi aktif** menjelaskan bahwa video masih berlangsung.
 - Dalam Presentasi, tombol sekunder **Rekam** memulai video. **Stop rekam** menyimpan video sambil meneruskan presentasi. **Stop presentasi** mengakhiri sesi dan menyelesaikan video yang sedang disimpan.
 - Sediakan satu area umpan balik untuk kondisi **Menyiapkan…**, **Menyimpan…**, **Rekaman tersimpan**, dan kegagalan. Setelah tersimpan, tampilkan nama file dan aksi **Buka folder**. Saat simpan gagal, tampilkan penyebab dan tindakan yang sesuai dengan kondisi file.
-- Pada rekaman layar yang mengecilkan Clario, tampilkan petunjuk singkat sebelum mulai bahwa tombol **Stop rekam** dapat diakses dengan membuka Clario dari taskbar.
+- Biarkan jendela terbuka saat rekaman dimulai. Jeda preview saat pengguna mengecilkan Clario dan lanjutkan saat jendela dibuka kembali.
 
 ## Pemilih, panel, dan pengaturan
 

@@ -40,21 +40,38 @@ public sealed partial class MainPage
         var visible = window.IsVisible && window.Presenter is not OverlappedPresenter { State: OverlappedPresenterState.Minimized };
         if (_studioWindowVisible == visible) return;
         _studioWindowVisible = visible;
-        if (!visible)
-        {
-            _recordingPreviewOpen = false;
-            if (_isRecordingOnlySession && _isLive && _recorder is null && !_sessionTransition && !_settingsDialogOpen)
-            {
-                StopPresentation();
-                return;
-            }
-        }
-        if (_isLoaded) UpdateSessionActions();
         _ = SyncStudioPreviewAsync();
         if (visible && _isLive)
         {
             UpdatePreview();
             LivePreviewCanvas.Invalidate();
+        }
+    }
+
+    // Capture is shared with the encoder and audience display. Only a standalone
+    // preview can release the Windows capture sessions while the window is hidden.
+    private bool _previewCaptureSuspended;
+
+    private void SyncPreviewCapture()
+    {
+        if (!_isLoaded || !_isLive || !_isRecordingOnlySession || _sessionTransition || _capture is null) return;
+        var suspend = !_studioWindowVisible && _recorder is null;
+        if (suspend == _previewCaptureSuspended) return;
+        _previewCaptureSuspended = suspend;
+        if (suspend)
+        {
+            _privacyWatchTimer.Stop();
+            _capture.SuspendPreview();
+            return;
+        }
+        try
+        {
+            _capture.ResumePreview();
+            if (_isSafeMirrorSession) _privacyWatchTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            HandleSourceLost(ex.Message);
         }
     }
 
@@ -67,6 +84,7 @@ public sealed partial class MainPage
 
     private Task SyncStudioPreviewAsync()
     {
+        SyncPreviewCapture();
         var show = ShowStudioInputs;
         StudioMeters.Visibility = _isLive && !RecordingPreviewHidden ? Visibility.Visible : Visibility.Collapsed;
         _recorder?.SetPreviewMeters(show);

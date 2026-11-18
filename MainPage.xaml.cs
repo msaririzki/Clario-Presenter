@@ -296,7 +296,7 @@ public sealed partial class MainPage : Page
         if (!IsRecordingOnly)
         {
             if (_isLive) await StopSessionAsync();
-            else if (TryStartSession()) MinimizeForScreenSession();
+            else TryStartSession();
             return;
         }
 
@@ -307,13 +307,9 @@ public sealed partial class MainPage : Page
         }
 
         var startedCapture = !_isLive;
-        if (await RunRecordingChangeAsync(async () =>
-            (!startedCapture || TryStartSession()) && await StartRecordingAsync(), "Menyiapkan rekaman…"))
-        {
-            if (_displays.Count == 1 || _isSafeMirrorSession)
-                (App.MainWindow as MainWindow)?.MinimizeForPresentation();
-        }
-        else if (startedCapture && _isLive)
+        var started = await RunRecordingChangeAsync(async () =>
+            (!startedCapture || TryStartSession()) && await StartRecordingAsync(), "Menyiapkan rekaman…");
+        if (!started && startedCapture && _isLive)
         {
             var status = FooterStatusText.Text;
             StopPresentation();
@@ -383,12 +379,6 @@ public sealed partial class MainPage : Page
         SetNotesVisible(false);
         UpdateCaptureModeUi();
         return true;
-    }
-
-    private void MinimizeForScreenSession()
-    {
-        if (!_isSafeMirrorSession || App.MainWindow is not MainWindow window) return;
-        window.MinimizeForPresentation();
     }
 
     private async Task StopSessionAsync()
@@ -575,7 +565,7 @@ public sealed partial class MainPage : Page
     private async Task<bool> StartRecordingAsync()
     {
         if (!_isLive || _capture is null) return false;
-        _recordingPreviewOpen = false;
+        _recordingPreviewOpen = true;
         StorageFile? pendingFile = null;
         var pendingFileWasAutoCreated = false;
         try
@@ -805,6 +795,7 @@ public sealed partial class MainPage : Page
         _privacyWatchTimer.Stop();
         _windowRescueTimer.Stop();
         _isLive = false;
+        _previewCaptureSuspended = false;
         _isFrozen = false;
         _isPrivacy = false;
         _isAutoHeld = false;
@@ -1055,7 +1046,7 @@ public sealed partial class MainPage : Page
             default:
                 FooterStatusText.Text = IsRecordingOnly
                     ? IsSafeMirrorMode
-                        ? "Saat merekam layar, buka kembali Clario dari taskbar untuk berhenti."
+                        ? "Pilih layar, lalu klik Mulai rekam."
                         : "Pilih jendela aplikasi, lalu klik Mulai rekam."
                     : "Pilih sumber dan layar audiens, lalu klik Mulai presentasi.";
                 break;

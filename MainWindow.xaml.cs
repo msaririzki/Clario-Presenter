@@ -42,11 +42,6 @@ public sealed partial class MainWindow : Window
     [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
 
-    public void MinimizeForPresentation()
-    {
-        if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter) presenter.Minimize();
-    }
-
     public void SetSessionStatus(string label, Microsoft.UI.Xaml.Media.Brush brush)
     {
         TitleStatusText.Text = label;

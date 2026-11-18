@@ -16,6 +16,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     private GraphicsCaptureItem? _item;
     private Direct3D11CaptureFramePool? _framePool;
     private GraphicsCaptureSession? _session;
+    private bool _captureCursor;
     private CanvasRenderTarget? _frontBuffer;
     private CanvasRenderTarget? _backBuffer;
     private CanvasRenderTarget? _taskbarFrontBuffer;
@@ -216,13 +217,19 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         StopCaptureObjects(keepLastFrame);
 
         _item = captureItem;
-        if (_item.Size.Width <= 0 || _item.Size.Height <= 0)
+        _captureCursor = captureCursor;
+        _item.Closed += Item_Closed;
+        StartFramePool(_item);
+    }
+
+    private void StartFramePool(GraphicsCaptureItem item)
+    {
+        if (item.Size.Width <= 0 || item.Size.Height <= 0)
         {
             throw new InvalidOperationException("Aplikasi belum dapat ditampilkan. Buka kembali jendelanya, lalu coba lagi.");
         }
 
-        _lastSize = _item.Size;
-        _item.Closed += Item_Closed;
+        _lastSize = item.Size;
         // Create on the UI dispatcher so Win2D capture copies and CanvasControl
         // rendering stay serialized on the same device thread.
         _framePool = Direct3D11CaptureFramePool.Create(
@@ -231,8 +238,8 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
             2,
             _lastSize);
         _framePool.FrameArrived += FramePool_FrameArrived;
-        _session = _framePool.CreateCaptureSession(_item);
-        _session.IsCursorCaptureEnabled = captureCursor;
+        _session = _framePool.CreateCaptureSession(item);
+        _session.IsCursorCaptureEnabled = _captureCursor;
         _session.StartCapture();
     }
 
@@ -472,17 +479,42 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         return newBack;
     }
 
+    internal void SuspendPreview()
+    {
+        foreach (var layer in _layerCache.Values) layer.Capture.SuspendPreview();
+        lock (_captureLock) ReleaseFramePool();
+    }
+
+    internal void ResumePreview()
+    {
+        lock (_captureLock)
+        {
+            if (_item is not null && _framePool is null) StartFramePool(_item);
+        }
+        foreach (var layer in _layerCache.Values)
+        {
+            if (layer.Faulted) continue;
+            try { layer.Capture.ResumePreview(); }
+            catch { layer.Faulted = true; }
+        }
+    }
+
+    private void ReleaseFramePool()
+    {
+        if (_framePool is not null) _framePool.FrameArrived -= FramePool_FrameArrived;
+
+        _session?.Dispose();
+        _framePool?.Dispose();
+        _session = null;
+        _framePool = null;
+    }
+
     private void StopCaptureObjects(bool keepLastFrame)
     {
         lock (_captureLock)
         {
             if (_item is not null) _item.Closed -= Item_Closed;
-            if (_framePool is not null) _framePool.FrameArrived -= FramePool_FrameArrived;
-
-            _session?.Dispose();
-            _framePool?.Dispose();
-            _session = null;
-            _framePool = null;
+            ReleaseFramePool();
             _item = null;
             _isFrozen = false;
 
@@ -527,7 +559,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         public nint Handle { get; }
         public DisplayBounds Bounds { get; set; }
         public CaptureSessionService Capture { get; } = new();
-        public bool Faulted { get; private set; }
+        public bool Faulted { get; set; }
         public long LastRequestedTick { get; set; }
 
         public PublicWindowLayer(nint handle, DisplayBounds bounds)
