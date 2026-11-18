@@ -46,7 +46,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         return new(track.Started.Task.IsCompletedSuccessfully, Interlocked.Exchange(ref track.Peak, 0), track.Warning);
     }
 
-    public Task StartAsync(CancellationToken token)
+    public async Task StartAsync(CancellationToken token)
     {
         var inputs = new List<CaptureTrack>(2);
         if (options.ComputerAudioEnabled) inputs.Add(new(options.PlaybackDeviceId, true));
@@ -54,7 +54,15 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         _tracks = inputs.ToArray();
         var workers = _tracks.Select(track => Task.Run(() => Capture(track, token))).ToArray();
         Completion = Task.WhenAll(workers);
-        return Task.WhenAll(_tracks.Select(track => track.Started.Task));
+        try
+        {
+            await Task.WhenAll(_tracks.Select(track => track.Started.Task))
+                .WaitAsync(TimeSpan.FromSeconds(8), token);
+        }
+        catch (TimeoutException ex)
+        {
+            throw new InvalidOperationException("Perangkat audio belum mengirim data. Periksa sambungannya lalu coba lagi.", ex);
+        }
     }
 
     public void StartClock(long timestamp) => Volatile.Write(ref _origin, timestamp);
@@ -74,11 +82,17 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         var voice = !track.Loopback && options.WarmNarration ? new WarmVoiceProcessor() : null;
         try
         {
-            Wasapi.Capture(track.DeviceId, track.Loopback, () => track.Started.TrySetResult(),
+            // An idle loopback endpoint need not deliver packets. A microphone
+            // must deliver PCM (including silence) before displaying the ready cue.
+            Wasapi.Capture(track.DeviceId, track.Loopback, () => { if (track.Loopback) track.Started.TrySetResult(); },
                 (data, frames, flags, timestamp, channels, position) =>
                 {
                     var origin = Volatile.Read(ref _origin);
-                    if (origin == 0) return;
+                    if (origin == 0)
+                    {
+                        track.PacketReceived(frames);
+                        return;
+                    }
                     long? timestampFrame = timestamp == 0 ? null
                         : (long)Math.Round((timestamp - origin * (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency)
                             * RecordingAudioFormat.SampleRate / TimeSpan.TicksPerSecond);
@@ -87,6 +101,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     if (muted() || data == 0 || (flags & Wasapi.Silent) != 0)
                     {
                         voice?.Reset();
+                        track.PacketReceived(frames);
                         return;
                     }
                     if ((flags & Wasapi.Discontinuity) != 0) voice?.Reset();
@@ -96,7 +111,8 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     voice?.Process(pcm.AsSpan(0, count), channels);
                     if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count));
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
-                }, token, options.MicrophoneSpeechProfile);
+                    track.PacketReceived(frames);
+                }, token, options.MicrophoneSpeechProfile && !options.WarmNarration);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -121,5 +137,16 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal PcmTimeline Timeline { get; } = new();
         internal volatile string? Warning;
+        private int _startupFrames;
+
+        internal void PacketReceived(int frames)
+        {
+            // Keep a short recorded lead-in for consonants spoken just before
+            // the window minimizes. Readiness is independent of voice volume.
+            if (Started.Task.IsCompleted) return;
+            _startupFrames += frames;
+            if (_startupFrames >= RecordingAudioFormat.SampleRate * 120 / 1000)
+                Started.TrySetResult();
+        }
     }
 }

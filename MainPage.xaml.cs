@@ -625,7 +625,9 @@ public sealed partial class MainPage : Page
             _lastRecordingWarning = null;
             var camera = recorder.IncludesCamera ? " · Kamera aktif" : "";
             var audio = recorder.IncludesAudio ? " · Audio aktif" : "";
-            FooterStatusText.Text = $"Sedang merekam · 1080p {settings.RecordingFrameRate} fps{camera}{audio}.";
+            FooterStatusText.Text = settings.MicrophoneEnabled
+                ? $"Mikrofon siap. Silakan bicara · 1080p {settings.RecordingFrameRate} fps{camera}."
+                : $"Sedang merekam · 1080p {settings.RecordingFrameRate} fps{camera}{audio}.";
             UpdateRecordingStatusLabels();
             _ = WatchRecordingAsync(recorder);
             return true;

@@ -90,6 +90,7 @@ internal static class AudioChecks
             var mixedFile = await folder.CreateFileAsync("audio-mix.mp4", CreationCollisionOption.ReplaceExisting);
             var silentFile = await folder.CreateFileAsync("video-only.mp4", CreationCollisionOption.ReplaceExisting);
             var warmFile = await folder.CreateFileAsync("audio-warm.mp4", CreationCollisionOption.ReplaceExisting);
+            var onsetFile = await folder.CreateFileAsync("audio-onset.mp4", CreationCollisionOption.ReplaceExisting);
             stage = "AAC recording with privacy";
             Progress();
             var mode = (int)ClientOutputMode.Live;
@@ -119,6 +120,21 @@ internal static class AudioChecks
                 if (recorder.Failure is not null) throw recorder.Failure;
             }
 
+            stage = "quiet microphone onset before first screen frame";
+            Progress();
+            var onset = new OpeningAudio();
+            await using (var recorder = new OutputRecordingService(onset))
+            {
+                var screen = new SyntheticFrame { HasFrame = false };
+                await recorder.StartAsync(screen, CaptureScaleMode.Fit, 1, () => ClientOutputMode.Live,
+                    await onsetFile.OpenAsync(FileAccessMode.ReadWrite));
+                await Task.Delay(350);
+                screen.HasFrame = true;
+                await Task.Delay(850);
+                await recorder.StopAsync().WaitAsync(TimeSpan.FromSeconds(12));
+                if (recorder.Failure is not null) throw recorder.Failure;
+            }
+
             stage = "warm narration AAC";
             Progress();
             await using (var recorder = new OutputRecordingService(new SyntheticAudio(warm: true)))
@@ -134,7 +150,7 @@ internal static class AudioChecks
             {
                 Passed = true, Inputs = devices.Inputs.Count, Outputs = devices.Outputs.Count,
                 NativeLoopbackOpened = devices.Outputs.Count > 0, MissingInputRejected = true,
-                Mixed = mixedFile.Path, VideoOnly = silentFile.Path, Warm = warmFile.Path
+                Mixed = mixedFile.Path, VideoOnly = silentFile.Path, Warm = warmFile.Path, Onset = onsetFile.Path
             }));
         }
         catch (Exception error)
@@ -221,9 +237,35 @@ internal static class AudioChecks
         }
     }
 
+    private sealed class OpeningAudio : IRecordingAudioSource
+    {
+        private readonly PcmTimeline _timeline = new();
+        private bool _armed;
+        public void StartClock(long timestamp) => _armed = true;
+        public Task Completion => Task.CompletedTask;
+        public string? Warning => null;
+
+        public async Task StartAsync(CancellationToken token)
+        {
+            if (!_armed) throw new InvalidOperationException("First mic packet arrived before the recorder clock started.");
+            await Task.Delay(120, token);
+            var voice = new WarmVoiceProcessor();
+            var pcm = new short[RecordingAudioFormat.SampleRate];
+            for (int i = 0; i < pcm.Length; i++)
+            {
+                int offset = i % 33600; // repeat after a 700 ms interval
+                var amplitude = offset < 4800 ? 220 : offset < 11040 ? 2800 : 0;
+                pcm[i] = (short)(amplitude * Math.Sin(i * Math.Tau * 550 / RecordingAudioFormat.SampleRate));
+            }
+            voice.Process(pcm, 1);
+            _timeline.Store(0, pcm, 1);
+        }
+        public void Read(long firstFrame, Span<short> samples) => _timeline.Read(firstFrame, samples);
+    }
+
     private sealed class SyntheticFrame : IRecordingFrameSource
     {
-        public bool HasFrame => true;
+        public bool HasFrame { get; set; } = true;
         public void DrawRecordingFrame(CanvasDrawingSession session, float width, float height,
             CaptureScaleMode scaleMode, float adaptiveZoom) => session.Clear(Color.FromArgb(255, 29, 45, 70));
     }

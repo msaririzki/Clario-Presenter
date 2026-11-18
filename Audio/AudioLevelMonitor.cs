@@ -48,7 +48,7 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
                 Marshal.Copy(data, samples, 0, count);
                 voice?.Process(samples.AsSpan(0, count), channels);
                 Accumulate(ref _peak, samples.AsSpan(0, count));
-            }, token, SpeechProfile);
+            }, token, SpeechProfile && !WarmNarration);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception exception)

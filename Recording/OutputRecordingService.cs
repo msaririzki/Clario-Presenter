@@ -138,7 +138,6 @@ public sealed class OutputRecordingService : IAsyncDisposable
             : null);
         if (_audio is not null)
         {
-            await _audio.StartAsync(_producerCancellation.Token);
             var pcm = AudioEncodingProperties.CreatePcm(RecordingAudioFormat.SampleRate, RecordingAudioFormat.Channels, 16);
             _mediaSource = new MediaStreamSource(descriptor, new AudioStreamDescriptor(pcm));
         }
@@ -180,7 +179,11 @@ public sealed class OutputRecordingService : IAsyncDisposable
         _clockStart = Stopwatch.GetTimestamp();
         _audio?.StartClock(_clockStart);
         SetAudioPrivacy(_modeProvider() is ClientOutputMode.Privacy or ClientOutputMode.SourceLost);
+        // Prepare the encoder before opening the input. Its first packet now has
+        // a valid place on the same timeline as the first video frame.
+        var audioReady = _audio?.StartAsync(_producerCancellation.Token) ?? Task.CompletedTask;
         _producerTask = Task.Run(() => ProduceFramesAsync(_producerCancellation.Token));
+        await audioReady;
         _transcodeTask = preparation.TranscodeAsync().AsTask();
     }
 
@@ -253,7 +256,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
                 // misses a 60 fps slot, skip that timestamp instead of making
                 // the final recording run faster than the live presentation.
                 var elapsedFrameIndex = Stopwatch.GetElapsedTime(_clockStart).Ticks / _frameDuration.Ticks;
-                var frameIndex = Math.Max(nextFrameIndex, elapsedFrameIndex);
+                var frameIndex = nextFrameIndex == 0 ? 0 : Math.Max(nextFrameIndex, elapsedFrameIndex);
 
                 if (!RefreshPendingFrameTimestamp(frameIndex))
                 {
@@ -294,7 +297,8 @@ public sealed class OutputRecordingService : IAsyncDisposable
             // Media Foundation has not requested the previous frame yet. Do not
             // waste another GPU render/readback; keep that sample aligned with
             // the newest real-time slot and let the encoder consume it first.
-            _pendingFrame.Timestamp = TimeSpan.FromTicks(frameIndex * _frameDuration.Ticks);
+            if (_pendingFrame.Timestamp != TimeSpan.Zero)
+                _pendingFrame.Timestamp = TimeSpan.FromTicks(frameIndex * _frameDuration.Ticks);
             return true;
         }
     }
@@ -456,8 +460,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
         }
     }
 
-    private bool AudioShouldBeMuted() => _capture is not { HasFrame: true }
-        || _modeProvider?.Invoke() is not (ClientOutputMode.Live or ClientOutputMode.Frozen);
+    private bool AudioShouldBeMuted() => _modeProvider?.Invoke() is not (ClientOutputMode.Live or ClientOutputMode.Frozen);
 
     internal void SetAudioPrivacy(bool enabled)
     {

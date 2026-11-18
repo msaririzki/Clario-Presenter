@@ -91,7 +91,7 @@ Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Ji
 
 Untuk narasi, pilih **Profil suara mikrofon → Narasi (Windows)**. Windows meminta pemrosesan suara yang tersedia pada driver mikrofon. Jika karakter suara dari mikrofon atau mixer USB lebih cocok dengan pengaturan biasanya, pilih **Standar perangkat**. Kedua pilihan memakai mikrofon yang Anda pilih.
 
-Pilih **Narasi hangat** jika ingin suara lebih berisi dan lembut. Profil ini memakai pemrosesan narasi Windows, memperkuat nada rendah suara secara ringan, dan meratakan bagian yang keras. Efek hanya diterapkan pada mikrofon.
+Pilih **Narasi hangat** jika ingin suara lebih berisi dan lembut. Clario memakai input standar perangkat, memperkuat nada rendah suara secara ringan, dan meratakan bagian yang keras. Suku kata pelan setelah jeda tetap diproses. Efek hanya diterapkan pada mikrofon. Mulailah bicara saat **Stop rekam** muncul atau Clario otomatis mengecil. Pada titik itu Clario sudah menerima data dari mikrofon.
 
 Klik **Perbarui perangkat audio** jika perangkat baru belum muncul. Saat **Suara komputer** aktif, semua bunyi dari speaker atau headphone yang dipilih bisa masuk ke video, termasuk notifikasi atau suara dari aplikasi yang gambarnya disembunyikan.
 
