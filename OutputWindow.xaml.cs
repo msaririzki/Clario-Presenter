@@ -63,7 +63,7 @@ public sealed partial class OutputWindow : Window
 
     private void ConfigureWindow(DisplayTarget target, bool previewMode)
     {
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = !previewMode;

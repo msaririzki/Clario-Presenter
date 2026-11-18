@@ -1,3 +1,4 @@
+using Clario_Presenter.Audio;
 using Clario_Presenter.Camera;
 using Windows.Foundation.Collections;
 using Windows.Storage;
@@ -9,6 +10,8 @@ namespace Clario_Presenter.Settings;
 public sealed class AppSettingsService
 {
     private const string RecordingFolderName = "Clario Presenter";
+    private const string CameraPositionXKey = "CameraCustomPositionX";
+    private const string CameraPositionYKey = "CameraCustomPositionY";
 #if CLARIO_UNPACKAGED
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -49,6 +52,9 @@ public sealed class AppSettingsService
         _localSettings.Values[nameof(PresenterSettings.CameraEnabled)] = Current.CameraEnabled;
         _localSettings.Values[nameof(PresenterSettings.CameraDeviceId)] = Current.CameraDeviceId;
         _localSettings.Values[nameof(PresenterSettings.CameraPosition)] = Current.CameraPosition;
+        _localSettings.Values[CameraPositionXKey] = Current.CameraCustomPosition.X;
+        _localSettings.Values[CameraPositionYKey] = Current.CameraCustomPosition.Y;
+        _localSettings.Values[nameof(PresenterSettings.CameraCustomPositionUsesFullFrame)] = Current.CameraCustomPositionUsesFullFrame;
         _localSettings.Values[nameof(PresenterSettings.CameraWidthPercent)] = Current.CameraWidthPercent;
         _localSettings.Values[nameof(PresenterSettings.CameraMirror)] = Current.CameraMirror;
         _localSettings.Values[nameof(PresenterSettings.ComputerAudioEnabled)] = Current.ComputerAudioEnabled;
@@ -58,13 +64,27 @@ public sealed class AppSettingsService
 #endif
     }
 
-    private static PresenterSettings Normalize(PresenterSettings settings) => settings with
+    private static PresenterSettings Normalize(PresenterSettings settings)
     {
-        RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
-        RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
-        CameraPosition = Math.Clamp(settings.CameraPosition, 0, 3),
-        CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent)
-    };
+        var position = Math.Clamp(settings.CameraPosition, 0, (int)CameraOverlayPosition.Custom);
+        var width = Math.Clamp(settings.CameraWidthPercent, CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent);
+        var customPosition = settings.CameraCustomPosition.Clamped();
+        if (!settings.CameraCustomPositionUsesFullFrame
+            && (position == (int)CameraOverlayPosition.Custom || customPosition != new CameraOverlayPoint(1, 1)))
+        {
+            customPosition = CameraOverlayLayout.MigrateInsetPosition(width, customPosition);
+        }
+
+        return settings with
+        {
+            RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
+            RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
+            CameraPosition = position,
+            CameraCustomPosition = customPosition,
+            CameraCustomPositionUsesFullFrame = true,
+            CameraWidthPercent = width
+        };
+    }
 
     public async Task<StorageFolder> GetRecordingFolderAsync()
     {
@@ -134,7 +154,7 @@ public sealed class AppSettingsService
         return new();
 #else
         var values = _localSettings.Values;
-        return new PresenterSettings
+        return Normalize(new PresenterSettings
         {
             RecordingFrameRate = ReadInt(values, nameof(PresenterSettings.RecordingFrameRate), 60),
             RecordingBitrateMbps = ReadInt(values, nameof(PresenterSettings.RecordingBitrateMbps), 18),
@@ -142,20 +162,27 @@ public sealed class AppSettingsService
             RecordingFolderPath = values[nameof(PresenterSettings.RecordingFolderPath)] as string ?? string.Empty,
             CameraEnabled = ReadBool(values, nameof(PresenterSettings.CameraEnabled)),
             CameraDeviceId = values[nameof(PresenterSettings.CameraDeviceId)] as string ?? string.Empty,
-            CameraPosition = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraPosition), 0), 0, 3),
-            CameraWidthPercent = Math.Clamp(ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24),
-                CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent),
+            CameraPosition = ReadInt(values, nameof(PresenterSettings.CameraPosition), 0),
+            CameraCustomPosition = new CameraOverlayPoint(
+                ReadDouble(values, CameraPositionXKey, 1),
+                ReadDouble(values, CameraPositionYKey, 1)),
+            CameraCustomPositionUsesFullFrame = ReadBool(values, nameof(PresenterSettings.CameraCustomPositionUsesFullFrame)),
+            CameraWidthPercent = ReadInt(values, nameof(PresenterSettings.CameraWidthPercent), 24),
             CameraMirror = ReadBool(values, nameof(PresenterSettings.CameraMirror)),
             ComputerAudioEnabled = ReadBool(values, nameof(PresenterSettings.ComputerAudioEnabled)),
             PlaybackDeviceId = values[nameof(PresenterSettings.PlaybackDeviceId)] as string ?? string.Empty,
             MicrophoneEnabled = ReadBool(values, nameof(PresenterSettings.MicrophoneEnabled)),
-            MicrophoneDeviceId = values[nameof(PresenterSettings.MicrophoneDeviceId)] as string ?? string.Empty
-        };
+            MicrophoneDeviceId = values.TryGetValue(nameof(PresenterSettings.MicrophoneDeviceId), out var microphoneId)
+                && microphoneId is string savedMicrophone ? savedMicrophone : Wasapi.AutomaticInputId
+        });
 #endif
     }
 
     private static int ReadInt(IPropertySet values, string key, int fallback) =>
         values.TryGetValue(key, out var value) && value is int number ? number : fallback;
+
+    private static double ReadDouble(IPropertySet values, string key, double fallback) =>
+        values.TryGetValue(key, out var value) && value is double number ? number : fallback;
 
     private static bool ReadBool(IPropertySet values, string key) =>
         values.TryGetValue(key, out var value) && value is bool enabled && enabled;

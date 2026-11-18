@@ -1,10 +1,13 @@
 using Clario_Presenter.Settings;
 using Clario_Presenter.Camera;
 using Clario_Presenter.Recording;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Windows.Foundation;
 using Windows.Storage;
 using Windows.System;
 
@@ -13,17 +16,21 @@ namespace Clario_Presenter;
 public sealed partial class SettingsDialog : ContentDialog
 {
     private const string CameraDisabled = "Aktifkan kamera untuk melihat gambar langsung.";
-    private const string TestCameraPrompt = "Tes kamera untuk melihat gambar langsung.";
-    private const string CameraReady = "Pratinjau kamera aktif.";
+    private const string CameraReady = "Preview kamera aktif.";
     private static readonly string CameraWidthRange = $"{CameraOverlayLayout.MinWidthPercent}–{CameraOverlayLayout.MaxWidthPercent}%";
     private static readonly string CameraWidthError = $"Lebar kamera harus {CameraWidthRange} dari lebar video.";
     private string _folderPath;
     private readonly PresenterSettings _originalSettings;
+    private readonly CanvasRenderTarget? _sourcePreview;
     private readonly SemaphoreSlim _previewGate = new(1, 1);
-    private readonly CancellationTokenSource _previewCancellation = new();
     private readonly DispatcherTimer _previewStatusTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private CancellationTokenSource? _previewStartCancellation;
     private CameraCaptureService? _previewCamera;
+    private string? _previewDeviceId;
     private CameraOverlayOptions _previewLayout = new();
+    private CameraOverlayPoint? _customCameraPosition;
+    private uint? _dragPointerId;
+    private Point _dragOffset;
     private int? _customCameraWidthPercent;
     private int _previewUpdateQueued;
     private bool _refreshingCameras;
@@ -33,9 +40,11 @@ public sealed partial class SettingsDialog : ContentDialog
     public bool IsSaved { get; private set; }
     private bool UsesCustomCameraWidth => ReferenceEquals(CameraSizeComboBox.SelectedItem, CameraCustomSizeItem);
 
-    public SettingsDialog(PresenterSettings settings, XamlRoot xamlRoot)
+    public SettingsDialog(PresenterSettings settings, XamlRoot xamlRoot, CanvasRenderTarget? sourcePreview = null)
     {
         InitializeComponent();
+        _sourcePreview = sourcePreview;
+        if (_sourcePreview is not null) CameraPreviewSourceText.Text = "Cuplikan · 16:9";
         XamlRoot = xamlRoot;
         UpdateDialogLayout();
         _originalSettings = settings;
@@ -49,7 +58,10 @@ public sealed partial class SettingsDialog : ContentDialog
         };
         AskLocationToggle.IsOn = settings.AskRecordingLocation;
         CameraEnabledToggle.IsOn = settings.CameraEnabled;
-        CameraPositionComboBox.SelectedIndex = Math.Clamp(settings.CameraPosition, 0, 3);
+        CameraPositionComboBox.SelectedIndex = Math.Clamp(settings.CameraPosition, 0, (int)CameraOverlayPosition.Custom);
+        var customPosition = settings.CameraCustomPosition.Clamped();
+        if (CameraPositionComboBox.SelectedIndex == (int)CameraOverlayPosition.Custom || customPosition != new CameraOverlayPoint(1, 1))
+            _customCameraPosition = customPosition;
         var widthPercent = Math.Clamp(settings.CameraWidthPercent, CameraOverlayLayout.MinWidthPercent, CameraOverlayLayout.MaxWidthPercent);
         CameraSizeComboBox.SelectedItem = CameraSizeComboBox.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => Equals(item.Tag, widthPercent.ToString())) ?? CameraCustomSizeItem;
@@ -62,7 +74,7 @@ public sealed partial class SettingsDialog : ContentDialog
         InitializeAudioSettings(settings);
         UpdateCameraLayout();
         UpdateCameraActions();
-        CameraStatusText.Text = settings.CameraEnabled ? TestCameraPrompt : CameraDisabled;
+        CameraStatusText.Text = settings.CameraEnabled ? "Menyiapkan kamera…" : CameraDisabled;
         SettingsNavigation.SelectionChanged += SettingsNavigation_SelectionChanged;
         SettingsNavigation.SelectedItem = CameraNavigationItem;
     }
@@ -86,6 +98,8 @@ public sealed partial class SettingsDialog : ContentDialog
             CameraEnabled = CameraEnabledToggle.IsOn,
             CameraDeviceId = (CameraDeviceComboBox.SelectedItem as CameraDevice)?.Id ?? _originalSettings.CameraDeviceId,
             CameraPosition = (int)_previewLayout.Position,
+            CameraCustomPosition = _previewLayout.CustomPosition,
+            CameraCustomPositionUsesFullFrame = true,
             CameraWidthPercent = _previewLayout.WidthPercent,
             CameraMirror = _previewLayout.Mirror,
             ComputerAudioEnabled = ComputerAudioToggle.IsOn,
@@ -140,7 +154,7 @@ public sealed partial class SettingsDialog : ContentDialog
         VideoSection.Visibility = ReferenceEquals(args.SelectedItem, VideoNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         StorageSection.Visibility = ReferenceEquals(args.SelectedItem, StorageNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         SettingsScroll.ChangeView(null, 0, null, disableAnimation: true);
-        if (_opened && CameraSection.Visibility == Visibility.Collapsed) await StopHiddenCameraPreviewAsync();
+        if (_opened && !_closing) await Task.WhenAll(SyncCameraPreviewAsync(), SyncAudioMonitorsAsync());
     }
 
     private async void CameraEnabled_Changed(object sender, RoutedEventArgs e)
@@ -148,38 +162,17 @@ public sealed partial class SettingsDialog : ContentDialog
         if (!_opened || _closing) return;
         UpdateCameraActions();
         SettingsErrorText.Visibility = Visibility.Collapsed;
-        if (CameraEnabledToggle.IsOn)
-        {
-            if (CameraDeviceComboBox.Items.Count == 0) await RefreshCamerasAsync();
-            else CameraStatusText.Text = CameraSelectionStatus();
-            return;
-        }
-
-        CameraStatusText.Text = CameraDisabled;
-        await StopHiddenCameraPreviewAsync();
-    }
-
-    private async Task StopHiddenCameraPreviewAsync()
-    {
-        if (_previewCamera is null || _closing) return;
-        await _previewGate.WaitAsync();
-        try
-        {
-            if (!_closing && (!CameraEnabledToggle.IsOn || CameraSection.Visibility == Visibility.Collapsed))
-            {
-                await StopCameraPreviewAsync();
-                CameraStatusText.Text = CameraEnabledToggle.IsOn ? CameraSelectionStatus() : CameraDisabled;
-                UpdateCameraActions();
-            }
-        }
-        finally { _previewGate.Release(); }
+        if (CameraEnabledToggle.IsOn && CameraDeviceComboBox.Items.Count == 0)
+            await RefreshCamerasAsync();
+        else
+            await SyncCameraPreviewAsync();
     }
 
     private async void RefreshCameras_Click(object sender, RoutedEventArgs e) => await RefreshCamerasAsync();
 
     private async Task RefreshCamerasAsync()
     {
-        if (_closing || !CameraEnabledToggle.IsOn || _refreshingCameras || _previewCamera is not null) return;
+        if (_closing || !CameraEnabledToggle.IsOn || _refreshingCameras) return;
         _refreshingCameras = true;
         var selectedId = (CameraDeviceComboBox.SelectedItem as CameraDevice)?.Id ?? _originalSettings.CameraDeviceId;
         UpdateCameraActions();
@@ -192,82 +185,90 @@ public sealed partial class SettingsDialog : ContentDialog
             CameraDeviceComboBox.SelectedItem = string.IsNullOrEmpty(selectedId)
                 ? devices.FirstOrDefault()
                 : devices.FirstOrDefault(device => device.Id == selectedId);
-            if (CameraEnabledToggle.IsOn) CameraStatusText.Text = CameraSelectionStatus();
         }
         catch (Exception exception)
         {
             if (!_closing && CameraEnabledToggle.IsOn) CameraStatusText.Text = $"Daftar kamera gagal dimuat: {exception.Message}";
+            return;
         }
         finally
         {
             _refreshingCameras = false;
             if (!_closing) UpdateCameraActions();
         }
+        if (!_closing) await SyncCameraPreviewAsync();
     }
 
-    private string CameraSelectionStatus() => CameraDeviceComboBox.Items.Count == 0
+    private string CameraSelectionStatus() => !CameraEnabledToggle.IsOn ? CameraDisabled
+        : CameraDeviceComboBox.Items.Count == 0
         ? "Kamera belum ditemukan. Hubungkan webcam, lalu perbarui daftar."
-        : CameraDeviceComboBox.SelectedItem is null
-            ? "Kamera tersimpan belum terhubung. Pilih kamera yang tersedia."
-            : TestCameraPrompt;
+        : "Pilih kamera yang ingin digunakan.";
 
-    private void CameraDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void CameraDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_opened || _closing || _refreshingCameras) return;
-        UpdateCameraActions();
         SettingsErrorText.Visibility = Visibility.Collapsed;
-        if (CameraDeviceComboBox.SelectedItem is CameraDevice) CameraStatusText.Text = TestCameraPrompt;
+        await SyncCameraPreviewAsync();
     }
 
     private void UpdateCameraActions()
     {
-        var enabled = CameraEnabledToggle.IsOn && !_refreshingCameras;
-        CameraDeviceComboBox.IsEnabled = enabled && _previewCamera is null;
+        CameraDeviceComboBox.IsEnabled = CameraEnabledToggle.IsOn && !_refreshingCameras;
         RefreshCamerasButton.IsEnabled = CameraDeviceComboBox.IsEnabled;
-        TestCameraButton.IsEnabled = enabled &&
-            (_previewCamera is not null || CameraDeviceComboBox.SelectedItem is CameraDevice);
     }
 
-    private async void TestCamera_Click(object sender, RoutedEventArgs e)
+    private CameraDevice? DesiredPreviewDevice() =>
+        !_closing && CameraEnabledToggle.IsOn && CameraSection.Visibility == Visibility.Visible
+            ? CameraDeviceComboBox.SelectedItem as CameraDevice
+            : null;
+
+    private async Task SyncCameraPreviewAsync()
     {
+        if (DesiredPreviewDevice()?.Id != _previewDeviceId) _previewStartCancellation?.Cancel();
         await _previewGate.WaitAsync();
         try
         {
-            if (_closing || !CameraEnabledToggle.IsOn || CameraSection.Visibility != Visibility.Visible) return;
-            TestCameraButton.IsEnabled = false;
-            CameraDeviceComboBox.IsEnabled = false;
-            RefreshCamerasButton.IsEnabled = false;
-            if (_previewCamera is not null)
+            if (_closing) return;
+            if (_previewCamera is not null && DesiredPreviewDevice()?.Id == _previewDeviceId)
             {
-                await StopCameraPreviewAsync();
-                CameraStatusText.Text = TestCameraPrompt;
+                CameraStatusText.Text = _previewCamera.Warning ?? CameraReady;
                 return;
             }
-            if (CameraDeviceComboBox.SelectedItem is not CameraDevice device)
-                throw new InvalidOperationException("Pilih kamera terlebih dahulu.");
-            CameraStatusText.Text = "Menyalakan kamera…";
-            _previewCamera = new CameraCaptureService();
-            _previewCamera.FrameAvailable += PreviewCamera_FrameAvailable;
-            await _previewCamera.StartAsync(device.Id, _previewCancellation.Token);
-            if (_closing) return;
-            CameraPreviewPlaceholder.Visibility = Visibility.Collapsed;
-            CameraPreviewCanvas.Visibility = Visibility.Visible;
-            TestCameraButton.Content = "Hentikan tes";
-            CameraStatusText.Text = CameraReady;
-            _previewStatusTimer.Start();
-            CameraPreviewCanvas.Invalidate();
-        }
-        catch (OperationCanceledException) when (_closing) { }
-        catch (Exception exception)
-        {
             await StopCameraPreviewAsync();
-            if (!_closing) CameraStatusText.Text = exception.Message;
+            if (_closing) return;
+            if (DesiredPreviewDevice() is not { } device)
+            {
+                if (!_refreshingCameras) CameraStatusText.Text = CameraSelectionStatus();
+                return;
+            }
+
+            using var start = new CancellationTokenSource();
+            _previewStartCancellation = start;
+            _previewDeviceId = device.Id;
+            try
+            {
+                CameraStatusText.Text = "Menyalakan kamera…";
+                _previewCamera = new CameraCaptureService();
+                _previewCamera.FrameAvailable += PreviewCamera_FrameAvailable;
+                await _previewCamera.StartAsync(device.Id, start.Token);
+                start.Token.ThrowIfCancellationRequested();
+                CameraPreviewPlaceholder.Visibility = Visibility.Collapsed;
+                CameraStatusText.Text = CameraReady;
+                _previewStatusTimer.Start();
+                CameraPreviewCanvas.Invalidate();
+            }
+            catch (OperationCanceledException) when (start.IsCancellationRequested)
+            {
+                await StopCameraPreviewAsync();
+            }
+            catch (Exception exception)
+            {
+                await StopCameraPreviewAsync();
+                if (!_closing) CameraStatusText.Text = exception.Message;
+            }
+            finally { _previewStartCancellation = null; }
         }
-        finally
-        {
-            if (!_closing) UpdateCameraActions();
-            _previewGate.Release();
-        }
+        finally { _previewGate.Release(); }
     }
 
     private void PreviewCamera_FrameAvailable(object? sender, EventArgs args)
@@ -285,13 +286,66 @@ public sealed partial class SettingsDialog : ContentDialog
 
     private void CameraPreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
     {
+        if (_sourcePreview is not null) args.DrawingSession.DrawImage(_sourcePreview);
+        if (_previewCamera is not { } camera || CameraPreviewPlaceholder.Visibility == Visibility.Visible) return;
         var bounds = CameraOverlayLayout.GetBounds(sender.ActualWidth, sender.ActualHeight, _previewLayout);
-        CameraOverlayRenderer.Draw(args.DrawingSession, _previewCamera, bounds, _previewLayout.Mirror);
+        CameraOverlayRenderer.Draw(args.DrawingSession, camera, bounds, _previewLayout.Mirror);
     }
 
     private void CameraLayout_Changed(object sender, SelectionChangedEventArgs args)
     {
-        if (_opened) UpdateCameraLayout();
+        if (!_opened || _closing) return;
+        if (ReferenceEquals(CameraPositionComboBox.SelectedItem, CameraCustomPositionItem) && _customCameraPosition is null)
+        {
+            var bounds = CameraOverlayLayout.GetBounds(CameraPreviewFrame.Width, CameraPreviewFrame.Height, _previewLayout);
+            _customCameraPosition = CameraOverlayLayout.GetCustomPosition(CameraPreviewFrame.Width, CameraPreviewFrame.Height,
+                _previewLayout, bounds.X, bounds.Y);
+        }
+        UpdateCameraLayout();
+    }
+
+    private void CameraPreview_PointerPressed(object sender, PointerRoutedEventArgs args)
+    {
+        if (_dragPointerId.HasValue) return;
+        var pointer = args.GetCurrentPoint(CameraPreviewFrame);
+        if (!pointer.Properties.IsLeftButtonPressed) return;
+        var bounds = CameraOverlayLayout.GetBounds(CameraPreviewFrame.Width, CameraPreviewFrame.Height, _previewLayout);
+        var point = pointer.Position;
+        if (point.X < bounds.X || point.X > bounds.X + bounds.Width
+            || point.Y < bounds.Y || point.Y > bounds.Y + bounds.Height
+            || !CameraPreviewFrame.CapturePointer(args.Pointer)) return;
+
+        _dragPointerId = args.Pointer.PointerId;
+        _dragOffset = new Point(point.X - bounds.X, point.Y - bounds.Y);
+        args.Handled = true;
+    }
+
+    private void CameraPreview_PointerMoved(object sender, PointerRoutedEventArgs args)
+    {
+        if (_dragPointerId != args.Pointer.PointerId) return;
+        var point = args.GetCurrentPoint(CameraPreviewFrame).Position;
+        MoveCameraPreview(point.X - _dragOffset.X, point.Y - _dragOffset.Y);
+        args.Handled = true;
+    }
+
+    private void MoveCameraPreview(double x, double y)
+    {
+        _customCameraPosition = CameraOverlayLayout.GetCustomPosition(CameraPreviewFrame.Width, CameraPreviewFrame.Height, _previewLayout, x, y);
+        if (ReferenceEquals(CameraPositionComboBox.SelectedItem, CameraCustomPositionItem)) UpdateCameraLayout();
+        else CameraPositionComboBox.SelectedItem = CameraCustomPositionItem;
+    }
+
+    private void CameraPreview_PointerReleased(object sender, PointerRoutedEventArgs args)
+    {
+        if (_dragPointerId != args.Pointer.PointerId) return;
+        _dragPointerId = null;
+        CameraPreviewFrame.ReleasePointerCapture(args.Pointer);
+        args.Handled = true;
+    }
+
+    private void CameraPreview_PointerCaptureLost(object sender, PointerRoutedEventArgs args)
+    {
+        if (_dragPointerId == args.Pointer.PointerId) _dragPointerId = null;
     }
 
     private void CameraSizePreset_Changed(object sender, SelectionChangedEventArgs args)
@@ -354,7 +408,8 @@ public sealed partial class SettingsDialog : ContentDialog
             : int.TryParse((CameraSizeComboBox.SelectedItem as ComboBoxItem)?.Tag as string, out var presetWidth) ? presetWidth : 24;
         _previewLayout = new CameraOverlayOptions
         {
-            Position = (CameraOverlayPosition)Math.Clamp(CameraPositionComboBox.SelectedIndex, 0, 3),
+            Position = (CameraOverlayPosition)Math.Clamp(CameraPositionComboBox.SelectedIndex, 0, (int)CameraOverlayPosition.Custom),
+            CustomPosition = _customCameraPosition ?? new CameraOverlayPoint(1, 1),
             WidthPercent = width,
             Mirror = CameraMirrorCheckBox.IsChecked == true
         };
@@ -383,15 +438,15 @@ public sealed partial class SettingsDialog : ContentDialog
         _previewStatusTimer.Stop();
         var camera = _previewCamera;
         _previewCamera = null;
+        _previewDeviceId = null;
         if (camera is not null)
         {
             camera.FrameAvailable -= PreviewCamera_FrameAvailable;
             try { await camera.DisposeAsync(); }
             catch (Exception exception) { System.Diagnostics.Debug.WriteLine($"Camera preview cleanup: {exception.Message}"); }
         }
-        TestCameraButton.Content = "Tes kamera";
-        CameraPreviewCanvas.Visibility = Visibility.Collapsed;
         CameraPreviewPlaceholder.Visibility = Visibility.Visible;
+        CameraPreviewCanvas.Invalidate();
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs args)
@@ -427,22 +482,27 @@ public sealed partial class SettingsDialog : ContentDialog
     private async void SettingsDialog_Closing(ContentDialog sender, ContentDialogClosingEventArgs args)
     {
         _closing = true;
-        _previewCancellation.Cancel();
+        _previewStartCancellation?.Cancel();
         var deferral = args.GetDeferral();
         try
         {
-            await _previewGate.WaitAsync();
-            try { await StopCameraPreviewAsync(); }
-            finally { _previewGate.Release(); }
+            await Task.WhenAll(StopDialogCameraPreviewAsync(), SyncAudioMonitorsAsync());
         }
         finally { deferral.Complete(); }
+    }
+
+    private async Task StopDialogCameraPreviewAsync()
+    {
+        await _previewGate.WaitAsync();
+        try { await StopCameraPreviewAsync(); }
+        finally { _previewGate.Release(); }
     }
 
     private void SettingsDialog_Closed(ContentDialog sender, ContentDialogClosedEventArgs args)
     {
         XamlRoot.Changed -= SettingsRoot_Changed;
-        _previewCancellation.Dispose();
         _previewStatusTimer.Tick -= PreviewStatusTimer_Tick;
+        _audioMeterTimer.Tick -= AudioMeterTimer_Tick;
         CameraPreviewCanvas.RemoveFromVisualTree();
     }
 

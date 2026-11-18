@@ -1,12 +1,20 @@
 namespace Clario_Presenter.Camera;
 
-public enum CameraOverlayPosition { BottomRight, BottomLeft, TopRight, TopLeft }
+public enum CameraOverlayPosition { BottomRight, BottomLeft, TopRight, TopLeft, Custom }
+
+public readonly record struct CameraOverlayPoint(double X, double Y)
+{
+    public CameraOverlayPoint Clamped() => new(ClampAxis(X), ClampAxis(Y));
+
+    private static double ClampAxis(double value) => double.IsFinite(value) ? Math.Clamp(value, 0, 1) : 1;
+}
 
 public sealed record CameraOverlayOptions
 {
     public bool Enabled { get; init; }
     public string DeviceId { get; init; } = string.Empty;
     public CameraOverlayPosition Position { get; init; } = CameraOverlayPosition.BottomRight;
+    public CameraOverlayPoint CustomPosition { get; init; } = new(1, 1);
     public int WidthPercent { get; init; } = 24;
     public bool Mirror { get; init; }
 }
@@ -17,21 +25,57 @@ public static class CameraOverlayLayout
 {
     public const int MinWidthPercent = 5;
     public const int MaxWidthPercent = 90;
+    private const double RecordingWidth = 1920;
+    private const double RecordingHeight = 1080;
 
     public static CameraRectangle GetBounds(double outputWidth, double outputHeight, CameraOverlayOptions options)
     {
         if (outputWidth <= 0 || outputHeight <= 0) return default;
-        var scale = Math.Min(outputWidth / 1920, outputHeight / 1080);
-        var margin = 32 * scale;
-        // Reserve space for the taskbar even when the camera is in a bottom corner.
-        var bottomMargin = 64 * scale;
-        var width = Math.Min(outputWidth * Math.Clamp(options.WidthPercent, MinWidthPercent, MaxWidthPercent) / 100,
-            (outputHeight - margin - bottomMargin) * 16 / 9);
+        var area = options.Position == CameraOverlayPosition.Custom
+            ? new CameraRectangle(0, 0, outputWidth, outputHeight)
+            : GetPresetArea(outputWidth, outputHeight);
+        var point = options.Position switch
+        {
+            CameraOverlayPosition.BottomLeft => new CameraOverlayPoint(0, 1),
+            CameraOverlayPosition.TopRight => new CameraOverlayPoint(1, 0),
+            CameraOverlayPosition.TopLeft => new CameraOverlayPoint(0, 0),
+            CameraOverlayPosition.Custom => options.CustomPosition.Clamped(),
+            _ => new CameraOverlayPoint(1, 1)
+        };
+        return PlaceInArea(area, outputWidth, options.WidthPercent, point);
+    }
+
+    public static CameraOverlayPoint GetCustomPosition(double outputWidth, double outputHeight,
+        CameraOverlayOptions options, double x, double y)
+    {
+        if (outputWidth <= 0 || outputHeight <= 0) return default;
+        var size = PlaceInArea(new CameraRectangle(0, 0, outputWidth, outputHeight), outputWidth, options.WidthPercent, default);
+        return new CameraOverlayPoint(
+            outputWidth > size.Width ? x / (outputWidth - size.Width) : 0,
+            outputHeight > size.Height ? y / (outputHeight - size.Height) : 0).Clamped();
+    }
+
+    public static CameraOverlayPoint MigrateInsetPosition(int widthPercent, CameraOverlayPoint previous)
+    {
+        var inset = PlaceInArea(GetPresetArea(RecordingWidth, RecordingHeight), RecordingWidth, widthPercent, previous.Clamped());
+        return GetCustomPosition(RecordingWidth, RecordingHeight,
+            new CameraOverlayOptions { WidthPercent = widthPercent }, inset.X, inset.Y);
+    }
+
+    private static CameraRectangle PlaceInArea(CameraRectangle area, double outputWidth, int widthPercent, CameraOverlayPoint point)
+    {
+        var width = Math.Min(outputWidth * Math.Clamp(widthPercent, MinWidthPercent, MaxWidthPercent) / 100,
+            Math.Min(area.Width, area.Height * 16 / 9));
         var height = width * 9 / 16;
-        var left = options.Position is CameraOverlayPosition.BottomLeft or CameraOverlayPosition.TopLeft;
-        var top = options.Position is CameraOverlayPosition.TopLeft or CameraOverlayPosition.TopRight;
-        return new CameraRectangle(left ? margin : outputWidth - margin - width,
-            top ? margin : outputHeight - bottomMargin - height, width, height);
+        return new CameraRectangle(area.X + (area.Width - width) * point.X,
+            area.Y + Math.Max(0, area.Height - height) * point.Y, width, height);
+    }
+
+    private static CameraRectangle GetPresetArea(double width, double height)
+    {
+        var scale = Math.Min(width / RecordingWidth, height / RecordingHeight);
+        var margin = 32 * scale;
+        return new CameraRectangle(margin, margin, width - 2 * margin, height - 3 * margin);
     }
 
     public static CameraRectangle Fit(double sourceWidth, double sourceHeight, CameraRectangle destination)

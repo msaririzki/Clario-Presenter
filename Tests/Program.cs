@@ -51,7 +51,7 @@ var cameraOptions = new CameraOverlayOptions { Enabled = true, WidthPercent = 24
 var bottomRight = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions);
 Check(Math.Abs(bottomRight.Width - 460.8) < 0.001, "Medium camera uses 24% of video width.");
 Check(bottomRight.Y + bottomRight.Height <= 1016.001, "Camera leaves the taskbar and bottom safe area clear.");
-foreach (var position in Enum.GetValues<CameraOverlayPosition>())
+foreach (var position in Enum.GetValues<CameraOverlayPosition>().Where(position => position != CameraOverlayPosition.Custom))
 {
     var bounds = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { Position = position });
     Check(bounds.X >= 32 && bounds.Y >= 32 && bounds.X + bounds.Width <= 1888.001
@@ -67,6 +67,34 @@ Check(small.Height == 54 && large.Height == 972 && large.Y >= 32 && large.Y + la
 var custom = CameraOverlayLayout.GetBounds(1920, 1080, cameraOptions with { WidthPercent = 47 });
 Check(Math.Abs(custom.Width - 902.4) < 0.001 && Math.Abs(custom.Height - 507.6) < 0.001,
     "Custom camera size follows the selected percentage.");
+var dragPosition = CameraOverlayLayout.GetCustomPosition(480, 270, cameraOptions, 137, 83);
+var draggedOptions = cameraOptions with { Position = CameraOverlayPosition.Custom, CustomPosition = dragPosition };
+var dragged = CameraOverlayLayout.GetBounds(1920, 1080, draggedOptions);
+Check(Math.Abs(dragged.X - 548) < 0.001 && Math.Abs(dragged.Y - 332) < 0.001,
+    "Dragging on the scaled preview places the overlay at the same spot in the recording.");
+var clampedDrag = CameraOverlayLayout.GetCustomPosition(480, 270, cameraOptions, -20, 400);
+Check(clampedDrag == new CameraOverlayPoint(0, 1), "Dragging outside the frame stops at the video edge.");
+foreach (var edge in new CameraOverlayPoint[] { new(0, 0), new(1, 0), new(0, 1), new(1, 1) })
+{
+    var point = CameraOverlayLayout.GetCustomPosition(480, 270, cameraOptions,
+        edge.X == 0 ? -10 : 480, edge.Y == 0 ? -10 : 270);
+    Check(point == edge, $"Dragging reaches corner {edge}.");
+    foreach (var targetSize in new[] { 5, 24, 90 })
+    {
+        var placed = draggedOptions with { CustomPosition = point, WidthPercent = targetSize };
+        var output = CameraOverlayLayout.GetBounds(1920, 1080, placed);
+        var preview = CameraOverlayLayout.GetBounds(480, 270, placed);
+        Check(Math.Abs(output.X - edge.X * (1920 - output.Width)) < 0.001
+            && Math.Abs(output.Y - edge.Y * (1080 - output.Height)) < 0.001,
+            $"Custom camera remains against the selected edges when resized to {targetSize}%.");
+        Check(Math.Abs(preview.X * 4 - output.X) < 0.001 && Math.Abs(preview.Y * 4 - output.Y) < 0.001,
+            "Preview and recording use the same custom edges.");
+    }
+}
+var migratedPoint = CameraOverlayLayout.MigrateInsetPosition(cameraOptions.WidthPercent, new CameraOverlayPoint(1, 1));
+var migratedBounds = CameraOverlayLayout.GetBounds(1920, 1080, draggedOptions with { CustomPosition = migratedPoint });
+Check(Math.Abs(migratedBounds.X - bottomRight.X) < 0.001 && Math.Abs(migratedBounds.Y - bottomRight.Y) < 0.001,
+    "Previously saved custom coordinates keep their on-screen position after migration.");
 var fourByThree = CameraOverlayLayout.Fit(640, 480, bottomRight);
 Check(Math.Abs(fourByThree.Width / fourByThree.Height - 4d / 3) < 0.001
     && fourByThree.X > bottomRight.X && fourByThree.Width < bottomRight.Width,

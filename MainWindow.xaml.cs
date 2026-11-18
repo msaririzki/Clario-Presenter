@@ -13,8 +13,6 @@ namespace Clario_Presenter;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    public bool AutoMinimizeOnDeactivate { get; set; }
-
     public MainWindow()
     {
         InitializeComponent();
@@ -31,13 +29,6 @@ public sealed partial class MainWindow : Window
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
-        Activated += MainWindow_Activated;
-    }
-
-    private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
-    {
-        if (!AutoMinimizeOnDeactivate || args.WindowActivationState != WindowActivationState.Deactivated) return;
-        MinimizeForPresentation();
     }
 
     public void MinimizeForPresentation()

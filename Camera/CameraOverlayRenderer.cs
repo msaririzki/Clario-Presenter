@@ -30,7 +30,11 @@ public static class CameraOverlayRenderer
                     rect, Color.FromArgb(255, 156, 167, 183), format);
             }
         }
-        session.DrawRoundedRectangle(rect, radius, radius, Color.FromArgb(255, 156, 167, 183),
-            Math.Max(1, (float)(bounds.Width / 240)));
+        // Keep the stroke inside the image when a custom position meets the frame edge.
+        var stroke = (float)Math.Min(Math.Min(bounds.Width, bounds.Height) / 2, Math.Max(1, bounds.Width / 240));
+        var inset = stroke / 2;
+        var border = new Rect(rect.X + inset, rect.Y + inset, rect.Width - stroke, rect.Height - stroke);
+        var borderRadius = Math.Max(0, radius - inset);
+        session.DrawRoundedRectangle(border, borderRadius, borderRadius, Color.FromArgb(255, 156, 167, 183), stroke);
     }
 }

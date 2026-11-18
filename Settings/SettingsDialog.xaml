@@ -122,9 +122,9 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Kamera" Style="{StaticResource SettingsSectionTitle}" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                                <TextBlock Text="Sertakan kamera" VerticalAlignment="Center" />
+                                <TextBlock Text="Aktifkan kamera" VerticalAlignment="Center" />
                                 <ToggleSwitch x:Name="CameraEnabledToggle" Style="{StaticResource SettingsSwitch}"
-                                              AutomationProperties.Name="Sertakan kamera dalam rekaman" Toggled="CameraEnabled_Changed" />
+                                              AutomationProperties.Name="Aktifkan kamera" Toggled="CameraEnabled_Changed" />
                             </StackPanel>
                         </Grid>
                         <Grid x:Name="CameraLayout" ColumnSpacing="18">
@@ -142,13 +142,16 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Pratinjau rekaman" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="16:9" Style="{StaticResource SettingsHint}" />
+                                    <TextBlock Text="Preview rekaman" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CameraPreviewSourceText" Grid.Column="1" Text="Contoh · 16:9" Style="{StaticResource SettingsHint}" />
                                 </Grid>
                                 <Border BorderThickness="1" BorderBrush="{StaticResource ClarioBorderBrush}" CornerRadius="10"
                                         Background="#0D1018">
                                     <Viewbox Stretch="Uniform">
-                                        <Grid x:Name="CameraPreviewFrame" Width="480" Height="270">
+                                        <Grid x:Name="CameraPreviewFrame" Width="480" Height="270" Background="Transparent"
+                                              PointerPressed="CameraPreview_PointerPressed" PointerMoved="CameraPreview_PointerMoved"
+                                              PointerReleased="CameraPreview_PointerReleased" PointerCanceled="CameraPreview_PointerReleased"
+                                              PointerCaptureLost="CameraPreview_PointerCaptureLost">
                                             <Border Margin="20,19,20,19" CornerRadius="8" BorderThickness="1"
                                                     Background="#131927" BorderBrush="#2A3448">
                                                 <Grid Padding="15" RowSpacing="13">
@@ -181,6 +184,9 @@
                                                     </Grid>
                                                 </Grid>
                                             </Border>
+                                            <canvas:CanvasControl x:Name="CameraPreviewCanvas" UseSharedDevice="True" ClearColor="Transparent"
+                                                                  Draw="CameraPreviewCanvas_Draw" IsHitTestVisible="False"
+                                                                  AutomationProperties.Name="Preview rekaman dan posisi kamera" />
                                             <Canvas IsHitTestVisible="False">
                                                 <Border x:Name="CameraPreviewPlaceholder" CornerRadius="5" BorderThickness="1.5"
                                                         Background="#26243E" BorderBrush="#B9B5FF">
@@ -192,12 +198,10 @@
                                                     </StackPanel>
                                                 </Border>
                                             </Canvas>
-                                            <canvas:CanvasControl x:Name="CameraPreviewCanvas" UseSharedDevice="True" ClearColor="Transparent"
-                                                                  Draw="CameraPreviewCanvas_Draw" Visibility="Collapsed"
-                                                                  AutomationProperties.Name="Pratinjau posisi dan ukuran kamera di rekaman" />
                                         </Grid>
                                     </Viewbox>
                                 </Border>
+                                <TextBlock Text="Seret kotak kamera untuk mengatur posisi." Style="{StaticResource SettingsHint}" />
                                 <TextBlock x:Name="CameraPreviewDetails" Style="{StaticResource SettingsHint}" />
                                 <TextBlock x:Name="CameraStatusText" Style="{StaticResource SettingsHint}" AutomationProperties.LiveSetting="Polite" />
                             </StackPanel>
@@ -220,6 +224,7 @@
                                           SelectionChanged="CameraLayout_Changed">
                                     <ComboBoxItem Content="Kanan bawah" /><ComboBoxItem Content="Kiri bawah" />
                                     <ComboBoxItem Content="Kanan atas" /><ComboBoxItem Content="Kiri atas" />
+                                    <ComboBoxItem x:Name="CameraCustomPositionItem" Content="Kustom" />
                                 </ComboBox>
                                 <ComboBox x:Name="CameraSizeComboBox" Header="Ukuran kamera" Style="{StaticResource ClarioPickerStyle}"
                                           SelectionChanged="CameraSizePreset_Changed">
@@ -247,8 +252,6 @@
                                 </StackPanel>
                                 <CheckBox x:Name="CameraMirrorCheckBox" Content="Cerminkan gambar" MinWidth="0"
                                           Checked="CameraMirror_Changed" Unchecked="CameraMirror_Changed" />
-                                <Button x:Name="TestCameraButton" Content="Tes kamera" IsEnabled="False" HorizontalAlignment="Stretch"
-                                        Style="{StaticResource ClarioButtonStyle}" Click="TestCamera_Click" />
                             </StackPanel>
                         </Grid>
                     </StackPanel>
@@ -271,9 +274,21 @@
                                     <ToggleSwitch x:Name="ComputerAudioToggle" Grid.Column="2" Style="{StaticResource SettingsSwitch}"
                                                   AutomationProperties.Name="Rekam suara komputer" Toggled="AudioSource_Changed" />
                                 </Grid>
-                                <ComboBox x:Name="PlaybackAudioComboBox" Header="Keluaran suara" DisplayMemberPath="Name"
-                                          Visibility="Collapsed" Style="{StaticResource ClarioPickerStyle}"
-                                          PlaceholderText="Pilih speaker atau headphone" SelectionChanged="AudioDevice_SelectionChanged" />
+                                <Grid x:Name="PlaybackAudioOptions" Visibility="Collapsed" ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="PlaybackAudioComboBox" Header="Keluaran suara" DisplayMemberPath="Name"
+                                              Style="{StaticResource ClarioPickerStyle}" PlaceholderText="Pilih speaker atau headphone"
+                                              ToolTipService.ToolTip="{Binding SelectedItem.Name, ElementName=PlaybackAudioComboBox}"
+                                              SelectionChanged="AudioDevice_SelectionChanged" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,3" Spacing="6">
+                                        <ProgressBar x:Name="PlaybackLevelBar" Height="6" Maximum="100"
+                                                     Foreground="{StaticResource ClarioLiveBrush}" AutomationProperties.Name="Level suara komputer" />
+                                        <TextBlock x:Name="PlaybackLevelStatus" Style="{StaticResource SettingsHint}" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource SettingsCard}">
@@ -289,9 +304,21 @@
                                     <ToggleSwitch x:Name="MicrophoneAudioToggle" Grid.Column="2" Style="{StaticResource SettingsSwitch}"
                                                   AutomationProperties.Name="Rekam mikrofon" Toggled="AudioSource_Changed" />
                                 </Grid>
-                                <ComboBox x:Name="MicrophoneAudioComboBox" Header="Input mikrofon" DisplayMemberPath="Name"
-                                          Visibility="Collapsed" Style="{StaticResource ClarioPickerStyle}"
-                                          PlaceholderText="Pilih mikrofon" SelectionChanged="AudioDevice_SelectionChanged" />
+                                <Grid x:Name="MicrophoneAudioOptions" Visibility="Collapsed" ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="MicrophoneAudioComboBox" Header="Input mikrofon" DisplayMemberPath="Name"
+                                              Style="{StaticResource ClarioPickerStyle}" PlaceholderText="Pilih mikrofon"
+                                              ToolTipService.ToolTip="{Binding SelectedItem.Name, ElementName=MicrophoneAudioComboBox}"
+                                              SelectionChanged="AudioDevice_SelectionChanged" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="0,0,0,3" Spacing="6">
+                                        <ProgressBar x:Name="MicrophoneLevelBar" Height="6" Maximum="100"
+                                                     Foreground="{StaticResource ClarioLiveBrush}" AutomationProperties.Name="Level mikrofon" />
+                                        <TextBlock x:Name="MicrophoneLevelStatus" Style="{StaticResource SettingsHint}" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
                         <StackPanel x:Name="AudioDeviceActions" Visibility="Collapsed" Spacing="6">

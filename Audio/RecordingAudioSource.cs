@@ -37,6 +37,14 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
         ? warning : null;
     public Task Completion { get; private set; } = Task.CompletedTask;
 
+    internal volatile bool MeteringEnabled;
+    internal AudioLevelReading? ReadLevel(bool loopback)
+    {
+        var track = Array.Find(_tracks, item => item.Loopback == loopback);
+        if (track is null) return null;
+        return new(track.Started.Task.IsCompletedSuccessfully, Interlocked.Exchange(ref track.Peak, 0), track.Warning);
+    }
+
     public Task StartAsync(CancellationToken token)
     {
         var inputs = new List<CaptureTrack>(2);
@@ -79,6 +87,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     var count = frames * channels;
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
                     Marshal.Copy(data, pcm, 0, count);
+                    if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count));
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
                 }, token);
         }
@@ -91,7 +100,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
             var source = track.Loopback ? "Suara komputer" : "Mikrofon";
             if (!track.Started.TrySetException(new InvalidOperationException(
                     track.Loopback ? $"{source} tidak bisa dibuka. Periksa perangkat keluaran di Pengaturan."
-                    : $"{source} tidak bisa dibuka. Periksa sambungan dan izin mikrofon Windows.", exception))
+                    : Wasapi.MicrophoneError(exception), exception))
                 && !token.IsCancellationRequested)
                 track.Warning = $"{source} terputus.";
         }
@@ -99,6 +108,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
 
     private sealed class CaptureTrack(string deviceId, bool loopback)
     {
+        internal int Peak;
         internal string DeviceId { get; } = deviceId;
         internal bool Loopback { get; } = loopback;
         internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

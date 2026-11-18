@@ -53,8 +53,11 @@ internal static class AudioChecks
                 try
                 {
                     await loopback.StartAsync(stop.Token).WaitAsync(TimeSpan.FromSeconds(5));
+                    loopback.MeteringEnabled = true;
                     await Task.Delay(150);
                     if (loopback.Warning is not null) throw new InvalidOperationException(loopback.Warning);
+                    if (loopback.ReadLevel(true) is not { IsReady: true, Peak: 0 } || loopback.ReadLevel(false) is not null)
+                        throw new InvalidOperationException("A muted output and a disabled microphone must remain distinguishable.");
                 }
                 finally
                 {
@@ -130,6 +133,19 @@ internal static class AudioChecks
 
     private static void VerifyMixer()
     {
+        var accumulated = 0;
+        AudioLevelMonitor.Accumulate(ref accumulated, [0, -1024]);
+        AudioLevelMonitor.Accumulate(ref accumulated, [512, 127]);
+        if (accumulated != 1024) throw new InvalidOperationException("Lost the highest audio level between UI updates.");
+        if (AudioLevelMonitor.PeakOf([100, -200, short.MinValue]) != 32768 || AudioLevelMonitor.PeakOf([0, 0]) != 0)
+            throw new InvalidOperationException("The level meter must handle silence and full-scale negative PCM.");
+        var integrated = new AudioDevice("internal", "Internal", Origin: AudioInputOrigin.Integrated);
+        var virtualInput = new AudioDevice("virtual", "Virtual", Origin: AudioInputOrigin.Software);
+        var externalDefault = new AudioDevice("usb", "USB");
+        if (Wasapi.SelectAutomaticInput([integrated, virtualInput], virtualInput) != integrated
+            || Wasapi.SelectAutomaticInput([integrated, externalDefault], externalDefault) != externalDefault
+            || Wasapi.SelectAutomaticInput([integrated, integrated with { Id = "other" }, virtualInput], virtualInput) != virtualInput)
+            throw new InvalidOperationException("Automatic input selection must prefer a known built-in input only when the Windows default is software.");
         var playback = new PcmTimeline();
         playback.Store(-1, [99, 99, 10_000, 20_000], channels: 2);
         playback.Store(100, [5, 7], channels: 2);

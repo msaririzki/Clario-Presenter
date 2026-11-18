@@ -207,8 +207,8 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     public void Start(nint windowHandle, bool keepLastFrame = false, bool captureCursor = true) =>
         StartItem(GraphicsCaptureItemFactory.CreateForWindow(windowHandle), keepLastFrame, captureCursor);
 
-    public void StartMonitor(nint monitorHandle, bool keepLastFrame = false) =>
-        StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle), keepLastFrame, captureCursor: true);
+    public void StartMonitor(nint monitorHandle, bool keepLastFrame = false, bool captureCursor = true) =>
+        StartItem(GraphicsCaptureItemFactory.CreateForMonitor(monitorHandle), keepLastFrame, captureCursor);
 
     private void StartItem(GraphicsCaptureItem captureItem, bool keepLastFrame, bool captureCursor)
     {

@@ -32,6 +32,8 @@ public sealed partial class MainPage : Page
     private bool _isSafeMirrorSession;
     private bool _isRecordingOnlySession;
     private bool _isProtectedPublicCapture;
+    private bool _presenterExcludedFromCapture;
+    private uint? _presenterPreviousCaptureAffinity;
     private long _lastPrivateViewTick;
     private nint _lastPublicWindow;
     private DisplayTarget? _clientDisplay;
@@ -61,6 +63,7 @@ public sealed partial class MainPage : Page
     {
         InitializeComponent();
         InitializeFloatingNotes();
+        _studioTimer.Tick += StudioTimer_Tick;
         SourceComboBox.ItemsSource = _sources;
         DisplayComboBox.ItemsSource = _audienceDisplays;
         SourceMonitorComboBox.ItemsSource = _displays;
@@ -284,7 +287,7 @@ public sealed partial class MainPage : Page
 
     private async Task RunPrimaryActionAsync()
     {
-        if (_sessionTransition) return;
+        if (_sessionTransition || _settingsDialogOpen) return;
         if (!IsRecordingOnly)
         {
             if (_isLive) await StopSessionAsync();
@@ -314,9 +317,9 @@ public sealed partial class MainPage : Page
 
     private async void PreviewButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_sessionTransition) return;
+        if (_sessionTransition || _settingsDialogOpen) return;
         if (_isLive) await StopSessionAsync();
-        else if (TryStartSession()) MinimizeForScreenSession();
+        else if (TryStartSession() && !DetailedPreview) MinimizeForScreenSession();
     }
 
     private bool TryStartSession()
@@ -373,7 +376,6 @@ public sealed partial class MainPage : Page
     private void MinimizeForScreenSession()
     {
         if (!_isSafeMirrorSession || App.MainWindow is not MainWindow window) return;
-        window.AutoMinimizeOnDeactivate = true;
         window.MinimizeForPresentation();
     }
 
@@ -497,7 +499,7 @@ public sealed partial class MainPage : Page
         switch (state)
         {
             case PresentationState.Live:
-                SetWindowStatus(_isRecordingOnlySession ? "Pratinjau" : "Presentasi aktif", LiveBrush);
+                SetWindowStatus(_isRecordingOnlySession ? "Preview" : "Presentasi aktif", LiveBrush);
                 break;
             case PresentationState.Frozen:
                 SetWindowStatus(_isFrozen ? "Freeze aktif" : "Menyiapkan tampilan", FreezeBrush);
@@ -509,22 +511,6 @@ public sealed partial class MainPage : Page
                 SetWindowStatus("Siap", MutedBrush);
                 break;
         }
-    }
-
-    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new SettingsDialog(_settingsService.Current, XamlRoot)
-        {
-            RequestedTheme = ActualTheme
-        };
-        await dialog.ShowAsync();
-        SettingsButton.Focus(FocusState.Programmatic);
-        if (!dialog.IsSaved) return;
-
-        _settingsService.Save(dialog.GetSettings());
-        var settings = _settingsService.Current;
-        FooterStatusText.Text = $"Pengaturan tersimpan · 1080p {settings.RecordingFrameRate} fps · {settings.RecordingBitrateMbps} Mbps"
-            + (settings.CameraEnabled ? " · kamera aktif untuk rekaman berikutnya" : string.Empty);
     }
 
     private async void RecordButton_Click(object sender, RoutedEventArgs e)
@@ -552,12 +538,14 @@ public sealed partial class MainPage : Page
         UpdateSessionActions();
         try
         {
+            await SyncStudioPreviewAsync();
             return await action();
         }
         finally
         {
             _sessionTransition = false;
             UpdateSessionActions();
+            await SyncStudioPreviewAsync();
         }
     }
 
@@ -596,14 +584,7 @@ public sealed partial class MainPage : Page
                     ResolveClientOutputMode,
                     stream,
                     new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps,
-                        new CameraOverlayOptions
-                        {
-                            Enabled = settings.CameraEnabled,
-                            DeviceId = settings.CameraDeviceId,
-                            Position = (CameraOverlayPosition)settings.CameraPosition,
-                            WidthPercent = settings.CameraWidthPercent,
-                            Mirror = settings.CameraMirror
-                        },
+                        PreviewCameraOptions(settings),
                         new RecordingAudioOptions(settings.ComputerAudioEnabled, settings.PlaybackDeviceId,
                             settings.MicrophoneEnabled, settings.MicrophoneDeviceId)));
                 if (!_isLive || _capture is null)
@@ -702,6 +683,7 @@ public sealed partial class MainPage : Page
             failure ??= exception;
         }
         if (fileWasAutoCreated) await DeleteEmptyRecordingAsync(file);
+        await SyncStudioPreviewAsync();
         UpdateSessionActions();
         UpdateRecordingStatusLabels();
         FooterStatusText.Text = failure is null
@@ -757,6 +739,7 @@ public sealed partial class MainPage : Page
             WindowCatalogService.MinimizeWindows(_privateWindows);
             _lastPrivateViewTick = _privateWindows.Count > 0 ? Environment.TickCount64 : 0;
             _capture.ConfigureDesktop(primaryDisplay.Bounds, primaryDisplay.WorkArea);
+            ExcludePresenterFromScreenCapture();
             _capture.FrameHoldPredicate = () => _isAutoHeld || _isProtectedPublicCapture || HasPrivateView();
             _capture.StartMonitor(primaryDisplay.Handle, keepLastFrame: true);
             _privacyWatchTimer.Start();
@@ -782,7 +765,6 @@ public sealed partial class MainPage : Page
         _sessionTimer.Stop();
         _privacyWatchTimer.Stop();
         _windowRescueTimer.Stop();
-        if (App.MainWindow is MainWindow mirrorWindow) mirrorWindow.AutoMinimizeOnDeactivate = false;
         _isLive = false;
         _isFrozen = false;
         _isPrivacy = false;
@@ -811,6 +793,7 @@ public sealed partial class MainPage : Page
             _capture.Dispose();
             _capture = null;
         }
+        RestorePresenterCaptureAffinity();
 
         _notesAudience = null;
         ApplyNoteCaptureRules();
@@ -832,6 +815,7 @@ public sealed partial class MainPage : Page
     private bool HasPrivateView()
     {
         if (IsForegroundPrivate() || IsNoteEditorOnRecordedDisplay() || WindowCatalogService.IsApplicationSwitcherActive()
+            || (!_presenterExcludedFromCapture && IsPresenterVisibleOnRecordedDisplay())
             || (_presenterDisplay is not null
                 && WindowCatalogService.HasPrivateWindowOnDisplay(_presenterDisplay.Bounds, _privateWindows)))
         {
@@ -841,6 +825,14 @@ public sealed partial class MainPage : Page
         // Do not capture the last few frames of a private window's minimize
         // animation after Windows has already marked its HWND as minimized.
         return Environment.TickCount64 - _lastPrivateViewTick < 300;
+    }
+
+    private bool IsPresenterVisibleOnRecordedDisplay()
+    {
+        var handle = GetPresenterWindowHandle();
+        return _presenterDisplay is not null && WindowCatalogService.IsWindowPresentable(handle)
+            && WindowCatalogService.TryGetCaptureBounds(handle, out var bounds)
+            && DesktopWindowPlan.Intersects(_presenterDisplay.Bounds, bounds);
     }
 
     private void PrivacyWatchTimer_Tick(object? sender, object e)
@@ -981,11 +973,12 @@ public sealed partial class MainPage : Page
         if (status is not null) FooterStatusText.Text = status;
     }
 
-    private void LivePreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) => _capture?.Draw(sender, args);
+    private void LivePreviewCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args) => DrawStudioPreview(sender, args);
 
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = false;
+        await SyncStudioPreviewAsync();
         DisposeFloatingNotes();
         await StopRecordingAsync();
         StopPresentation();
@@ -1007,6 +1000,7 @@ public sealed partial class MainPage : Page
         FooterStatusIcon.Foreground = brush;
         UpdateSessionActions();
         UpdatePreview();
+        _ = SyncStudioPreviewAsync();
         UpdateRecordingStatusLabels();
 
         switch (state)
@@ -1018,7 +1012,7 @@ public sealed partial class MainPage : Page
                     : _recorder?.IsRecording == true
                         ? "Sedang merekam. Klik Stop rekam untuk menyimpan video."
                         : _isRecordingOnlySession
-                            ? "Pratinjau aktif. Klik Mulai rekam untuk menyimpan video."
+                            ? "Preview aktif. Klik Mulai rekam untuk menyimpan video."
                             : "Presentasi aktif. Klik Rekam jika Anda juga ingin menyimpan video.";
                 break;
             case PresentationState.Frozen:
@@ -1052,12 +1046,13 @@ public sealed partial class MainPage : Page
         var recording = _recorder is not null;
         PrimaryButton.IsEnabled = !_sessionTransition;
         PreviewButton.IsEnabled = !_sessionTransition;
+        PreviewModePicker.IsEnabled = !_sessionTransition;
         SettingsButton.IsEnabled = !_sessionTransition;
         RecordButton.IsEnabled = !_sessionTransition;
         OpenRecordingFolderButton.Visibility = !_sessionTransition && _lastSavedRecordingFolder is not null
             ? Visibility.Visible : Visibility.Collapsed;
         PreviewButton.Visibility = IsRecordingOnly && !recording ? Visibility.Visible : Visibility.Collapsed;
-        PreviewButton.Content = _isLive ? "Tutup pratinjau" : "Lihat pratinjau";
+        PreviewButton.Content = _isLive ? "Tutup preview" : "Buka preview";
         SessionControls.Visibility = _isLive ? Visibility.Visible : Visibility.Collapsed;
         RecordButton.Visibility = IsRecordingOnly ? Visibility.Collapsed : Visibility.Visible;
         FreezeButton.Content = _isFrozen ? "Lanjutkan tampilan" : "Freeze";
@@ -1090,7 +1085,7 @@ public sealed partial class MainPage : Page
         ClientStateSubtitle.Text = _isLive
             ? "Buka layar atau aplikasi yang ingin ditampilkan."
             : IsRecordingOnly
-                ? "Tampilan sumber akan terlihat di sini saat pratinjau atau rekaman berjalan."
+                ? "Tampilan sumber akan terlihat di sini saat preview atau rekaman berjalan."
                 : "Sumber presentasi akan terlihat di sini.";
     }
 

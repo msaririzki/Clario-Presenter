@@ -115,7 +115,7 @@
               Background="{StaticResource ClarioSurfaceBrush}" BorderBrush="{StaticResource ClarioBorderBrush}" BorderThickness="0,1,0,0">
             <StackPanel x:Name="PrimaryActions" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                 <Button x:Name="SettingsButton" Content="Pengaturan" Style="{StaticResource ClarioButtonStyle}" Click="SettingsButton_Click" />
-                <Button x:Name="PreviewButton" Content="Lihat pratinjau" Style="{StaticResource ClarioButtonStyle}" Click="PreviewButton_Click" />
+                <Button x:Name="PreviewButton" Content="Buka preview" Style="{StaticResource ClarioButtonStyle}" Click="PreviewButton_Click" />
                 <Button x:Name="PrimaryButton" Content="Mulai rekam" MinWidth="140"
                         Style="{StaticResource ClarioPrimaryButtonStyle}" Click="PrimaryButton_Click" />
             </StackPanel>
@@ -127,7 +127,14 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel x:Name="PreviewHeading" VerticalAlignment="Center" Spacing="2">
-                    <TextBlock Text="Pratinjau" FontSize="14" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Preview" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <ComboBox x:Name="PreviewModePicker" SelectedIndex="0" AutomationProperties.Name="Tampilan preview"
+                                  Style="{StaticResource ClarioPickerStyle}" SelectionChanged="PreviewMode_Changed">
+                            <ComboBoxItem Content="Sumber saja" />
+                            <ComboBoxItem Content="Hasil rekaman" />
+                        </ComboBox>
+                    </StackPanel>
                     <TextBlock x:Name="ActiveSourceTitle" FontSize="12" Foreground="{StaticResource ClarioSecondaryTextBrush}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel x:Name="SupportActions" Grid.Row="1" Orientation="Horizontal" Spacing="8">
@@ -163,6 +170,7 @@
 
                 <Border x:Name="PreviewPanel" Padding="8" Style="{StaticResource ClarioPanelStyle}">
                     <Grid Background="{StaticResource ClarioCanvasBrush}">
+                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <canvas:CanvasControl x:Name="LivePreviewCanvas" Visibility="Collapsed" UseSharedDevice="True"
                                               ClearColor="#0E1116" Draw="LivePreviewCanvas_Draw" />
                         <StackPanel x:Name="ClientStateOverlay" MaxWidth="340" Margin="18" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -173,6 +181,23 @@
                             <TextBlock x:Name="ClientStateSubtitle" Text="Tampilan yang masuk ke video akan terlihat di sini." FontSize="13"
                                        Foreground="{StaticResource ClarioSecondaryTextBrush}" TextAlignment="Center" TextWrapping="Wrap" />
                         </StackPanel>
+                        <Grid x:Name="StudioMeters" Grid.Row="1" Visibility="Collapsed" Padding="12,8" ColumnSpacing="16"
+                              Background="{StaticResource ClarioSurfaceBrush}">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Suara komputer" FontWeight="SemiBold" />
+                                <ProgressBar x:Name="StudioPlaybackBar" AutomationProperties.Name="Level suara komputer" />
+                                <TextBlock x:Name="StudioPlaybackText" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="Mikrofon" FontWeight="SemiBold" />
+                                <ProgressBar x:Name="StudioMicBar" AutomationProperties.Name="Level mikrofon" />
+                                <TextBlock x:Name="StudioMicText" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock x:Name="StudioCameraText" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,0" FontSize="12"
+                                       Foreground="{StaticResource ClarioSecondaryTextBrush}" TextWrapping="Wrap" />
+                        </Grid>
                     </Grid>
                 </Border>
 

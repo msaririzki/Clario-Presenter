@@ -71,6 +71,20 @@ public sealed class OutputRecordingService : IAsyncDisposable
     public bool IncludesAudio => _audio is not null;
     public string? AudioWarning => _audio?.Warning;
 
+    internal void SetPreviewMeters(bool enabled)
+    {
+        if (_audio is RecordingAudioSource audio) audio.MeteringEnabled = enabled;
+    }
+
+    internal AudioLevelReading? ReadPreviewLevel(bool loopback) =>
+        (_audio as RecordingAudioSource)?.ReadLevel(loopback);
+
+    internal void DrawPreviewCamera(CanvasDrawingSession session)
+    {
+        if (_camera is not null && _cameraOptions is { Enabled: true })
+            CameraOverlayRenderer.Draw(session, _camera, _cameraBounds, _cameraOptions.Mirror);
+    }
+
     public OutputRecordingService() { }
 
     internal OutputRecordingService(IRecordingAudioSource audio) => _suppliedAudio = audio;
@@ -311,8 +325,7 @@ public sealed class OutputRecordingService : IAsyncDisposable
                         _scaleMode,
                         _adaptiveZoom);
 
-                    if (_camera is not null && _cameraOptions is { Enabled: true })
-                        CameraOverlayRenderer.Draw(drawingSession, _camera, _cameraBounds, _cameraOptions.Mirror);
+                    DrawPreviewCamera(drawingSession);
                 }
             }
 
