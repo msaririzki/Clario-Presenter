@@ -755,11 +755,10 @@ public sealed partial class MainPage : Page
             // available from the taskbar and will trigger auto-hold when restored.
             _isAutoHeld = true;
             WindowCatalogService.MinimizeWindows(_privateWindows);
-            _lastPrivateViewTick = Environment.TickCount64;
+            _lastPrivateViewTick = _privateWindows.Count > 0 ? Environment.TickCount64 : 0;
             _capture.ConfigureDesktop(primaryDisplay.Bounds, primaryDisplay.WorkArea);
             _capture.FrameHoldPredicate = () => _isAutoHeld || _isProtectedPublicCapture || HasPrivateView();
             _capture.StartMonitor(primaryDisplay.Handle, keepLastFrame: true);
-            _capture.SetProtectedWindows(WindowCatalogService.GetPublicDesktopWindows(primaryDisplay.WorkArea, _privateWindows));
             _privacyWatchTimer.Start();
         }
         else
@@ -865,14 +864,12 @@ public sealed partial class MainPage : Page
 
         var wasProtected = _isProtectedPublicCapture;
         var wasHeld = _isAutoHeld;
-        if (protectedViewNeeded) _capture.ProtectDesktop();
-        // Keep public captures prepared in BOTH states. Opening a private app
-        // changes only whether the monitor backdrop is held, never the source
-        // dimensions, window capture sessions, or the recorder's Live state.
-        if (!switcherActive)
+        if (protectedViewNeeded)
         {
-            TryUpdateProtectedDesktop(protectedViewNeeded);
+            _capture.ProtectDesktop();
+            if (!switcherActive) UpdateProtectedDesktop();
         }
+        else if (wasProtected) _capture.ResumeDesktop();
         _isProtectedPublicCapture = protectedViewNeeded;
         _isAutoHeld = false;
 
@@ -880,23 +877,22 @@ public sealed partial class MainPage : Page
             UpdatePresentationState();
     }
 
-    private bool TryUpdateProtectedDesktop(bool protectedViewNeeded)
+    private void UpdateProtectedDesktop()
     {
-        if (_capture is null || _presenterDisplay is null) return false;
+        if (_capture is null || _presenterDisplay is null) return;
 
         try
         {
-            if (protectedViewNeeded && _lastPublicWindow != nint.Zero
+            if (_lastPublicWindow != nint.Zero
                 && !WindowCatalogService.IsInWindowFamily(_lastPublicWindow, _privateWindows))
                 WindowCatalogService.PrepareWindowForBackgroundCapture(_lastPublicWindow);
             var publicWindows = WindowCatalogService.GetPublicDesktopWindows(_presenterDisplay.WorkArea, _privateWindows);
-            return _capture.SetProtectedWindows(publicWindows, retainSceneIfEmpty: protectedViewNeeded);
+            _capture.SetProtectedWindows(publicWindows, retainSceneIfEmpty: true);
         }
         catch
         {
             // Keep the last good composition on transient enumeration/driver
             // failures. Never tear down a working scene during a private detour.
-            return false;
         }
     }
 

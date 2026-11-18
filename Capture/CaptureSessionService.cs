@@ -29,6 +29,7 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     private SizeInt32 _lastSize;
     private volatile bool _isFrozen;
     private volatile bool _desktopProtected;
+    private TimeSpan _acceptDesktopFramesAfter;
     public bool IsDesktopProtected => _desktopProtected;
     private bool _disposed;
     public int PublicCaptureStartCount { get; private set; }
@@ -87,6 +88,17 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
     public void ProtectDesktop()
     {
         lock (_frameLock) _desktopProtected = true;
+    }
+
+    public void ResumeDesktop()
+    {
+        if (_layerCache.Count == 0) return;
+        // Window capture indicators are visible to a simultaneous monitor capture.
+        // Release the sessions before accepting monitor pixels again. Queued
+        // frames carry their acquisition time on the same QPC clock as Stopwatch.
+        ClearProtectedWindows();
+        _acceptDesktopFramesAfter = System.Diagnostics.Stopwatch.GetElapsedTime(0)
+            + TimeSpan.FromMilliseconds(120);
     }
 
     public bool SetProtectedWindows(IReadOnlyList<nint> windowHandles, bool retainSceneIfEmpty = false)
@@ -348,7 +360,9 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
                     if (nextSize.Width <= 0 || nextSize.Height <= 0) return;
 
                     sizeChanged = nextSize.Width != _lastSize.Width || nextSize.Height != _lastSize.Height;
-                    var holdFrame = FrameHoldPredicate?.Invoke() ?? false;
+                    var holdFrame = (FrameHoldPredicate?.Invoke() ?? false)
+                        || (_desktopLayout is not null && (_layerCache.Count != 0
+                            || frame.SystemRelativeTime <= _acceptDesktopFramesAfter));
                     if (_desktopLayout is not null && !_isFrozen && holdFrame)
                     {
                         lock (_frameLock)
