@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <Version>1.0.1</Version>
+    <Product>Clario Presenter</Product>
+    <Company>msaririzki</Company>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>Clario_Presenter</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -16,6 +19,23 @@
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(WindowsPackageType)' == 'None'">
+    <DefineConstants>$(DefineConstants);CLARIO_UNPACKAGED</DefineConstants>
+  </PropertyGroup>
+
+  <!-- A standalone EXE needs the same Win2D activation classes that MSIX normally registers. -->
+  <Target Name="PrepareStandaloneWin2DManifest" BeforeTargets="GetNewAppManifestValues"
+          Condition="'$(WindowsPackageType)' == 'None' and '$(WindowsAppSDKSelfContained)' == 'true'">
+    <PropertyGroup>
+      <CanvasManifest>$(IntermediateOutputPath)Clario.Win2D.manifest</CanvasManifest>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="&quot;$(ManifestTool)&quot; -nologo -manifest &quot;$(ApplicationManifest)&quot; -winmd:&quot;$(Win2DWinMDPath)&quot; -dll:Microsoft.Graphics.Canvas.dll -out:&quot;$(CanvasManifest)&quot;" />
+    <PropertyGroup>
+      <ApplicationManifest>$(CanvasManifest)</ApplicationManifest>
+    </PropertyGroup>
+  </Target>
+
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
@@ -24,7 +44,7 @@
     <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
     <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\AppIcon.ico" />
+    <Content Include="Assets\AppIcon.ico" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
 

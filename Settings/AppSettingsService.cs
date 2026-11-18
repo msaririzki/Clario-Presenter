@@ -1,13 +1,20 @@
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using System.Text.Json;
 
 namespace Clario_Presenter.Settings;
 
 public sealed class AppSettingsService
 {
     private const string RecordingFolderName = "Clario Presenter";
+#if CLARIO_UNPACKAGED
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Clario Presenter", "settings.json");
+#else
     private readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
+#endif
 
     public PresenterSettings Current { get; private set; }
 
@@ -18,14 +25,22 @@ public sealed class AppSettingsService
 
     public void Save(PresenterSettings settings)
     {
-        Current = settings with
+        var normalized = Normalize(settings);
+#if CLARIO_UNPACKAGED
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        var temporaryPath = Path.Combine(Path.GetDirectoryName(SettingsPath)!, Path.GetRandomFileName());
+        try
         {
-            RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
-            RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
-            CameraPosition = Math.Clamp(settings.CameraPosition, 0, 3),
-            CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, 15, 35)
-        };
-
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(normalized));
+            File.Move(temporaryPath, SettingsPath, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
+        Current = normalized;
+#else
+        Current = normalized;
         _localSettings.Values[nameof(PresenterSettings.RecordingFrameRate)] = Current.RecordingFrameRate;
         _localSettings.Values[nameof(PresenterSettings.RecordingBitrateMbps)] = Current.RecordingBitrateMbps;
         _localSettings.Values[nameof(PresenterSettings.AskRecordingLocation)] = Current.AskRecordingLocation;
@@ -39,7 +54,16 @@ public sealed class AppSettingsService
         _localSettings.Values[nameof(PresenterSettings.PlaybackDeviceId)] = Current.PlaybackDeviceId;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneEnabled)] = Current.MicrophoneEnabled;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneDeviceId)] = Current.MicrophoneDeviceId;
+#endif
     }
+
+    private static PresenterSettings Normalize(PresenterSettings settings) => settings with
+    {
+        RecordingFrameRate = settings.RecordingFrameRate is 30 ? 30 : 60,
+        RecordingBitrateMbps = Math.Clamp(settings.RecordingBitrateMbps, 8, 32),
+        CameraPosition = Math.Clamp(settings.CameraPosition, 0, 3),
+        CameraWidthPercent = Math.Clamp(settings.CameraWidthPercent, 15, 35)
+    };
 
     public async Task<StorageFolder> GetRecordingFolderAsync()
     {
@@ -98,6 +122,16 @@ public sealed class AppSettingsService
 
     private PresenterSettings Load()
     {
+#if CLARIO_UNPACKAGED
+        try
+        {
+            if (File.Exists(SettingsPath))
+                return Normalize(JsonSerializer.Deserialize<PresenterSettings>(File.ReadAllText(SettingsPath)) ?? new());
+        }
+        catch (JsonException) { }
+        catch (IOException) { }
+        return new();
+#else
         var values = _localSettings.Values;
         return new PresenterSettings
         {
@@ -115,6 +149,7 @@ public sealed class AppSettingsService
             MicrophoneEnabled = ReadBool(values, nameof(PresenterSettings.MicrophoneEnabled)),
             MicrophoneDeviceId = values[nameof(PresenterSettings.MicrophoneDeviceId)] as string ?? string.Empty
         };
+#endif
     }
 
     private static int ReadInt(IPropertySet values, string key, int fallback) =>

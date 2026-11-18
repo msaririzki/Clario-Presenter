@@ -2,63 +2,19 @@
 
 Clario Presenter adalah aplikasi Windows untuk menampilkan dan merekam satu layar atau aplikasi, sambil menyembunyikan jendela tertentu. Catatan dan kontrol presentasi hanya terlihat oleh presenter.
 
-## Status saat ini
+## Unduh untuk Windows
 
-Versi MVP sudah berjalan sebagai aplikasi WinUI 3 native:
+**[Unduh installer Windows x64](https://github.com/msaririzki/Clario-Presenter/releases/latest/download/Clario-Presenter-Setup-x64.exe)** · [Lihat semua rilis](https://github.com/msaririzki/Clario-Presenter/releases)
 
-- enumerasi jendela aplikasi yang sedang terbuka;
-- deteksi monitor utama dan monitor eksternal;
-- capture jendela nyata melalui `Windows.Graphics.Capture`;
-- pilihan sumber **Layar** atau **Aplikasi** untuk merekam atau presentasi;
-- mode **Rekam** menyimpan video langsung, dengan pilihan **Lihat pratinjau** untuk memeriksa sumber;
-- sumber layar selalu memakai ukuran **Seluruh gambar** agar tepi dan taskbar tetap di tempatnya saat membuka aplikasi tersembunyi;
-- untuk sumber aplikasi, **Perbesar** memberi zoom ringan dan **Isi layar** memenuhi area tampilan;
-- pemilih jendela privat per aplikasi;
-- Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
-- capture jendela publik disiapkan sebelum membuka aplikasi privat dan digunakan kembali selama perpindahan; adegan lama baru diganti setelah seluruh jendela baru mengirim frame nyata;
-- snapshot desktop menahan transisi Alt+Tab/preview taskbar; perpindahan ke aplikasi privat tidak mengganti rekaman dengan layar jeda dan tidak mengubah dimensi output;
-- jendela di monitor lain disaring dari komposisi, dan jendela publik yang tertutup penuh tidak membutuhkan capture aktif tambahan;
-- jendela publik dan dialog perangkat dari proses yang sama disusun sesuai urutan desktop, termasuk dialog Cisco Packet Tracer yang tidak memiliki Win32 owner;
-- taskbar aman disimpan terpisah dan selalu digambar di posisi tetap di atas jendela publik;
-- jika jendela publik sempat diminimalkan, Clario memulihkannya tanpa mengambil fokus agar video tetap mengirim frame di belakang aplikasi privat;
-- jendela privat dapat tetap terbuka berdampingan dengan aplikasi publik; mirror desktop hanya dilanjutkan ketika jendela privat sudah diminimalkan atau ditutup;
-- Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
-- pratinjau sumber di area utama saat sesi aktif;
-- output fullscreen bersih pada monitor eksternal;
-- jendela aplikasi yang terbuka atau mengingat posisi di monitor klien otomatis dikembalikan ke layar laptop selama sesi aktif;
-- editor catatan privat yang dibuka sesuai kebutuhan dan timer rekaman pada tombol **Stop rekam**;
-- perekam output klien ke MP4 H.264 1920×1080 dengan pilihan 30 atau 60 fps dan akselerasi hardware;
-- overlay kamera khusus rekaman: pilihan webcam internal/USB atau kamera virtual yang terdaftar di Windows, preview, empat posisi, tiga ukuran, serta opsi cermin;
-- kamera dimulai hanya saat `Tes kamera` atau REC dengan kamera diaktifkan; kamera dilepas setelah preview ditutup atau rekaman selesai;
-- jika kamera tidak tersedia saat mulai REC, aplikasi menampilkan error; jika kamera terputus di tengah sesi, rekaman layar berlanjut dengan penanda kamera tidak tersedia;
-- buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
-- backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
-- rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
-- menu Pengaturan untuk kelancaran video, kualitas video, folder rekaman, dan pilihan lokasi setiap kali merekam;
-- penyimpanan otomatis yang rapi ke `Videos\Clario Presenter` dengan nama file bertimestamp;
-- status Siap, Aktif, Gambar ditahan, dan Privasi;
-- Freeze mempertahankan gambar terakhir tanpa menghentikan kontrol presenter;
-- Privasi mengganti tampilan audiens dengan pesan jeda yang netral;
-- fallback aman otomatis ketika jendela sumber ditutup;
-- render event-driven mengikuti kedatangan frame, tanpa polling 30 FPS;
-- reusable double buffer GPU dan pembuangan frame antrean yang sudah usang untuk menjaga latency rendah;
-- dukungan dasar UI Automation dan keyboard accessibility.
+1. Gunakan Windows 10 versi 2004 (build 19041) atau lebih baru, atau Windows 11, dengan prosesor x64 (Intel atau AMD).
+2. Buka `Clario-Presenter-Setup-x64.exe` dan ikuti petunjuk pemasangan. Installer memasang aplikasi untuk akun Windows Anda dan menyertakan runtime yang diperlukan.
+3. Buka **Clario Presenter** dari menu **Mulai**. Untuk presentasi dua layar, sambungkan monitor atau proyektor lalu pilih **Win+P → Extend (Perluas)**.
 
-Frame GPU disalin ke dua render target yang digunakan bergantian. Buffer dibuat ulang hanya ketika ukuran jendela berubah, bukan pada setiap frame. Ini menjaga lifetime frame tetap aman, menghindari alokasi berulang, dan memungkinkan preview laptop serta output klien memakai device Win2D yang sama.
+Installer rilis pertama belum ditandatangani dengan sertifikat penerbit. Windows mungkin menampilkan peringatan SmartScreen. Setiap rilis menyertakan `SHA256SUMS.txt` untuk memeriksa file unduhan.
 
-## Menjalankan aplikasi
+Untuk memperbarui, selesaikan rekaman, tutup Clario, lalu jalankan installer versi terbaru. Untuk menghapus aplikasi, buka **Pengaturan Windows → Aplikasi → Clario Presenter → Hapus instalan**. Video yang sudah disimpan tetap ada.
 
-Persyaratan pengembangan:
-
-- Windows 10 build 19041 atau lebih baru;
-- .NET 9 SDK;
-- akses NuGet untuk memulihkan Windows App SDK.
-
-```powershell
-dotnet restore -r win-x64
-dotnet build -p:Platform=x64
-dotnet run --no-build -p:Platform=x64
-```
+## Cara menggunakan Clario
 
 ### Rekam
 
@@ -112,6 +68,74 @@ Untuk catatan dari AI, minta satu file Markdown UTF-8 dengan judul `## Nomor —
 
 Clario meminta Windows mengecualikan panel dari tangkapan. Jika pengecualian tidak dapat dipasang atau diverifikasi, Clario memindahkan panel ke layar yang tidak direkam dan tidak digunakan audiens, atau menyembunyikannya. Ini diverifikasi untuk jalur tangkapan Clario, bukan jaminan untuk perekam lain. Lakukan satu rekaman uji singkat dengan file Packet Tracer yang akan dipakai.
 
+## Fitur dan cara kerja
+
+Clario menggunakan WinUI 3 dan menyediakan fitur berikut.
+
+- enumerasi jendela aplikasi yang sedang terbuka;
+- deteksi monitor utama dan monitor eksternal;
+- capture jendela nyata melalui `Windows.Graphics.Capture`;
+- pilihan sumber **Layar** atau **Aplikasi** untuk merekam atau presentasi;
+- mode **Rekam** menyimpan video langsung, dengan pilihan **Lihat pratinjau** untuk memeriksa sumber;
+- sumber layar selalu memakai ukuran **Seluruh gambar** agar tepi dan taskbar tetap di tempatnya saat membuka aplikasi tersembunyi;
+- untuk sumber aplikasi, **Perbesar** memberi zoom ringan dan **Isi layar** memenuhi area tampilan;
+- pemilih jendela privat per aplikasi;
+- Live Terlindungi mempertahankan desktop aman terakhir dan memperbarui jendela publik di posisi serta ukuran aslinya sehingga dialog kecil tidak diperbesar menjadi seluruh output;
+- capture jendela publik disiapkan sebelum membuka aplikasi privat dan digunakan kembali selama perpindahan; adegan lama baru diganti setelah seluruh jendela baru mengirim frame nyata;
+- snapshot desktop menahan transisi Alt+Tab/preview taskbar; perpindahan ke aplikasi privat tidak mengganti rekaman dengan layar jeda dan tidak mengubah dimensi output;
+- jendela di monitor lain disaring dari komposisi, dan jendela publik yang tertutup penuh tidak membutuhkan capture aktif tambahan;
+- jendela publik dan dialog perangkat dari proses yang sama disusun sesuai urutan desktop, termasuk dialog Cisco Packet Tracer yang tidak memiliki Win32 owner;
+- taskbar aman disimpan terpisah dan selalu digambar di posisi tetap di atas jendela publik;
+- jika jendela publik sempat diminimalkan, Clario memulihkannya tanpa mengambil fokus agar video tetap mengirim frame di belakang aplikasi privat;
+- jendela privat dapat tetap terbuka berdampingan dengan aplikasi publik; mirror desktop hanya dilanjutkan ketika jendela privat sudah diminimalkan atau ditutup;
+- Clario otomatis diminimalkan ketika presenter kembali ke Canva/browser agar tidak ikut tercermin;
+- pratinjau sumber di area utama saat sesi aktif;
+- output fullscreen bersih pada monitor eksternal;
+- jendela aplikasi yang terbuka atau mengingat posisi di monitor klien otomatis dikembalikan ke layar laptop selama sesi aktif;
+- editor catatan privat yang dibuka sesuai kebutuhan dan timer rekaman pada tombol **Stop rekam**;
+- perekam output klien ke MP4 H.264 1920×1080 dengan pilihan 30 atau 60 fps dan akselerasi hardware;
+- overlay kamera khusus rekaman: pilihan webcam internal/USB atau kamera virtual yang terdaftar di Windows, preview, empat posisi, tiga ukuran, serta opsi cermin;
+- kamera dimulai hanya saat `Tes kamera` atau REC dengan kamera diaktifkan; kamera dilepas setelah preview ditutup atau rekaman selesai;
+- jika kamera tidak tersedia saat mulai REC, aplikasi menampilkan error; jika kamera terputus di tengah sesi, rekaman layar berlanjut dengan penanda kamera tidak tersedia;
+- buffer BGRA independen per sampel mencegah encoder membaca frame GPU yang sedang digambar ulang dan menghilangkan kilatan hitam;
+- backpressure encoder menghindari render/readback GPU yang belum diminta dan timestamp berbasis waktu nyata mencegah video dipercepat ketika frame 60 fps terlambat;
+- rekaman mengambil buffer output internal Clario, sehingga panel Clario, PDF, dan aplikasi privat tidak ikut masuk;
+- menu Pengaturan untuk kelancaran video, kualitas video, folder rekaman, dan pilihan lokasi setiap kali merekam;
+- penyimpanan otomatis yang rapi ke `Videos\Clario Presenter` dengan nama file bertimestamp;
+- status Siap, Aktif, Gambar ditahan, dan Privasi;
+- Freeze mempertahankan gambar terakhir tanpa menghentikan kontrol presenter;
+- Privasi mengganti tampilan audiens dengan pesan jeda yang netral;
+- fallback aman otomatis ketika jendela sumber ditutup;
+- render event-driven mengikuti kedatangan frame, tanpa polling 30 FPS;
+- reusable double buffer GPU dan pembuangan frame antrean yang sudah usang untuk menjaga latency rendah;
+- dukungan dasar UI Automation dan keyboard accessibility.
+
+Frame GPU disalin ke dua render target yang digunakan bergantian. Buffer dibuat ulang hanya ketika ukuran jendela berubah, bukan pada setiap frame. Ini menjaga lifetime frame tetap aman, menghindari alokasi berulang, dan memungkinkan preview laptop serta output klien memakai device Win2D yang sama.
+
+## Menjalankan dari kode sumber
+
+Persyaratan pengembangan:
+
+- Windows 10 build 19041 atau lebih baru;
+- .NET 10 SDK;
+- akses NuGet untuk memulihkan Windows App SDK.
+
+```powershell
+dotnet restore -r win-x64
+dotnet build -p:Platform=x64
+dotnet run --no-build -p:Platform=x64
+```
+
+### Membuat installer
+
+Di Windows x64, siapkan .NET 10 SDK, Inno Setup 6.3.3 atau lebih baru dalam seri 6, dan komponen Visual C++ x64 dari Visual Studio Build Tools. Jalankan dari folder proyek.
+
+```powershell
+.\installer\Build-Installer.ps1
+```
+
+Installer dan SHA-256 tersimpan di `bin/installer/<versi>/`. Versi mengikuti properti `Version` di `Clario.Presenter.csproj`. Saat membuat GitHub Release, gunakan tag `v<versi>` dan unggah kedua file tersebut untuk menjaga tautan unduhan tetap berlaku.
+
 ## Prinsip desain
 
 - permukaan graphite dengan kontras tenang;
@@ -124,7 +148,7 @@ Clario meminta Windows mengecualikan panel dari tangkapan. Jika pengecualian tid
 
 ## Teknologi
 
-- C# dan .NET 9;
+- C# dan .NET 10;
 - WinUI 3 / Windows App SDK 1.8;
 - Windows Graphics Capture untuk menangkap satu jendela atau monitor utama;
 - Win2D di atas Direct3D 11 untuk preview dan output GPU;
@@ -176,7 +200,7 @@ Uji integrasi kamera (opsional, benar-benar menyalakan kamera pertama yang terse
 ```powershell
 dotnet build Tests/CameraSmoke/Clario.CameraSmoke.csproj
 # Di Windows PowerShell 5.1, setelah Clario sudah terdaftar pada Windows:
-Invoke-CommandInDesktopPackage -PackageFamilyName '237E57D9-2488-4F07-B595-A20D0BDFEF66_1z32rh13vfry6' -AppId App -Command 'E:\projeck git\Bagikan layar\Tests\CameraSmoke\bin\Debug\net9.0-windows10.0.26100.0\win-x64\Clario.CameraSmoke.exe'
+Invoke-CommandInDesktopPackage -PackageFamilyName '237E57D9-2488-4F07-B595-A20D0BDFEF66_1z32rh13vfry6' -AppId App -Command 'E:\projeck git\Bagikan layar\Tests\CameraSmoke\bin\Debug\net10.0-windows10.0.26100.0\win-x64\Clario.CameraSmoke.exe'
 ```
 
 Sesuaikan path repository. Laporan tersimpan di `%TEMP%\Clario-CameraSmoke.json`; lokasi MP4 uji dicantumkan di laporan. Kamera virtual/eksternal perlu diuji ulang setelah drivernya tersedia.
