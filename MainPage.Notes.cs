@@ -196,14 +196,6 @@ public sealed partial class MainPage
         }
     }
 
-    // The editor is not the floating window. Hold the raw monitor capture if
-    // the editor itself is visible on the source display, including behind a dialog.
-    private bool IsNoteEditorOnRecordedDisplay() =>
-        _presenterDisplay is not null && NotesPanel.Visibility == Visibility.Visible
-        && !string.IsNullOrWhiteSpace(FreeNotesTextBox.Text)
-        && WindowCatalogService.IsWindowPresentable(GetPresenterWindowHandle())
-        && WindowCatalogService.HasPrivateWindowOnDisplay(_presenterDisplay.Bounds, [GetPresenterWindowHandle()]);
-
     private void SetNotesEditingEnabled(bool enabled)
     {
         OpenNotesButton.IsEnabled = enabled && !_importingNotes;

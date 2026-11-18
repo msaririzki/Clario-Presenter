@@ -4,6 +4,7 @@ using Clario_Presenter.Recording;
 using Clario_Presenter.Services;
 using Microsoft.Graphics.Canvas;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows.Forms;
 using Windows.Storage;
@@ -31,7 +32,8 @@ internal static class DesktopSwitchChecks
             using var capture = new CaptureSessionService();
             var held = false;
             capture.ConfigureDesktop(display.Bounds, display.WorkArea);
-            capture.FrameHoldPredicate = () => held;
+            capture.FrameHoldPredicate = () => held || WindowCatalogService.RequiresProtectedDesktop(
+                display.Bounds, [], backdrop.Handle, presenterExcluded: true, privatePresenterThumbnail: true);
             capture.StartMonitor(display.Handle, keepLastFrame: true);
             var scene = new TestRegion(capture, desktopBounds, display.Bounds);
             var publicHandles = new[] { publicApp.Handle, secondApp.Handle };
@@ -51,6 +53,22 @@ internal static class DesktopSwitchChecks
             await recorder.StartAsync(scene, CaptureScaleMode.Fit, 1, () => ClientOutputMode.Live,
                 await file.OpenAsync(FileAccessMode.ReadWrite), new RecordingOptions(60, 10, cameraOptions));
             using var inspection = new CanvasRenderTarget(CanvasDevice.GetSharedDevice(), 640, 360, 96);
+            // Exercise a compositor-owned overlay that is not in the public-window list.
+            // A second top-level window with the same class is common with multiple monitors.
+            using (var popup = new ThumbnailPopup(origin.X + 20, origin.Y + 20))
+            {
+                await Task.Delay(300);
+                if (!WindowCatalogService.IsApplicationSwitcherActive()
+                    || WindowCatalogService.RequiresProtectedDesktop(display.Bounds, [], backdrop.Handle, true, true)
+                    || !WindowCatalogService.RequiresProtectedDesktop(display.Bounds, [], backdrop.Handle, true, false)
+                    || !WindowCatalogService.RequiresProtectedDesktop(display.Bounds, [secondApp.Handle], backdrop.Handle, true, true))
+                    throw new InvalidOperationException("Unexpected thumbnail protection for monitor capture.");
+                using (var drawing = inspection.CreateDrawingSession()) scene.DrawRecordingFrame(drawing, 640, 360);
+                var sample = inspection.GetPixelBytes(36, 36, 1, 1);
+                if (sample[0] < 245 || sample[1] < 245 || sample[2] < 245)
+                    throw new InvalidOperationException("Public shell popup missing from the desktop frame.");
+            }
+            await Task.Delay(180);
             var checks = 0;
             var publicFrameSignatures = new HashSet<int>();
             for (var pass = 0; pass < 10; pass++)
@@ -112,7 +130,7 @@ internal static class DesktopSwitchChecks
                 throw new InvalidOperationException("The public app did not keep moving while private content was active.");
             File.WriteAllText(reportPath, JsonSerializer.Serialize(new
             {
-                Passed = true, PrivateSwitches = checks, PublicCaptureStarts = capture.PublicCaptureStartCount,
+                Passed = true, PublicShellPopup = true, PrivateSwitches = checks, PublicCaptureStarts = capture.PublicCaptureStartCount,
                 DistinctPublicFrames = publicFrameSignatures.Count, Recording = file.Path,
                 Bytes = (await file.GetBasicPropertiesAsync()).Size, WithCamera = recorder.IncludesCamera
             }, new JsonSerializerOptions { WriteIndented = true }));
@@ -140,6 +158,54 @@ internal static class DesktopSwitchChecks
             }
             finally { session.Transform = transform; }
         }
+    }
+
+    private sealed class ThumbnailPopup : IDisposable
+    {
+        private const string ClassName = "TaskListThumbnailWnd";
+        private readonly nint _module = GetModuleHandle(null);
+        private readonly nint _window;
+
+        public ThumbnailPopup(int x, int y)
+        {
+            var cls = new PopupClass { Name = ClassName, Instance = _module, Background = GetStockObject(0),
+                Procedure = GetProcAddress(GetModuleHandle("user32.dll"), "DefWindowProcW") };
+            if (RegisterClass(ref cls) == 0) throw new System.ComponentModel.Win32Exception();
+            _window = CreateWindowEx(0x08000088, ClassName, "", 0x90000000, x, y, 48, 48, 0, 0, _module, 0);
+            if (_window == 0)
+            {
+                var error = new System.ComponentModel.Win32Exception();
+                UnregisterClass(ClassName, _module);
+                throw error;
+            }
+        }
+
+        public void Dispose()
+        {
+            DestroyWindow(_window);
+            UnregisterClass(ClassName, _module);
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct PopupClass
+        {
+            public uint Style;
+            public nint Procedure;
+            public int ClassExtra, WindowExtra;
+            public nint Instance, Icon, Cursor, Background, MenuName;
+            public string Name;
+        }
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern ushort RegisterClass(ref PopupClass cls);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern bool UnregisterClass(string name, nint instance);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern nint CreateWindowEx(uint exStyle, string cls, string title, uint style,
+            int x, int y, int width, int height, nint parent, nint menu, nint instance, nint param);
+        [DllImport("user32.dll")] private static extern bool DestroyWindow(nint window);
+        [DllImport("gdi32.dll")] private static extern nint GetStockObject(int index);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern nint GetModuleHandle(string? module);
+        [DllImport("kernel32.dll", ExactSpelling = true)] private static extern nint GetProcAddress(nint module, string name);
     }
 
     private sealed class PatternWindow : Form

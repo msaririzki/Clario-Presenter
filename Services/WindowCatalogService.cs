@@ -84,11 +84,44 @@ public static class WindowCatalogService
 
     public static nint GetForegroundWindowHandle() => GetForegroundWindow();
 
-    public static bool IsApplicationSwitcherActive() => GetAsyncKeyState(0x12) < 0
-        || GetAsyncKeyState(0x5B) < 0 || GetAsyncKeyState(0x5C) < 0
-        || IsWindowVisible(FindWindow("TaskListThumbnailWnd", null))
-        || IsWindowVisible(FindWindow("MultitaskingViewFrame", null))
-        || IsShellOverlay(GetForegroundWindow());
+    public static bool IsApplicationSwitcherActive(bool allowStartMenu = false)
+    {
+        if (GetAsyncKeyState(0x12) < 0 || GetAsyncKeyState(0x5B) < 0 || GetAsyncKeyState(0x5C) < 0
+            || HasVisibleShellWindow("TaskListThumbnailWnd")
+            || HasVisibleShellWindow("MultitaskingViewFrame")) return true;
+        var window = GetForegroundWindow();
+        if (!IsShellOverlay(window)) return false;
+        if (!allowStartMenu) return true;
+        GetWindowThreadProcessId(window, out var pid);
+        try
+        {
+            using var process = Process.GetProcessById((int)pid);
+            return !process.ProcessName.Equals("StartMenuExperienceHost", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException) { return true; }
+        catch (InvalidOperationException) { return true; }
+        catch (System.ComponentModel.Win32Exception) { return true; }
+    }
+
+    private static bool HasVisibleShellWindow(string className)
+    {
+        nint window = 0;
+        while ((window = FindWindowEx(0, window, className, null)) != 0)
+            if (IsWindowVisible(window)) return true;
+        return false;
+    }
+
+    internal static bool RequiresProtectedDesktop(DisplayBounds display, IReadOnlyCollection<nint> privateWindows,
+        nint presenter, bool presenterExcluded, bool privatePresenterThumbnail)
+    {
+        if (!presenterExcluded && IsWindowPresentable(presenter)
+            && (!TryGetCaptureBounds(presenter, out var bounds) || DesktopWindowPlan.Intersects(display, bounds))) return true;
+        if ((privateWindows.Count != 0 || !privatePresenterThumbnail) && IsApplicationSwitcherActive(allowStartMenu: true)) return true;
+        if (privateWindows.Count == 0) return false;
+        var foreground = GetForegroundWindow();
+        return (IsInWindowFamily(foreground, privateWindows) && IsWindowPresentable(foreground))
+            || HasPrivateWindowOnDisplay(display, privateWindows);
+    }
 
     public static IReadOnlyList<nint> GetPublicDesktopWindows(DisplayBounds workArea, IEnumerable<nint> privateWindows)
     {
@@ -295,7 +328,7 @@ public static class WindowCatalogService
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int virtualKey);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern nint FindWindow(string className, string? windowName);
+    private static extern nint FindWindowEx(nint parent, nint after, string className, string? windowName);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect

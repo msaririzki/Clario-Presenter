@@ -802,22 +802,12 @@ public sealed partial class MainPage : Page
         UpdateCaptureModeUi();
     }
 
-    private bool IsForegroundPrivate()
-    {
-        var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
-        var presenterWindow = GetPresenterWindowHandle();
-        if (foregroundWindow == presenterWindow) return true;
-
-        return WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
-            && WindowCatalogService.IsWindowPresentable(foregroundWindow);
-    }
-
     private bool HasPrivateView()
     {
-        if (IsForegroundPrivate() || IsNoteEditorOnRecordedDisplay() || WindowCatalogService.IsApplicationSwitcherActive()
-            || (!_presenterExcludedFromCapture && IsPresenterVisibleOnRecordedDisplay())
-            || (_presenterDisplay is not null
-                && WindowCatalogService.HasPrivateWindowOnDisplay(_presenterDisplay.Bounds, _privateWindows)))
+        var presenterExcluded = _presenterExcludedFromCapture
+            && GetWindowDisplayAffinity(GetPresenterWindowHandle(), out var affinity) && affinity == ExcludeFromCapture;
+        if (_presenterDisplay is null || WindowCatalogService.RequiresProtectedDesktop(_presenterDisplay.Bounds,
+            _privateWindows, GetPresenterWindowHandle(), presenterExcluded, App.MainWindow is MainWindow { UsesPrivateThumbnail: true }))
         {
             _lastPrivateViewTick = Environment.TickCount64;
             return true;
@@ -825,14 +815,6 @@ public sealed partial class MainPage : Page
         // Do not capture the last few frames of a private window's minimize
         // animation after Windows has already marked its HWND as minimized.
         return Environment.TickCount64 - _lastPrivateViewTick < 300;
-    }
-
-    private bool IsPresenterVisibleOnRecordedDisplay()
-    {
-        var handle = GetPresenterWindowHandle();
-        return _presenterDisplay is not null && WindowCatalogService.IsWindowPresentable(handle)
-            && WindowCatalogService.TryGetCaptureBounds(handle, out var bounds)
-            && DesktopWindowPlan.Intersects(_presenterDisplay.Bounds, bounds);
     }
 
     private void PrivacyWatchTimer_Tick(object? sender, object e)

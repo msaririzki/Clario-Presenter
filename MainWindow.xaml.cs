@@ -13,6 +13,8 @@ namespace Clario_Presenter;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    internal bool UsesPrivateThumbnail { get; }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -21,6 +23,12 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
 
         AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+        // The shell can render a thumbnail as part of another window. Keep the
+        // presenter (including the notes editor) iconic from its first frame.
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var enabled = 1;
+        UsesPrivateThumbnail = DwmSetWindowAttribute(handle, 7, ref enabled, sizeof(int)) == 0 // FORCE_ICONIC_REPRESENTATION
+            && DwmSetWindowAttribute(handle, 11, ref enabled, sizeof(int)) == 0; // DISALLOW_PEEK
         AppWindow.Resize(new SizeInt32(1440, 900));
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
         {
@@ -30,6 +38,9 @@ public sealed partial class MainWindow : Window
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
     }
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
 
     public void MinimizeForPresentation()
     {
