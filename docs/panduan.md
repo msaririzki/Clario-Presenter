@@ -89,6 +89,8 @@ Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Ji
 | Hanya suara video atau musik | Aktifkan **Suara komputer**. Pilih speaker atau headphone tempat suara diputar. |
 | Suara Anda dan suara video | Aktifkan **Mikrofon** dan **Suara komputer**. Keduanya disimpan bersama dalam satu video. |
 
+Untuk narasi, pilih **Profil suara mikrofon → Narasi (Windows)**. Windows meminta pemrosesan suara yang tersedia pada driver mikrofon. Jika karakter suara dari mikrofon atau mixer USB lebih cocok dengan pengaturan biasanya, pilih **Standar perangkat**. Kedua pilihan memakai mikrofon yang Anda pilih.
+
 Klik **Perbarui perangkat audio** jika perangkat baru belum muncul. Saat **Suara komputer** aktif, semua bunyi dari speaker atau headphone yang dipilih bisa masuk ke video, termasuk notifikasi atau suara dari aplikasi yang gambarnya disembunyikan.
 
 Video disimpan sebagai MP4 Full HD (1920×1080). Di **Pengaturan → Video**, pilih **30 fps** untuk meringankan kerja komputer atau **60 fps** untuk gerakan yang lebih halus. Kelancaran hasil juga bergantung pada komputer dan kamera yang dipakai.

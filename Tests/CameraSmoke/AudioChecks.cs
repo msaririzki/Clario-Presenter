@@ -19,7 +19,7 @@ internal static class AudioChecks
                 var device = Wasapi.Enumerate().Inputs.First();
                 using var stop = new CancellationTokenSource();
                 Wasapi.Capture(device.Id, false, stop.Cancel,
-                    (_, _, _, _, _) => throw new InvalidOperationException("Open-only check received a microphone packet."), stop.Token);
+                    (_, _, _, _, _, _) => throw new InvalidOperationException("Open-only check received a microphone packet."), stop.Token);
                 if (!stop.IsCancellationRequested) throw new InvalidOperationException("Microphone was not opened.");
             });
             File.WriteAllText(report, JsonSerializer.Serialize(new { Passed = true, InputOpenedWithoutReading = true }));
@@ -160,6 +160,20 @@ internal static class AudioChecks
         playback.Read(99, output);
         if (!output.SequenceEqual(new short[] { 0, 0, 5, 7, 0, 0, 0, 0 }))
             throw new InvalidOperationException("A late packet moved earlier into a silent gap.");
+
+        var clock = new CapturePacketClock();
+        const int packet = 480;
+        for (int i = 0; i < 50; i++)
+        {
+            int expected = i * packet;
+            long stamp = expected + (i == 0 ? 0 : (i % 2 == 0 ? -19 : 27));
+            var flags = i == 4 ? Wasapi.TimestampError : i == 5 ? Wasapi.Silent : 0u;
+            if (clock.Place(packet, (ulong)expected, flags, stamp, expected + 950) != expected)
+                throw new InvalidOperationException("Timestamp jitter split a contiguous PCM packet.");
+        }
+        const int afterDrop = 51 * packet;
+        if (clock.Place(packet, afterDrop, Wasapi.Discontinuity, afterDrop, afterDrop + 600) != afterDrop)
+            throw new InvalidOperationException("A real capture discontinuity must keep its position on the video clock.");
     }
 
     private sealed class SyntheticAudio : IRecordingAudioSource
@@ -174,7 +188,8 @@ internal static class AudioChecks
             for (var index = 0; index < samples.Length; index += 2)
             {
                 var time = (firstFrame + index / 2) / (double)RecordingAudioFormat.SampleRate;
-                var input = (short)(Math.Sin(time * Math.Tau * 440) * 5800 + Math.Sin(time * Math.Tau * 660) * 3600);
+                var input = (short)(Math.Sin(time * Math.Tau * 440) * 5800 + Math.Sin(time * Math.Tau * 660) * 3600
+                    + Math.Sin(time * Math.Tau * 120) * 2500 + Math.Sin(time * Math.Tau * 4500) * 1800);
                 samples[index] = input;
                 samples[index + 1] = input;
             }

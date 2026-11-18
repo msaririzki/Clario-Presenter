@@ -12,13 +12,15 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
     private volatile bool _isReady;
     private volatile string? _error;
 
-    internal AudioLevelMonitor(string deviceId, bool loopback)
+    internal AudioLevelMonitor(string deviceId, bool loopback, bool speechProfile = false)
     {
         DeviceId = deviceId;
+        SpeechProfile = speechProfile;
         _worker = Task.Run(() => ReadLevels(loopback, _stop.Token));
     }
 
     internal string DeviceId { get; }
+    internal bool SpeechProfile { get; }
     internal bool HasStopped => _worker.IsCompleted;
 
     internal AudioLevelReading TakeReading() => new(_isReady, Interlocked.Exchange(ref _peak, 0), _error);
@@ -30,14 +32,14 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
         {
             // Use the same endpoint and PCM format as the recorder. The meter
             // keeps only the highest sample level since the previous UI tick.
-            Wasapi.Capture(DeviceId, loopback, () => _isReady = true, (data, frames, flags, _, channels) =>
+            Wasapi.Capture(DeviceId, loopback, () => _isReady = true, (data, frames, flags, _, channels, _) =>
             {
                 if (data == nint.Zero || (flags & Wasapi.Silent) != 0) return;
                 var count = checked(frames * channels);
                 if (samples.Length < count) Array.Resize(ref samples, count);
                 Marshal.Copy(data, samples, 0, count);
                 Accumulate(ref _peak, samples.AsSpan(0, count));
-            }, token);
+            }, token, SpeechProfile);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception exception)

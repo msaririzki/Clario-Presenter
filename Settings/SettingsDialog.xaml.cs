@@ -105,6 +105,7 @@ public sealed partial class SettingsDialog : ContentDialog
             ComputerAudioEnabled = ComputerAudioToggle.IsOn,
             PlaybackDeviceId = SelectedAudioDeviceId(PlaybackAudioComboBox, _originalSettings.PlaybackDeviceId),
             MicrophoneEnabled = MicrophoneAudioToggle.IsOn,
+            MicrophoneSpeechProfile = MicrophoneProfilePicker.SelectedIndex == 0,
             MicrophoneDeviceId = SelectedAudioDeviceId(MicrophoneAudioComboBox, _originalSettings.MicrophoneDeviceId)
         };
     }

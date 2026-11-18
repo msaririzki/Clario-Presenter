@@ -5,7 +5,7 @@ namespace Clario_Presenter.Audio;
 
 public sealed record RecordingAudioOptions(
     bool ComputerAudioEnabled = false, string PlaybackDeviceId = "",
-    bool MicrophoneEnabled = false, string MicrophoneDeviceId = "")
+    bool MicrophoneEnabled = false, string MicrophoneDeviceId = "", bool MicrophoneSpeechProfile = true)
 {
     public bool Enabled => ComputerAudioEnabled || MicrophoneEnabled;
 }
@@ -69,27 +69,26 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
     private void Capture(CaptureTrack track, CancellationToken token)
     {
         short[] pcm = [];
+        var clock = new CapturePacketClock();
         try
         {
             Wasapi.Capture(track.DeviceId, track.Loopback, () => track.Started.TrySetResult(),
-                (data, frames, flags, timestamp, channels) =>
+                (data, frames, flags, timestamp, channels, position) =>
                 {
                     var origin = Volatile.Read(ref _origin);
-                    if (origin == 0 || muted() || data == 0 || (flags & Wasapi.Silent) != 0) return;
-                    var firstFrame = (flags & Wasapi.TimestampError) != 0 || timestamp == 0
-                        ? RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin)) - frames
+                    if (origin == 0) return;
+                    long? timestampFrame = timestamp == 0 ? null
                         : (long)Math.Round((timestamp - origin * (double)TimeSpan.TicksPerSecond / Stopwatch.Frequency)
                             * RecordingAudioFormat.SampleRate / TimeSpan.TicksPerSecond);
-                    var lastFrames = RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin));
-                    // A driver can report a discontinuity or a bad hardware timestamp.
-                    if (firstFrame > lastFrames + RecordingAudioFormat.SampleRate / 10)
-                        firstFrame = lastFrames - frames;
+                    var firstFrame = clock.Place(frames, position, flags, timestampFrame,
+                        RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin)));
+                    if (muted() || data == 0 || (flags & Wasapi.Silent) != 0) return;
                     var count = frames * channels;
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
                     Marshal.Copy(data, pcm, 0, count);
                     if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count));
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);
-                }, token);
+                }, token, options.MicrophoneSpeechProfile);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {

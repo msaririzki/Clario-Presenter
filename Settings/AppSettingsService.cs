@@ -60,6 +60,7 @@ public sealed class AppSettingsService
         _localSettings.Values[nameof(PresenterSettings.ComputerAudioEnabled)] = Current.ComputerAudioEnabled;
         _localSettings.Values[nameof(PresenterSettings.PlaybackDeviceId)] = Current.PlaybackDeviceId;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneEnabled)] = Current.MicrophoneEnabled;
+        _localSettings.Values[nameof(PresenterSettings.MicrophoneSpeechProfile)] = Current.MicrophoneSpeechProfile;
         _localSettings.Values[nameof(PresenterSettings.MicrophoneDeviceId)] = Current.MicrophoneDeviceId;
 #endif
     }
@@ -172,6 +173,7 @@ public sealed class AppSettingsService
             ComputerAudioEnabled = ReadBool(values, nameof(PresenterSettings.ComputerAudioEnabled)),
             PlaybackDeviceId = values[nameof(PresenterSettings.PlaybackDeviceId)] as string ?? string.Empty,
             MicrophoneEnabled = ReadBool(values, nameof(PresenterSettings.MicrophoneEnabled)),
+            MicrophoneSpeechProfile = !values.TryGetValue(nameof(PresenterSettings.MicrophoneSpeechProfile), out var speech) || speech is not false,
             MicrophoneDeviceId = values.TryGetValue(nameof(PresenterSettings.MicrophoneDeviceId), out var microphoneId)
                 && microphoneId is string savedMicrophone ? savedMicrophone : Wasapi.AutomaticInputId
         });

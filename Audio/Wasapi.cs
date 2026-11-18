@@ -24,6 +24,7 @@ internal static class Wasapi
     private const int InvalidArgument = unchecked((int)0x80070057);
     internal const string AutomaticInputId = "clario:automatic-microphone";
     internal const uint Silent = 2;
+    internal const uint Discontinuity = 1;
     internal const uint TimestampError = 4;
     private static readonly PropertyKey FriendlyNameKey = new(new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"), 14);
     private static readonly PropertyKey InstanceIdKey = new(new Guid("78C34FC8-104A-4ACA-9EA4-524D52996E57"), 256);
@@ -139,7 +140,7 @@ internal static class Wasapi
     }
 
     internal static void Capture(string deviceId, bool loopback, Action started,
-        Action<nint, int, uint, long, int> packet, CancellationToken token)
+        Action<nint, int, uint, long, int, ulong> packet, CancellationToken token, bool speechProfile = false)
     {
         var enumerator = CreateEnumerator();
         IDevice? device = null;
@@ -163,27 +164,33 @@ internal static class Wasapi
             Check(device.GetState(out var state));
             if (state != Active) throw new InvalidOperationException("Perangkat audio sudah tidak aktif.");
 
-            var clientId = typeof(IAudioClient).GUID;
-            Check(device.Activate(ref clientId, 23, 0, out var activated));
-            client = (IAudioClient)activated;
             var flags = ConvertPcm | ResampleHighQuality | (loopback ? Loopback : 0);
-            var channels = loopback ? 2 : PreferredInputChannels(client);
-            var format = new WaveFormat(channels);
-            var initialize = client.Initialize(0, flags, 1_000_000, 0, ref format, 0);
-            if (!loopback && initialize is UnsupportedFormat or InvalidArgument)
+            int channels = 0;
+            int Initialize(bool speech, bool alternateChannels)
             {
-                // Try the other channel count on drivers that reject the requested format.
                 Release(client);
                 client = null;
-                Check(device.Activate(ref clientId, 23, 0, out activated));
+                var clientId = typeof(IAudioClient).GUID;
+                Check(device.Activate(ref clientId, 23, 0, out var activated));
                 client = (IAudioClient)activated;
-                channels = channels == 1 ? 2 : 1;
-                format = new WaveFormat(channels);
-                initialize = client.Initialize(0, flags, 1_000_000, 0, ref format, 0);
+                if (speech && client is IAudioClient2 advanced)
+                {
+                    var properties = new AudioClientProperties { Size = Marshal.SizeOf<AudioClientProperties>(), Category = 9 }; // AudioCategory_Speech
+                    var result = advanced.SetClientProperties(ref properties);
+                    if (result < 0) return result;
+                }
+                channels = loopback ? 2 : PreferredInputChannels(client);
+                if (alternateChannels) channels = channels == 1 ? 2 : 1;
+                var format = new WaveFormat(channels);
+                return client.Initialize(0, flags, 1_000_000, 0, ref format, 0);
             }
+            var speech = speechProfile && !loopback;
+            var initialize = Initialize(speech, false);
+            if (speech && initialize < 0) initialize = Initialize(false, false);
+            if (!loopback && initialize is UnsupportedFormat or InvalidArgument) initialize = Initialize(false, true);
             Check(initialize);
             var readerId = typeof(IAudioCaptureClient).GUID;
-            Check(client.GetService(ref readerId, out var service));
+            Check(client!.GetService(ref readerId, out var service));
             reader = (IAudioCaptureClient)service;
             token.ThrowIfCancellationRequested();
             Check(client.Start());
@@ -195,10 +202,10 @@ internal static class Wasapi
                 Check(reader.GetNextPacketSize(out var framesReady));
                 while (framesReady > 0 && !token.IsCancellationRequested)
                 {
-                    Check(reader.GetBuffer(out var data, out var frames, out var packetFlags, out _, out var timestamp));
+                    Check(reader.GetBuffer(out var data, out var frames, out var packetFlags, out var position, out var timestamp));
                     try
                     {
-                        if (frames > 0) packet(data, checked((int)frames), packetFlags, checked((long)timestamp), channels);
+                        if (frames > 0) packet(data, checked((int)frames), packetFlags, checked((long)timestamp), channels, position);
                     }
                     finally { Check(reader.ReleaseBuffer(frames)); }
                     Check(reader.GetNextPacketSize(out framesReady));
@@ -338,5 +345,19 @@ internal static class Wasapi
         [PreserveSig] int GetBuffer(out nint data, out uint frames, out uint flags, out ulong position, out ulong timestamp);
         [PreserveSig] int ReleaseBuffer(uint frames);
         [PreserveSig] int GetNextPacketSize(out uint frames);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AudioClientProperties
+    {
+        internal int Size, Offload, Category, Options;
+    }
+
+    [ComImport, Guid("726778CD-F60A-4EDA-82DE-E47610CD78AA"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAudioClient2
+    {
+        // IAudioClient's twelve methods followed by IAudioClient2.IsOffloadCapable.
+        void _VtblGap1_13();
+        [PreserveSig] int SetClientProperties(ref AudioClientProperties properties);
     }
 }
