@@ -40,12 +40,6 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
             // keeps only the highest sample level since the previous UI tick.
             Wasapi.Capture(DeviceId, loopback, () => _isReady = true, (data, frames, flags, _, channels, _) =>
             {
-                if (data == nint.Zero || (flags & Wasapi.Silent) != 0)
-                {
-                    voice?.Reset();
-                    noise?.Reset();
-                    return;
-                }
                 if ((flags & Wasapi.Discontinuity) != 0)
                 {
                     voice?.Reset();
@@ -53,8 +47,16 @@ internal sealed class AudioLevelMonitor : IAsyncDisposable
                 }
                 var count = checked(frames * channels);
                 if (samples.Length < count) Array.Resize(ref samples, count);
-                Marshal.Copy(data, samples, 0, count);
-                noise?.Process(samples.AsSpan(0, count), channels);
+                if (data == nint.Zero || (flags & Wasapi.Silent) != 0)
+                {
+                    count = noise?.Drain(samples.AsSpan(0, count), channels) ?? 0;
+                    if (count == 0) voice?.Reset();
+                }
+                else
+                {
+                    Marshal.Copy(data, samples, 0, count);
+                    noise?.Process(samples.AsSpan(0, count), channels);
+                }
                 voice?.Process(samples.AsSpan(0, count), channels);
                 Accumulate(ref _peak, samples.AsSpan(0, count), !loopback);
             }, token, SpeechProfile && !WarmNarration);

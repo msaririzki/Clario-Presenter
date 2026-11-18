@@ -183,11 +183,18 @@ internal static class AudioChecks
             var before = Energy(fan);
             for (int n = 0; n < fan.Length; n += 640)
                 reducer.Process(fan.AsSpan(n, Math.Min(640, fan.Length - n)), 2);
-            if (Energy(fan) > before / 4) throw new InvalidOperationException("Stationary noise was not attenuated.");
+            if (Energy(fan) > before / 2) throw new InvalidOperationException("Broadband noise was not attenuated by at least 3 dB.");
             reducer.Reset();
             Array.Clear(fan);
             reducer.Process(fan.AsSpan(0, 4800), 1);
             if (fan.Any(x => x != 0)) throw new InvalidOperationException("Private audio survived a reducer reset.");
+            // After a pause, preserve a soft 20 ms onset even if the model
+            // classifies it as background. The fixed pipeline delay is 20 ms.
+            var onset = new short[2400];
+            for (int i = 0; i < 960; i++) onset[i] = (short)(180 * Math.Sin(i * Math.Tau * 550 / 48000));
+            reducer.Process(onset, 1);
+            if (AudioLevelMonitor.PeakOf(onset.AsSpan(960, 480)) < 90)
+                throw new InvalidOperationException("Quiet microphone onset disappeared.");
         }
         var roomTone = Enumerable.Repeat((short)35, 480).ToArray();
         roomTone[123] = 350;

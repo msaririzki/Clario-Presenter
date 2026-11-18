@@ -99,7 +99,7 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                             * RecordingAudioFormat.SampleRate / TimeSpan.TicksPerSecond);
                     var firstFrame = clock.Place(frames, position, flags, timestampFrame,
                         RecordingAudioFormat.FramesAt(Stopwatch.GetElapsedTime(origin)));
-                    if (muted() || data == 0 || (flags & Wasapi.Silent) != 0)
+                    if (muted())
                     {
                         voice?.Reset();
                         noise?.Reset();
@@ -113,8 +113,16 @@ internal sealed class RecordingAudioSource(RecordingAudioOptions options, Func<b
                     }
                     var count = frames * channels;
                     if (pcm.Length < count) Array.Resize(ref pcm, count);
-                    Marshal.Copy(data, pcm, 0, count);
-                    noise?.Process(pcm.AsSpan(0, count), channels);
+                    if (data == 0 || (flags & Wasapi.Silent) != 0)
+                    {
+                        count = noise?.Drain(pcm.AsSpan(0, count), channels) ?? 0;
+                        if (count == 0) voice?.Reset();
+                    }
+                    else
+                    {
+                        Marshal.Copy(data, pcm, 0, count);
+                        noise?.Process(pcm.AsSpan(0, count), channels);
+                    }
                     voice?.Process(pcm.AsSpan(0, count), channels);
                     if (MeteringEnabled) AudioLevelMonitor.Accumulate(ref track.Peak, pcm.AsSpan(0, count), !track.Loopback);
                     track.Timeline.Store(firstFrame, pcm.AsSpan(0, count), channels);

@@ -13,10 +13,12 @@ internal sealed class FanNoiseReducer : IDisposable
     private Channel? _right;
     private int _offset;
     private bool _used;
+    private int _tailFrames;
 
     internal void Process(Span<short> pcm, int channels)
     {
         _used = true;
+        _tailFrames = 2 * Size;
         if (channels == 2) _right ??= new Channel();
         for (int i = 0; i < pcm.Length; i += channels)
         {
@@ -29,11 +31,27 @@ internal sealed class FanNoiseReducer : IDisposable
         }
     }
 
+    // A silent WASAPI packet still occupies time. Drain the overlap window so
+    // the last consonant reaches the recorder before sleeping through silence.
+    internal int Drain(Span<short> pcm, int channels)
+    {
+        var count = Math.Min(pcm.Length / channels, _tailFrames);
+        if (count == 0) return 0;
+        var remaining = _tailFrames - count;
+        var tail = pcm[..(count * channels)];
+        tail.Clear();
+        Process(tail, channels);
+        _tailFrames = remaining;
+        if (remaining == 0) Reset();
+        return count * channels;
+    }
+
     internal void Reset()
     {
         if (!_used) return;
         _used = false;
         _offset = 0;
+        _tailFrames = 0;
         _left.Reset();
         _right?.Reset();
     }
@@ -46,7 +64,9 @@ internal sealed class FanNoiseReducer : IDisposable
 
     private sealed class Channel : IDisposable
     {
-        private Denoiser? _model;
+        private IntPtr _model;
+        private int _quietFrames;
+        private float _backgroundGain = 1;
         private readonly float[] _frame = new float[Size];
         private readonly short[] _input = new short[Size], _previous = new short[Size];
 
@@ -59,19 +79,30 @@ internal sealed class FanNoiseReducer : IDisposable
 
         internal void Filter()
         {
-            _model ??= new Denoiser();
+            if (_model == IntPtr.Zero)
+            {
+                _model = Native.rnnoise_create(IntPtr.Zero);
+                if (_model == IntPtr.Zero) throw new InvalidOperationException("Peredam suara kipas belum bisa dimulai.");
+            }
             double energy = 0;
             foreach (var sample in _previous) energy += sample * sample;
             // Preserve faint consonants even when the speech model is uncertain.
             // For a loud stationary fan, retain only a small amount of the input.
             var rms = Math.Sqrt(energy / Size);
-            var dry = (float)Math.Clamp(0.75 - (rms - 220) / 1300, 0.005, 0.75);
-            for (int i = 0; i < Size; i++) _frame[i] = _input[i] / (float)short.MaxValue;
-            _model.Denoise(_frame);
+            var dry = (float)Math.Clamp(0.75 - (rms - 220) / 1300, 0.002, 0.75);
+            for (int i = 0; i < Size; i++) _frame[i] = _input[i];
+            var probability = ProcessFrame(_model, _frame, _frame);
+            // Keep tails through short gaps. Reopen within one frame when
+            // speech returns and keep a dry path for low-level consonants.
+            _quietFrames = probability < 0.35f ? Math.Min(20, _quietFrames + 1) : 0;
+            var target = _quietFrames >= 14 ? 0.012f : 1f;
+            var initial = _backgroundGain;
+            _backgroundGain += (target - initial) * (target < initial ? 0.18f : 1f);
             for (int i = 0; i < Size; i++)
             {
                 // RNNoise synthesizes the preceding frame (one overlap window).
-                _frame[i] = (1 - dry) * _frame[i] + dry * _previous[i] / short.MaxValue;
+                var gain = initial + (_backgroundGain - initial) * (i + 1) / Size;
+                _frame[i] = (float)(((1 - dry) * _frame[i] * gain + dry * _previous[i]) / short.MaxValue);
                 _previous[i] = _input[i];
             }
         }
@@ -81,12 +112,17 @@ internal sealed class FanNoiseReducer : IDisposable
             Dispose();
             Array.Clear(_frame);
             Array.Clear(_previous);
+            _quietFrames = 0;
+            _backgroundGain = 1;
         }
 
         public void Dispose()
         {
-            _model?.Dispose();
-            _model = null;
+            if (_model != IntPtr.Zero) Native.rnnoise_destroy(_model);
+            _model = IntPtr.Zero;
         }
+
+        [DllImport("rnnoise", EntryPoint = "rnnoise_process_frame", CallingConvention = CallingConvention.Cdecl)]
+        private static extern float ProcessFrame(IntPtr model, [Out] float[] output, [In] float[] input);
     }
 }
