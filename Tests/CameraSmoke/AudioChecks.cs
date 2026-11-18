@@ -85,8 +85,8 @@ internal static class AudioChecks
                 }
             }
 
-            var folder = await ApplicationData.Current.TemporaryFolder.CreateFolderAsync("AudioSmoke",
-                CreationCollisionOption.OpenIfExists);
+            var temporaryFolder = await StorageFolder.GetFolderFromPathAsync(Path.GetTempPath());
+            var folder = await temporaryFolder.CreateFolderAsync("ClarioAudioSmoke", CreationCollisionOption.GenerateUniqueName);
             var mixedFile = await folder.CreateFileAsync("audio-mix.mp4", CreationCollisionOption.ReplaceExisting);
             var silentFile = await folder.CreateFileAsync("video-only.mp4", CreationCollisionOption.ReplaceExisting);
             var warmFile = await folder.CreateFileAsync("audio-warm.mp4", CreationCollisionOption.ReplaceExisting);
