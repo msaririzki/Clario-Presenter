@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Panduan penggunaan
+    url: https://github.com/msaririzki/Clario-Presenter/blob/main/docs/panduan.md
+    about: Pelajari cara memilih layar, menyembunyikan aplikasi, dan menyetel audio.
+  - name: Unduh versi terbaru
+    url: https://github.com/msaririzki/Clario-Presenter/releases/latest
+    about: Dapatkan installer Windows dan informasi versi.

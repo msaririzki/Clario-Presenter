@@ -1,0 +1,18 @@
+name: Usulkan fitur
+description: Ceritakan kebutuhan Anda saat presentasi atau merekam.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Apa yang ingin Anda lakukan?
+      description: Ceritakan situasinya dan bagian yang saat ini terasa sulit.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Seperti apa hasil yang Anda harapkan?
+      placeholder: Saat saya melakukan …, saya ingin audiens melihat ….
+    validations:
+      required: true

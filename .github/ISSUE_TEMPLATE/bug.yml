@@ -1,0 +1,31 @@
+name: Laporkan masalah
+description: Laporkan kendala saat memasang atau menggunakan Clario Presenter.
+labels: ["bug"]
+body:
+  - type: input
+    id: environment
+    attributes:
+      label: Versi Clario dan Windows
+      placeholder: Misalnya Clario 1.0.1 di Windows 11 x64
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Apa yang Anda lakukan?
+      description: Sebutkan mode dan sumber yang dipilih jika masalah terjadi saat presentasi atau merekam.
+      placeholder: Saya memilih Rekam → Layar, lalu membuka aplikasi yang disembunyikan.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Apa yang terjadi dan apa yang Anda harapkan?
+      description: Sebutkan di mana gejalanya terlihat atau terdengar, misalnya di laptop, proyektor, atau file MP4.
+    validations:
+      required: true
+  - type: textarea
+    id: devices
+    attributes:
+      label: Perangkat atau gambar pendukung (opsional)
+      description: Cantumkan resolusi dan skala monitor, atau nama kamera dan mikrofon jika relevan. Gunakan contoh yang aman dibagikan karena laporan ini bersifat publik.
