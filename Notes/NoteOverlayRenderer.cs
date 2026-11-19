@@ -8,14 +8,12 @@ namespace Clario_Presenter.Notes;
 internal sealed class NoteOverlayRenderer : IDisposable
 {
     private const string BodyFont = "Segoe UI";
-    private const string CodeFont = "Consolas";
-    private const float BlockGap = 9;
     private static readonly Color White = Color.FromArgb(255, 242, 245, 250);
     private static readonly Color Muted = Color.FromArgb(255, 179, 190, 209);
     private static readonly Color Outline = Color.FromArgb(255, 99, 115, 144);
     private static readonly Color Surface = Color.FromArgb(255, 30, 39, 56);
     private static readonly Color Selection = Color.FromArgb(255, 47, 54, 88);
-    private readonly List<BlockLayout> _blocks = [];
+    private readonly List<NoteBlockLayout> _blocks = [];
     private CanvasDevice? _device;
     private IReadOnlyList<NoteStep>? _document;
     private int[] _firstBlock = [];
@@ -37,10 +35,7 @@ internal sealed class NoteOverlayRenderer : IDisposable
         if (anchor >= 0 && anchor < _blocks.Count)
         {
             var block = _blocks[anchor];
-            var y = scroll - block.Top - (block.IsCode ? 9 : 0);
-            block.Layout.HitTest(0, Math.Max(0, y), out var region);
-            character = region.CharacterIndex;
-            lineOffset = y - (float)region.LayoutBounds.Y;
+            (character, lineOffset) = block.Anchor(scroll - block.Top);
         }
 
         if (rebuild)
@@ -52,32 +47,29 @@ internal sealed class NoteOverlayRenderer : IDisposable
             {
                 var section = document[i];
                 _firstBlock[i] = _blocks.Count;
+                if (section.DocumentTitle is { } title)
+                    _blocks.Add(new(new(NoteBlockKind.Heading, [new(title)], Level: 1), textSize));
                 if (document.Count > 1 || section.Title != "Catatan")
-                    AddBlock(device, new(NoteBlockKind.Heading, [new(section.Title)]), width, textSize);
-                foreach (var block in section.Blocks) AddBlock(device, block, width, textSize);
+                    _blocks.Add(new(new(NoteBlockKind.Heading, [new(section.Title)], Level: 2), textSize));
+                foreach (var block in section.Blocks) _blocks.Add(new(block, textSize));
             }
         }
 
         _contentHeight = 0;
-        for (var i = 0; i < _blocks.Count; i++)
+        foreach (var block in _blocks)
         {
-            var block = _blocks[i];
-            if (!rebuild)
-                block.Layout.RequestedSize = new Size(Math.Max(1, width - (block.IsCode ? 20 : 0)), 0);
-            var height = (float)Math.Ceiling(block.Layout.LayoutBoundsIncludingTrailingWhitespace.Height)
-                + (block.IsCode ? 18 : 0);
-            _blocks[i] = block with { Top = _contentHeight, Height = height };
-            _contentHeight += height + BlockGap;
+            block.Measure(device, width);
+            block.Top = _contentHeight;
+            _contentHeight += block.Height + block.Gap;
         }
-        if (_blocks.Count > 0) _contentHeight -= BlockGap;
+        if (_blocks.Count > 0) _contentHeight -= _blocks[^1].Gap;
         for (var i = 0; i < _sectionTops.Length; i++)
             _sectionTops[i] = _firstBlock[i] < _blocks.Count ? _blocks[_firstBlock[i]].Top : _contentHeight;
 
         if (anchor >= 0 && anchor < _blocks.Count)
         {
             var block = _blocks[anchor];
-            block.Layout.GetCaretPosition(character, false, out var region);
-            scroll = block.Top + (block.IsCode ? 9 : 0) + (float)region.LayoutBounds.Y + lineOffset;
+            scroll = block.Top + block.AnchorY(character, lineOffset);
         }
 
         _device = device;
@@ -93,30 +85,6 @@ internal sealed class NoteOverlayRenderer : IDisposable
     {
         var found = Array.BinarySearch(_sectionTops, scroll);
         return found >= 0 ? found : Math.Max(0, ~found - 1);
-    }
-
-    private void AddBlock(CanvasDevice device, NoteBlock block, float width, float textSize)
-    {
-        var content = string.Concat(block.Runs.Select(run => run.Text));
-        if (content.Length == 0) return;
-        var code = block.Kind == NoteBlockKind.Code;
-        using var format = new CanvasTextFormat
-        {
-            FontFamily = code ? CodeFont : BodyFont,
-            FontSize = block.Kind == NoteBlockKind.Heading ? textSize + 2 : textSize,
-            FontWeight = new Windows.UI.Text.FontWeight { Weight = block.Kind == NoteBlockKind.Heading ? (ushort)600 : (ushort)400 },
-            WordWrapping = CanvasWordWrapping.Wrap
-        };
-        var layout = new CanvasTextLayout(device, content, format, Math.Max(1, width - (code ? 20 : 0)), 0);
-        _blocks.Add(new(layout, code, 0, 0));
-        var offset = 0;
-        foreach (var run in block.Runs)
-        {
-            if (run.Text.Length == 0) continue;
-            if (run.Bold) layout.SetFontWeight(offset, run.Text.Length, new Windows.UI.Text.FontWeight { Weight = 700 });
-            if (!code && run.Monospace) layout.SetFontFamily(offset, run.Text.Length, CodeFont);
-            offset += run.Text.Length;
-        }
     }
 
     internal void Draw(CanvasDrawingSession session, NoteOverlayGeometry geometry, IReadOnlyList<NoteStep> steps,
@@ -165,7 +133,7 @@ internal sealed class NoteOverlayRenderer : IDisposable
         }
     }
 
-    private void DrawBody(CanvasDrawingSession session, Rect body, float scroll)
+    internal void DrawBody(CanvasDrawingSession session, Rect body, float scroll)
     {
         // Blocks below the viewport need no drawing. Reuse the measured layouts while scrolling.
         var bottom = scroll + body.Height;
@@ -173,9 +141,7 @@ internal sealed class NoteOverlayRenderer : IDisposable
         {
             var block = _blocks[index];
             var y = (float)body.Y + block.Top - scroll;
-            if (block.IsCode)
-                session.FillRoundedRectangle((float)body.X, y, (float)body.Width, block.Height, 5, 5, Surface);
-            session.DrawTextLayout(block.Layout, (float)body.X + (block.IsCode ? 10 : 0), y + (block.IsCode ? 9 : 0), White);
+            block.Draw(session, (float)body.X, y, White, Muted, Outline, Surface);
         }
     }
 
@@ -233,12 +199,11 @@ internal sealed class NoteOverlayRenderer : IDisposable
 
     public void Dispose()
     {
-        foreach (var block in _blocks) block.Layout.Dispose();
+        foreach (var block in _blocks) block.Dispose();
         _blocks.Clear();
         _document = null;
         _device = null;
         _contentHeight = 0;
     }
 
-    private readonly record struct BlockLayout(CanvasTextLayout Layout, bool IsCode, float Top, float Height);
 }

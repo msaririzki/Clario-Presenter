@@ -29,6 +29,7 @@ internal static class Program
                     new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
                 if (args.Contains("--desktop-camera")) await DesktopSwitchChecks.RunAsync(reportPath, includeCamera: true);
                 else if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
+                else if (args.Contains("--markdown-layout")) await MarkdownLayoutChecks.RunAsync(reportPath);
                 else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
                 else if (args.Contains("--recording-stability")) await AudioChecks.RunStabilityAsync(reportPath);
                 else if (args.Contains("--audio")) await AudioChecks.RunAsync(reportPath);

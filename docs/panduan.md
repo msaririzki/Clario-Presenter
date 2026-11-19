@@ -57,6 +57,8 @@ Saat Anda membuka jendela yang disembunyikan, Clario tetap menampilkan materi di
 
 Buka **Catatan** untuk mengetik atau menempelkan naskah. Untuk naskah yang sudah disiapkan, klik **Buka file**. Clario menerima file teks (`.txt`) dan Markdown (`.md` atau `.markdown`) hingga 200.000 karakter. Untuk catatan yang disiapkan sendiri atau dengan bantuan AI, simpan sebagai Markdown UTF-8 dan awali tiap langkah dengan judul seperti `## 1. Periksa router`. Tombol **Daftar** di panel melayang bisa langsung membuka langkah yang dipilih.
 
+File Markdown langsung terbuka dalam mode **Baca**. Klik **Lihat teks** untuk mengedit sumbernya. Di panel catatan dan catatan melayang, tabel mengikuti lebar panel. Perlebar panel untuk membandingkan kolom, atau persempit untuk membaca setiap baris sebagai pasangan judul dan nilai. Kutipan memakai garis di kiri. Gunakan tiga tanda backtick untuk blok perintah agar spasi dan baris perintah tetap terbaca.
+
 Klik **Sematkan** agar naskah terlihat di atas aplikasi. Semua bagian tersambung seperti satu dokumen. Saat panel diperlebar, lebih banyak kata muat di tiap baris. Saat panel ditinggikan, baris dan bagian berikutnya langsung terlihat.
 
 - **Untuk membaca**, klik **↓ Turun** atau **↑ Naik** di bawah catatan. Arahkan penunjuk ke bilah tombol lalu gulir roda mouse untuk bergerak sedikit demi sedikit. Dengan **Klik tembus** aktif, Anda tetap bisa mengeklik dan mengetik di jendela router di balik teks.

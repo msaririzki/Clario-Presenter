@@ -428,7 +428,11 @@ public sealed partial class MainPage : Page
     private void NotesButton_Click(object sender, RoutedEventArgs e)
     {
         SetNotesVisible(NotesButton.IsChecked == true);
-        if (NotesPanel.Visibility == Visibility.Visible) FreeNotesTextBox.Focus(FocusState.Programmatic);
+        if (NotesPanel.Visibility == Visibility.Visible)
+        {
+            if (NoteReader.Visibility == Visibility.Visible) NoteReaderScroll.Focus(FocusState.Programmatic);
+            else FreeNotesTextBox.Focus(FocusState.Programmatic);
+        }
     }
 
     private void CollapseNotes_Click(object sender, RoutedEventArgs e) => CloseNoteEditor();
@@ -481,7 +485,7 @@ public sealed partial class MainPage : Page
         Grid.SetColumn(NotesPanel, docked ? 1 : 0);
         NotesPanel.HorizontalAlignment = docked ? HorizontalAlignment.Stretch : HorizontalAlignment.Right;
         NotesPanel.Width = docked ? double.NaN : Math.Min(340, StudioGrid.ActualWidth);
-        if (visible) FreeNotesTextBox.Height = Math.Max(80, StudioGrid.ActualHeight - 186);
+        if (visible) NoteContentArea.Height = Math.Max(80, StudioGrid.ActualHeight - 186);
     }
 
     private void SessionTimer_Tick(object? sender, object e)
@@ -1019,6 +1023,8 @@ public sealed partial class MainPage : Page
         DisposeFloatingNotes();
         await StopRecordingAsync();
         StopPresentation();
+        NoteReaderCanvas.RemoveFromVisualTree();
+        _noteReaderRenderer.Dispose();
         LivePreviewCanvas.RemoveFromVisualTree();
     }
 

@@ -2,13 +2,17 @@ using System.Diagnostics;
 using System.Text;
 using Clario_Presenter.Notes;
 using Clario_Presenter.Services;
+using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 
 namespace Clario_Presenter;
 
 public sealed partial class MainPage
 {
+    private readonly NoteOverlayRenderer _noteReaderRenderer = new();
+    private IReadOnlyList<NoteStep> _readerDocument = [];
     private FloatingNoteWindow? _floatingNotes;
     private DisplayTarget? _notesAudience;
     private bool _syncingNotesControls;
@@ -85,6 +89,7 @@ public sealed partial class MainPage
             }
             finally { _syncingNotesControls = false; }
             NoteStatusText.Text = $"File dibuka: {_notesFileName}";
+            SetNoteReader(MarkdownNotesCheckBox.IsChecked == true);
             RunNoteAction(() => UpdateNoteDocument(reset: true));
         }
         catch (DecoderFallbackException)
@@ -165,11 +170,46 @@ public sealed partial class MainPage
     }
 
     private void FreeNotesTextBox_TextChanged(object sender, RoutedEventArgs args) => QueueNotesUpdate();
-    private void MarkdownNotes_Changed(object sender, RoutedEventArgs args) => QueueNotesUpdate();
+    private void MarkdownNotes_Changed(object sender, RoutedEventArgs args)
+    {
+        if (NoteReadButton is null) return;
+        SetNoteReader(MarkdownNotesCheckBox.IsChecked == true && NoteReader.Visibility == Visibility.Visible);
+        QueueNotesUpdate();
+    }
+
+    private void SetNoteReader(bool read)
+    {
+        NoteReadButton.Visibility = MarkdownNotesCheckBox.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        NoteReadButton.Content = read ? "Lihat teks" : "Baca";
+        FreeNotesTextBox.Visibility = read ? Visibility.Collapsed : Visibility.Visible;
+        NoteReader.Visibility = read ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ToggleNoteReader_Click(object sender, RoutedEventArgs e)
+    {
+        var read = NoteReader.Visibility != Visibility.Visible;
+        SetNoteReader(read);
+        if (read) RunNoteAction(() => UpdateNoteDocument(reset: false));
+        else FreeNotesTextBox.Focus(FocusState.Programmatic);
+    }
+
+    private void NoteReader_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => NoteReaderCanvas.Invalidate();
+
+    private void NoteReader_Draw(CanvasControl canvas, CanvasDrawEventArgs args)
+    {
+        var width = Math.Max(1, canvas.ActualWidth - 24);
+        var scroll = (float)NoteReaderScroll.VerticalOffset;
+        var height = _noteReaderRenderer.Measure(canvas.Device, _readerDocument, (float)width, 16, ref scroll);
+        NoteReaderExtent.Height = height + 12;
+        if (Math.Abs(scroll - NoteReaderScroll.VerticalOffset) > 1)
+            NoteReaderScroll.ChangeView(null, scroll, null, true);
+        _noteReaderRenderer.DrawBody(args.DrawingSession,
+            new Windows.Foundation.Rect(6, 6, width, canvas.ActualHeight), scroll);
+    }
 
     private void QueueNotesUpdate()
     {
-        if (_syncingNotesControls || _floatingNotes is null) return;
+        if (_syncingNotesControls || (_floatingNotes is null && NoteReader?.Visibility != Visibility.Visible)) return;
         _notesUpdateTimer.Stop();
         _notesUpdateTimer.Start();
     }
@@ -182,7 +222,14 @@ public sealed partial class MainPage
 
     private void UpdateNoteDocument(bool reset)
     {
-        _floatingNotes?.SetDocument(NoteDocument.Parse(FreeNotesTextBox.Text, MarkdownNotesCheckBox.IsChecked == true), reset);
+        var steps = NoteDocument.Parse(FreeNotesTextBox.Text, MarkdownNotesCheckBox.IsChecked == true);
+        _floatingNotes?.SetDocument(steps, reset);
+        if (NoteReader.Visibility == Visibility.Visible)
+        {
+            _readerDocument = steps;
+            if (reset) NoteReaderScroll.ChangeView(null, 0, null, true);
+            NoteReaderCanvas.Invalidate();
+        }
     }
 
     private void RunNoteAction(Action action)

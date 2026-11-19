@@ -158,10 +158,19 @@ Check(steps[0].Blocks[0].Runs.Any(run => run is { Text: "Narasi", Bold: true })
     "Narration and inline commands retain their formatting.");
 Check(steps[0].Blocks.Any(block => block.Kind == NoteBlockKind.Code && block.Runs[0].Text == "show ip interface brief\n## bukan langkah"),
     "Cisco commands are preserved verbatim.");
-Check(steps[0].Blocks.SelectMany(block => block.Runs).Any(run => run.Text == "• "),
+Check(steps[0].Blocks.Any(block => block.Marker == "• "),
     "Checklist items retain their list marker.");
 Check(string.Concat(steps[1].Blocks.SelectMany(block => block.Runs).Select(run => run.Text)) == "Topologi",
     "External image URLs are not in the display model.");
+var formatted = NoteDocument.Parse("# Modul\n## Router\n> *Pelan* dan ~~lama~~.\n\n" +
+    "| Port | Status |\n| :--- | ---: |\n| `Gi0/0` | **up** |\n\n- [x] Selesai\n\n---", true).Single();
+Check(formatted.DocumentTitle == "Modul" && formatted.Blocks.Any(b => b.Quoted && b.Runs.Any(r => r.Italic)
+    && b.Runs.Any(r => r.Strike)), "Document title, quote and emphasis survive parsing.");
+var dataRow = formatted.Blocks.Single(b => b.Row is { IsHeader: false }).Row!;
+Check(dataRow.Cells[0].Single() is { Text: "Gi0/0", Monospace: true } && dataRow.Cells[1].Single().Bold
+    && dataRow.Headers[0].Single().Text == "Port", "Table fields keep their headers and inline formatting.");
+Check(formatted.Blocks.Any(b => b.Marker == "☑ ") && formatted.Blocks.Any(b => b.Kind == NoteBlockKind.Divider),
+    "Task state and horizontal rule are visible blocks.");
 var plain = NoteDocument.Parse("## Langkah\r\nshow vlan brief", false);
 Check(plain.Count == 1 && plain[0].Blocks[0].Runs[0].Text == "## Langkah\nshow vlan brief",
     "Plain text does not interpret headings.");

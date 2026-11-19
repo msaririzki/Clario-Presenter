@@ -212,13 +212,27 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Catatan pribadi" Style="{StaticResource ClarioHeadingStyle}" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Tutup editor catatan"
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                    <Button x:Name="NoteReadButton" Content="Baca" Visibility="Collapsed" Click="ToggleNoteReader_Click"
+                                            Style="{StaticResource ClarioButtonStyle}" />
+                                    <Button Style="{StaticResource ClarioIconButtonStyle}" AutomationProperties.Name="Tutup editor catatan"
                                         Click="CollapseNotes_Click" ToolTipService.ToolTip="Tutup editor catatan">
-                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
-                                </Button>
+                                        <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
-                            <TextBox Grid.Row="1" x:Name="FreeNotesTextBox" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap"
-                                     AutomationProperties.Name="Teks catatan" PlaceholderText="Ketik atau tempel catatan di sini…" TextChanged="FreeNotesTextBox_TextChanged" />
+                            <Grid Grid.Row="1" x:Name="NoteContentArea" MinHeight="80">
+                                <TextBox x:Name="FreeNotesTextBox" AcceptsReturn="True" TextWrapping="Wrap"
+                                         AutomationProperties.Name="Teks catatan" PlaceholderText="Ketik atau tempel catatan di sini…" TextChanged="FreeNotesTextBox_TextChanged" />
+                                <Grid x:Name="NoteReader" Visibility="Collapsed">
+                                    <canvas:CanvasControl x:Name="NoteReaderCanvas" IsHitTestVisible="False" Draw="NoteReader_Draw" />
+                                    <ScrollViewer x:Name="NoteReaderScroll" Background="Transparent" VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"
+                                                  AutomationProperties.Name="Baca catatan" ViewChanged="NoteReader_ViewChanged">
+                                        <Border x:Name="NoteReaderExtent" />
+                                    </ScrollViewer>
+                                </Grid>
+                            </Grid>
                             <StackPanel Grid.Row="2" Spacing="8">
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
