@@ -81,6 +81,25 @@ public sealed partial class MainPage
 
     private double? _restoreReaderOffset;
 
+    private void ShowInstallationResult()
+    {
+        if (!UpdateService.InstalledCopy) return;
+        var path = Path.Combine(UpdateService.Folder, "last-install.txt");
+        try
+        {
+            if (!File.Exists(path)) return;
+            var target = new FileInfo(path).Length <= 64 && Version.TryParse(File.ReadAllText(path), out var value) ? value : null;
+            File.Delete(path);
+            if (target is null) return;
+            var message = UpdateService.Installed >= target
+                ? $"Clario sudah diperbarui ke {UpdateService.Installed}."
+                : $"Pembaruan ke {target} belum berhasil. Versi terpasang masih {UpdateService.Installed}.";
+            FooterStatusText.Text = message + (FooterStatusText.Text.StartsWith("Catatan ", StringComparison.Ordinal) ? " " + FooterStatusText.Text : "");
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     private async Task FinishForUpdateAsync(bool install)
     {
         if (install ? !UpdatesAllowed : _handoff || _recorder is not null || _sessionTransition || _importingNotes) return;

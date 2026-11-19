@@ -46,7 +46,7 @@ public sealed partial class MainPage
         finally
         {
             _settingsDialogOpen = false;
-            await SyncStudioPreviewAsync();
+            if (_isLoaded) await SyncStudioPreviewAsync();
         }
     }
 

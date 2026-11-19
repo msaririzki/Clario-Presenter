@@ -6,6 +6,8 @@ Mulai 1.0.17, salinan Windows x64 yang dipasang dengan installer memeriksa GitHu
 
 Clario menunda aktivitas pembaruan selama preview, presentasi, perekaman dan penyimpanan video. Setelah unduhan lengkap dan terverifikasi, **Pasang dan buka kembali** menyimpan pengaturan dan catatan, menunggu Clario ditutup, lalu menjalankan installer per pengguna. Catatan dipulihkan saat aplikasi dibuka kembali. Salinan pemulihan disimpan sementara di direktori Updates pengguna dan dienkripsi dengan perlindungan data Windows untuk akun tersebut. Posisi baca, pilihan Markdown, ukuran panel dan sematan dipulihkan melalui pemeriksaan privasi monitor yang biasa.
 
+Saat dibuka kembali setelah pemasangan, Clario membandingkan versi yang berjalan dengan versi yang diminta. Jika installer gagal, pengguna bisa melihat versi yang masih terpasang.
+
 Build tanpa identitas penerbit terkonfigurasi menyediakan **Unduh pembaruan**, yang membuka halaman rilis resmi. Jika memakai tombol ini, tutup Clario secara normal setelah selesai merekam agar catatan ikut dipulihkan. Pengguna 1.0.16 atau lebih lama memasang versi pertama yang memiliki menu Pembaruan secara manual dan menyimpan catatan sebelum menutup versi lama. Untuk beralih dari build tanpa identitas penerbit ke pembaruan otomatis, pasang satu build bertanda tangan secara manual.
 
 ## Tahapan rilis

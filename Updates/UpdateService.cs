@@ -121,7 +121,7 @@ internal sealed class UpdateService
     {
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"))
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
-        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-File",
+        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File",
             Path.Combine(AppContext.BaseDirectory, "Updates", "Install-Update.ps1"), "-Installer", path,
             "-Digest", release.Digest, "-Size", release.Size.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "-Publisher", Pin, "-Version", release.Version.ToString() }) psi.ArgumentList.Add(arg);

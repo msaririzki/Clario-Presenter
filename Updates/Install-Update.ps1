@@ -34,5 +34,10 @@ try {
 } catch { exit 1 }
 finally {
     if ($handle) { $handle.Dispose() }
-    if ($reopen -and (Test-Path -LiteralPath $app)) { Start-Process -FilePath $app -WindowStyle Normal }
+    if ($reopen -and (Test-Path -LiteralPath $app)) {
+        # The reopened app compares this target with its actual running version.
+        $targetFile = Join-Path (Split-Path $Installer -Parent) 'last-install.txt'
+        try { [IO.File]::WriteAllText($targetFile, $Version.ToString()) } catch { }
+        Start-Process -FilePath $app -WindowStyle Normal
+    }
 }

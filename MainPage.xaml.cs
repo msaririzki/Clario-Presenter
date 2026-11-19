@@ -87,6 +87,7 @@ public sealed partial class MainPage : Page
         UpdateCaptureModeUi();
         await RestoreUpdateNotesAsync();
         if (!_isLoaded) return;
+        ShowInstallationResult();
         _updates.Changed += ShowUpdateNotice;
         _updateTimer.Tick += Updates_Tick;
         _updateTimer.Start();
