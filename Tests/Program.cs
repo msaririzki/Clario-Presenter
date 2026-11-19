@@ -195,3 +195,5 @@ Check(NoteOverlayPlacement.Resize(initialPanel, otherDisplay, NoteResizeEdge.Top
     500, 500, 264, 168) == new DisplayBounds(-540, 292, 440, 168),
     "Dragging a single edge preserves the other dimension and the opposite edge.");
 Console.WriteLine($"PASS: {checks} composition and notes checks.");
+
+await UpdateChecks.RunAsync();

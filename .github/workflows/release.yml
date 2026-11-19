@@ -1,0 +1,72 @@
+name: Siapkan draf rilis Windows
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2025
+    timeout-minutes: 35
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
+        with:
+          dotnet-version: 10.0.x
+      - name: Periksa versi tag dan manifest
+        shell: pwsh
+        run: |
+          $v = ([xml](Get-Content Clario.Presenter.csproj -Raw)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $manifest = ([xml](Get-Content Package.appxmanifest -Raw)).Package.Identity.Version
+          if ($v -notmatch '^\d+\.\d+\.\d+$' -or $env:GITHUB_REF_NAME -cne "v$v" -or $manifest -ne "$v.0") { throw 'Versi rilis tidak cocok.' }
+          "CLARIO_VERSION=$v" >> $env:GITHUB_ENV
+      - name: Jalankan pengujian
+        run: dotnet run --project Tests/Clario.GeometryTests.csproj -c Release
+      - name: Bangun installer
+        shell: pwsh
+        env:
+          CERTIFICATE_PFX: ${{ secrets.CLARIO_SIGNING_PFX_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CLARIO_SIGNING_PASSWORD }}
+          EXPECTED_PIN: ${{ vars.CLARIO_PUBLISHER_SHA256 }}
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $compiler)) {
+            choco install innosetup --version=6.4.3 -y --no-progress
+            if ($LASTEXITCODE) { throw 'Instalasi Inno Setup gagal.' }
+          }
+          $params = @{ InnoCompiler = $compiler }
+          if ($env:EXPECTED_PIN -or $env:CERTIFICATE_PFX -or $env:CERTIFICATE_PASSWORD) {
+            if (!$env:CERTIFICATE_PFX -or !$env:CERTIFICATE_PASSWORD -or $env:EXPECTED_PIN -notmatch '^[0-9a-fA-F]{64}$') { throw 'Konfigurasi penandatanganan belum lengkap.' }
+            $path = Join-Path $env:RUNNER_TEMP ([IO.Path]::GetRandomFileName())
+            try {
+              [IO.File]::WriteAllBytes($path,[Convert]::FromBase64String($env:CERTIFICATE_PFX))
+              $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+              $cert = Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password | Where-Object HasPrivateKey | Select-Object -First 1
+              if (!$cert -or $cert.GetCertHashString([Security.Cryptography.HashAlgorithmName]::SHA256) -ne $env:EXPECTED_PIN) { throw 'Sertifikat penerbit tidak cocok.' }
+              $params.SigningThumbprint = $cert.Thumbprint
+            } finally { Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue }
+          }
+          & ./installer/Build-Installer.ps1 @params
+      - name: Buat atau perbarui draf
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $state = gh release view $tag --json isDraft --jq .isDraft 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --verify-tag --draft --generate-notes --title "Clario Presenter $env:CLARIO_VERSION"
+            if ($LASTEXITCODE) { throw 'Pembuatan draf gagal.' }
+          } elseif ($state -ne 'true') { throw 'Rilis sudah terbit.' }
+          $dir = "bin/installer/$env:CLARIO_VERSION"
+          gh release upload $tag "$dir/Clario-Presenter-Setup-x64.exe" "$dir/SHA256SUMS.txt" --clobber
+          if ($LASTEXITCODE) { throw 'Unggahan belum selesai.' }

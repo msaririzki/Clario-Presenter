@@ -8,6 +8,7 @@ AppUpdatesURL=https://github.com/msaririzki/Clario-Presenter/releases/latest
 DefaultDirName={localappdata}\Programs\Clario Presenter
 DefaultGroupName=Clario Presenter
 DisableProgramGroupPage=yes
+AppMutex=Local\ClarioPresenter.Running.5EC3B50D
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible

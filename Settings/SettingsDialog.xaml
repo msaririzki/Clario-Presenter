@@ -109,6 +109,9 @@
                 <NavigationViewItem x:Name="StorageNavigationItem" Content="Penyimpanan">
                     <NavigationViewItem.Icon><SymbolIcon x:Name="StorageNavigationIcon" Symbol="Folder" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="UpdateNavigationItem" Content="Pembaruan">
+                    <NavigationViewItem.Icon><SymbolIcon x:Name="UpdateNavigationIcon" Symbol="Sync" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto"
@@ -367,6 +370,15 @@
                         </Border>
                     </StackPanel>
 
+                    <StackPanel x:Name="UpdateSection" Visibility="Collapsed" Spacing="12">
+                        <TextBlock Text="Pembaruan" Style="{StaticResource SettingsSectionTitle}" />
+                        <TextBlock x:Name="InstalledVersion" />
+                        <TextBlock x:Name="UpdateStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                        <TextBlock x:Name="ReleaseSummary" TextWrapping="Wrap" Visibility="Collapsed" />
+                        <Button x:Name="CheckUpdatesButton" Content="Cek sekarang" Click="CheckUpdates_Click" />
+                        <Button x:Name="UpdateActionButton" Click="UpdateAction_Click" />
+                        <HyperlinkButton x:Name="ReleaseNotesLink" Content="Catatan rilis" />
+                    </StackPanel>
                     <StackPanel x:Name="StorageSection" Visibility="Collapsed" Spacing="12">
                         <TextBlock Text="Penyimpanan" Style="{StaticResource SettingsSectionTitle}" />
                         <Border Style="{StaticResource SettingsCard}">

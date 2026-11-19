@@ -9,6 +9,8 @@
     <PackageReference Include="Markdig" Version="1.6.0" />
     <Compile Include="..\Notes\NoteDocument.cs" Link="NoteDocument.cs" />
     <Compile Include="..\Notes\NoteOverlayPlacement.cs" Link="NoteOverlayPlacement.cs" />
+    <Compile Include="..\Updates\UpdateRelease.cs" Link="UpdateRelease.cs" />
+    <Compile Include="..\Updates\UpdateService.cs" Link="UpdateService.cs" />
     <Compile Remove="CameraSmoke\**\*.cs" />
     <Compile Include="..\Camera\CameraOverlayLayout.cs" Link="CameraOverlayLayout.cs" />
     <Compile Include="..\Capture\DesktopCompositionLayout.cs" Link="DesktopCompositionLayout.cs" />

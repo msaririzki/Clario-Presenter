@@ -52,6 +52,8 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     internal DisplayBounds Bounds => _bounds;
     internal (float Width, float Height) Size => (_width, _height);
     internal int StepIndex => _step;
+    internal float ReadingOffset => _scroll;
+    internal void RestoreReadingOffset(float offset) { _scroll = Math.Max(0, offset); if (_shown) Refresh(); }
     internal float ScrollOffset => _indexOpen ? _indexScroll : _scroll;
 
     private NoteOverlayGeometry Geometry => new(_bounds.Width / _scale, _bounds.Height / _scale);

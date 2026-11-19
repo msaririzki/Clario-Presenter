@@ -74,7 +74,7 @@ public sealed partial class MainPage : Page
         Unloaded += MainPage_Unloaded;
     }
 
-    private void MainPage_Loaded(object sender, RoutedEventArgs e)
+    private async void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = true;
         if (App.MainWindow is { } window)
@@ -85,6 +85,11 @@ public sealed partial class MainPage : Page
         }
         RefreshDisplays();
         UpdateCaptureModeUi();
+        await RestoreUpdateNotesAsync();
+        if (!_isLoaded) return;
+        _updates.Changed += ShowUpdateNotice;
+        _updateTimer.Tick += Updates_Tick;
+        _updateTimer.Start();
     }
 
     private void RefreshSources()
@@ -336,6 +341,8 @@ public sealed partial class MainPage : Page
 
     private bool TryStartSession()
     {
+        if (_handoff) return false;
+        _updates.Pause();
         RefreshDisplays();
         var source = SourceComboBox.SelectedItem as WindowSource;
         var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
@@ -550,7 +557,8 @@ public sealed partial class MainPage : Page
 
     private async Task<bool> RunRecordingChangeAsync(Func<Task<bool>> action, string busyLabel)
     {
-        if (_sessionTransition) return false;
+        if (_sessionTransition || _handoff) return false;
+        _updates.Pause();
         _sessionTransition = true;
         (IsRecordingOnly ? PrimaryButton : RecordButton).Content = busyLabel;
         UpdateSessionActions();
@@ -1003,7 +1011,17 @@ public sealed partial class MainPage : Page
 
     private void PresenterWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
-        if (_recorder is null && !_sessionTransition) return;
+        if (_recoveryPending) return;
+        if (_handoff) { args.Cancel = true; return; }
+        if (_recorder is null && !_sessionTransition)
+        {
+            if (_backupOnClose && FreeNotesTextBox.Text.Length > 0)
+            {
+                args.Cancel = true;
+                DispatcherQueue.TryEnqueue(async () => await FinishForUpdateAsync(false));
+            }
+            return;
+        }
         args.Cancel = true;
         FooterStatusText.Text = _sessionTransition ? "Tunggu sampai rekaman selesai disiapkan atau disimpan."
             : "Rekaman masih berjalan. Klik Stop rekam dahulu untuk menutup Clario.";
@@ -1014,6 +1032,10 @@ public sealed partial class MainPage : Page
     private async void MainPage_Unloaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = false;
+        _updateTimer.Stop();
+        _updateTimer.Tick -= Updates_Tick;
+        _updates.Changed -= ShowUpdateNotice;
+        _updates.Pause();
         if (App.MainWindow is { } window)
         {
             window.AppWindow.Closing -= PresenterWindow_Closing;
@@ -1086,6 +1108,7 @@ public sealed partial class MainPage : Page
 
     private void UpdateSessionActions()
     {
+        ShowUpdateNotice();
         var recording = _recorder is not null;
         PrimaryButton.IsEnabled = !_sessionTransition;
         PreviewButton.IsEnabled = !_sessionTransition;

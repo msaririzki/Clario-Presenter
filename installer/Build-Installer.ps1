@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$InnoCompiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-    [string]$CrtDirectory
+    [string]$CrtDirectory,
+    [string]$SigningThumbprint
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +26,29 @@ $properties = @('-p:Platform=x64', '-p:WindowsPackageType=None', '-p:WindowsAppS
     '-p:PublishReadyToRun=false', '-p:PublishTrimmed=false', '-p:DebugType=none',
     '-p:OutputPath=bin\installer-build\', '-p:IntermediateOutputPath=obj\installer-build\')
 
+if ($SigningThumbprint) {
+    if ($SigningThumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Thumbprint sertifikat tidak valid.' }
+    $certificate = Get-Item -LiteralPath "Cert:\CurrentUser\My\$SigningThumbprint"
+    if (!$certificate.HasPrivateKey) { throw 'Kunci penandatanganan tidak tersedia.' }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $pin = [BitConverter]::ToString($sha.ComputeHash($certificate.RawData)).Replace('-', '') }
+    finally { $sha.Dispose() }
+    $properties += "-p:UpdatePublisherSHA256=$pin"
+    $tool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\signtool.exe" |
+        Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+    if (!$tool) { throw 'SignTool tidak ditemukan.' }
+}
+
+function Protect-ReleaseFile([string]$Path) {
+    if (!$SigningThumbprint) { return }
+    & $tool.FullName sign /sha1 $SigningThumbprint /s My /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $Path
+    if ($LASTEXITCODE) { throw 'Penandatanganan gagal.' }
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $SigningThumbprint) {
+        throw 'Verifikasi tanda tangan gagal.'
+    }
+}
+
 Push-Location $root
 try {
     dotnet publish $project -c Release -r win-x64 --self-contained true -o $payload @properties
@@ -32,6 +56,8 @@ try {
     foreach ($file in 'Clario.Presenter.exe','coreclr.dll','Microsoft.UI.Xaml.dll','Microsoft.Graphics.Canvas.dll','Clario.Presenter.pri','Assets\AppIcon.ico') {
         if (!(Test-Path -LiteralPath (Join-Path $payload $file))) { throw "Berkas distribusi belum lengkap: $file" }
     }
+    Protect-ReleaseFile (Join-Path $payload 'Clario.Presenter.exe')
+    Protect-ReleaseFile (Join-Path $payload 'Updates\Install-Update.ps1')
     Copy-Item "$CrtDirectory\*.dll" -Destination $payload
 
     # Include notices from the exact package versions selected by restore.
@@ -58,6 +84,7 @@ try {
     & $InnoCompiler /Q "/DAppVersion=$version" "/DPayload=$payload" "/O$output" (Join-Path $PSScriptRoot 'Clario.iss')
     if ($LASTEXITCODE) { throw 'Pembuatan installer gagal.' }
     $installer = Get-Item (Join-Path $output 'Clario-Presenter-Setup-x64.exe')
+    Protect-ReleaseFile $installer.FullName
     $digest = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content (Join-Path $output 'SHA256SUMS.txt') "$digest  $($installer.Name)" -Encoding ascii
     Write-Output $installer.FullName

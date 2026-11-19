@@ -21,7 +21,7 @@ Get-FileHash .\Clario-Presenter-Setup-x64.exe -Algorithm SHA256
 
 </details>
 
-Untuk memperbarui aplikasi, selesaikan rekaman, tutup Clario, lalu jalankan installer versi terbaru. Untuk menghapus Clario, buka **Pengaturan Windows → Aplikasi**, pilih **Clario Presenter**, lalu **Hapus instalan**. Video Anda tetap tersimpan di folder rekaman.
+Pada Clario 1.0.17 dan seterusnya, buka **Pengaturan → Pembaruan → Cek sekarang**. Pilih **Pasang dan buka kembali** jika tersedia, atau **Unduh pembaruan** untuk membuka rilis resmi. Untuk memperbarui aplikasi secara manual, selesaikan rekaman, tutup Clario, lalu jalankan installer versi terbaru. Untuk menghapus Clario, buka **Pengaturan Windows → Aplikasi**, pilih **Clario Presenter**, lalu **Hapus instalan**. Video Anda tetap tersimpan di folder rekaman.
 
 ## Rekam layar
 

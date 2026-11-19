@@ -201,6 +201,11 @@ public sealed partial class MainPage
         var scroll = (float)NoteReaderScroll.VerticalOffset;
         var height = _noteReaderRenderer.Measure(canvas.Device, _readerDocument, (float)width, 16, ref scroll);
         NoteReaderExtent.Height = height + 12;
+        if (_restoreReaderOffset is double restored)
+        {
+            _restoreReaderOffset = null;
+            DispatcherQueue.TryEnqueue(() => NoteReaderScroll.ChangeView(null, restored, null, true));
+        }
         if (Math.Abs(scroll - NoteReaderScroll.VerticalOffset) > 1)
             NoteReaderScroll.ChangeView(null, scroll, null, true);
         _noteReaderRenderer.DrawBody(args.DrawingSession,

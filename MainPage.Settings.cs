@@ -14,7 +14,7 @@ public sealed partial class MainPage
 
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_settingsDialogOpen) return;
+        if (_settingsDialogOpen || _handoff) return;
         _settingsDialogOpen = true;
         try
         {
@@ -26,11 +26,19 @@ public sealed partial class MainPage
             {
                 RequestedTheme = ActualTheme
             };
+            dialog.ConfigureUpdates(_updates, () => UpdatesAllowed, () => _backupOnClose = Updates.UpdateService.InstalledCopy,
+                ReferenceEquals(sender, OpenUpdateButton));
             await dialog.ShowAsync();
             SettingsButton.Focus(FocusState.Programmatic);
             if (!dialog.IsSaved) return;
 
-            _settingsService.Save(dialog.GetSettings());
+            try { _settingsService.Save(dialog.GetSettings()); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                FooterStatusText.Text = $"Pengaturan belum tersimpan. {error.Message}";
+                return;
+            }
+            if (dialog.ApplyUpdate) { await FinishForUpdateAsync(true); return; }
             var settings = _settingsService.Current;
             FooterStatusText.Text = $"Pengaturan tersimpan · 1080p {settings.RecordingFrameRate} fps · {settings.RecordingBitrateMbps} Mbps"
                 + (settings.CameraEnabled ? " · kamera aktif untuk rekaman berikutnya" : string.Empty);

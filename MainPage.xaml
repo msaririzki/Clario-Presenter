@@ -277,12 +277,18 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <FontIcon x:Name="FooterStatusIcon" Glyph="&#xE930;" FontSize="12" VerticalAlignment="Center" Foreground="{StaticResource ClarioLiveBrush}" />
             <TextBlock x:Name="FooterStatusText" Grid.Column="1" Text="Pilih sumber untuk memulai."
                        TextWrapping="Wrap" MaxLines="2" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis"
                        Foreground="{StaticResource ClarioSecondaryTextBrush}" ToolTipService.ToolTip="{Binding Text, ElementName=FooterStatusText}" />
-            <StackPanel x:Name="SavedRecordingActions" Grid.Column="2" Orientation="Horizontal" Spacing="6" Visibility="Collapsed">
+            <StackPanel Grid.Column="2" x:Name="UpdateNotice" Visibility="Collapsed" Orientation="Horizontal" Spacing="4"
+                        HorizontalAlignment="Right" Background="{StaticResource ClarioSurfaceBrush}">
+                <Button x:Name="OpenUpdateButton" Content="Pembaruan tersedia" Click="SettingsButton_Click" />
+                <Button Content="Nanti" Click="UpdateLater_Click" />
+            </StackPanel>
+            <StackPanel x:Name="SavedRecordingActions" Grid.Column="3" Orientation="Horizontal" Spacing="6" Visibility="Collapsed">
                 <Button Content="Putar rekaman" Style="{StaticResource ClarioButtonStyle}" Click="PlayRecording_Click" />
                 <Button Content="Buka folder" Style="{StaticResource ClarioButtonStyle}" Click="OpenRecordingFolder_Click" />
             </StackPanel>

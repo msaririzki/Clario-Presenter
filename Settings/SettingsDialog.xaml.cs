@@ -139,6 +139,7 @@ public sealed partial class SettingsDialog : ContentDialog
             CameraNavigationItem.Icon = sideNavigation ? CameraNavigationIcon : null;
             AudioNavigationItem.Icon = sideNavigation ? AudioNavigationIcon : null;
             VideoNavigationItem.Icon = sideNavigation ? VideoNavigationIcon : null;
+            UpdateNavigationItem.Icon = sideNavigation ? UpdateNavigationIcon : null;
             StorageNavigationItem.Icon = sideNavigation ? StorageNavigationIcon : null;
         }
         CameraControlsColumn.Width = sideBySideCamera
@@ -156,6 +157,7 @@ public sealed partial class SettingsDialog : ContentDialog
         CameraSection.Visibility = ReferenceEquals(args.SelectedItem, CameraNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         AudioSection.Visibility = ReferenceEquals(args.SelectedItem, AudioNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         VideoSection.Visibility = ReferenceEquals(args.SelectedItem, VideoNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSection.Visibility = ReferenceEquals(args.SelectedItem, UpdateNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         StorageSection.Visibility = ReferenceEquals(args.SelectedItem, StorageNavigationItem) ? Visibility.Visible : Visibility.Collapsed;
         SettingsScroll.ChangeView(null, 0, null, disableAnimation: true);
         if (_opened && !_closing) await Task.WhenAll(SyncCameraPreviewAsync(), SyncAudioMonitorsAsync());
@@ -504,6 +506,7 @@ public sealed partial class SettingsDialog : ContentDialog
 
     private void SettingsDialog_Closed(ContentDialog sender, ContentDialogClosedEventArgs args)
     {
+        if (_updates is not null) _updates.Changed -= UpdateDetails;
         XamlRoot.Changed -= SettingsRoot_Changed;
         _previewStatusTimer.Tick -= PreviewStatusTimer_Tick;
         _audioMeterTimer.Tick -= AudioMeterTimer_Tick;
