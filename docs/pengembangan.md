@@ -46,6 +46,7 @@ Baca laporan JSON dan periksa nilai `Passed` setelah pengujian selesai. Uji reka
 | Tanpa argumen mode | Menyalakan kamera pertama, menguji pratinjau, membuka kembali kamera, merekam pola uji 1080p60, dan memeriksa transisi Privasi |
 | `--desktop-only` | Berpindah di antara jendela uji publik dan privat sambil memeriksa pembaruan frame |
 | `--floating-notes` | Menjangkau catatan panjang, mengubah ukuran, memilih bagian, menjaga fokus, dan memeriksa pengecualian panel dari tangkapan |
+| `--reference-notes` | Menguji panel aplikasi langsung, klik tembus, dan video dari jendela publik saat referensi dibuka atau ditutup |
 | `--recording-stability` | Menjalankan perekam selama tiga menit pada 1080p60 dengan gambar bergerak, audio sintetis, dan pengumpulan memori berkala. MP4 disimpan di sebelah laporan. |
 | `--audio` | Membuka keluaran WASAPI dan membuat MP4 uji dengan suara sintetis serta segmen Privasi |
 | `--audio-input-open-only` | Membuka input mikrofon tanpa membaca sampel audio |
@@ -59,3 +60,10 @@ Gunakan Windows x64, .NET 10 SDK, Inno Setup 6.3.3 atau lebih baru dalam seri 6,
 ```
 
 Skrip menghasilkan `Clario-Presenter-Setup-x64.exe` dan `SHA256SUMS.txt` di `bin/installer/<versi>/`. Versi berasal dari properti `Version` di [Clario.Presenter.csproj](../Clario.Presenter.csproj). Untuk rilis, gunakan tag `v<versi>` dan unggah kedua file dengan nama tersebut agar tautan unduhan di README tetap berfungsi.
+
+## Rencana implementasi referensi aplikasi
+
+1. Tambahkan pemilih jendela pada panel Catatan. Periksa identitas sumber dan cegah pengguna memilih aplikasi yang juga akan direkam.
+2. Pakai kembali panel melayang dan kontrolnya. Tampilkan sumber di area baca melalui Windows Graphics Capture. Tambahkan zoom dan geser isi. Periksa pengecualian rekaman sebelum menampilkan panel dan lepaskan tangkapan saat panel ditutup.
+3. Simpan identitas jendela privat untuk seluruh sesi. Susun mode Layar dari tangkapan jendela publik sejak frame pertama. Kecualikan proses, keluarga jendela sumber, panel Clario, dan elemen pemilih aplikasi. Gunakan komposisi yang sama untuk preview, layar audiens, dan MP4. Pisahkan setelan mikrofon dari audio komputer saat referensi aktif.
+4. Uji pembesaran, klik tembus, pembaruan sumber, sumber tertutup, serta rekaman publik saat sumber privat menutupi jendela publik. Jalankan ulang pengujian catatan teks dan tangkapan layar sebelum memperbarui GitHub.

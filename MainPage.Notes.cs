@@ -14,6 +14,9 @@ public sealed partial class MainPage
     private readonly NoteOverlayRenderer _noteReaderRenderer = new();
     private IReadOnlyList<NoteStep> _readerDocument = [];
     private FloatingNoteWindow? _floatingNotes;
+    private WindowSource? _noteReference;
+    private WindowSource? _sessionNoteReference;
+    private bool _choosingNoteReference;
     private DisplayTarget? _notesAudience;
     private bool _syncingNotesControls;
     private bool _importingNotes;
@@ -108,6 +111,68 @@ public sealed partial class MainPage
         }
     }
 
+    private async void NoteReference_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isLive || _sessionTransition || _choosingNoteReference || _handoff) return;
+        _choosingNoteReference = true;
+        try
+        {
+            var sources = WindowCatalogService.GetPresentableWindows();
+            var picker = new ComboBox
+            {
+                ItemsSource = sources, DisplayMemberPath = nameof(WindowSource.DisplayName),
+                SelectedItem = sources.FirstOrDefault(item => item.Handle == _noteReference?.Handle),
+                PlaceholderText = "Pilih jendela", HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var content = new StackPanel { Spacing = 12 };
+            content.Children.Add(picker);
+            content.Children.Add(new TextBlock
+            {
+                Text = "Semua jendela aplikasi ini disembunyikan dari hasil Clario. Saat merekam Layar, Clario hanya menampilkan jendela publik. Suara komputer dimatikan selama rekaman.",
+                TextWrapping = TextWrapping.Wrap
+            });
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot, Title = "Sematkan jendela aplikasi", Content = content,
+                PrimaryButtonText = "Sematkan", SecondaryButtonText = _noteReference is null ? "" : "Pakai teks",
+                CloseButtonText = "Batal", IsPrimaryButtonEnabled = picker.SelectedItem is WindowSource
+            };
+            picker.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = picker.SelectedItem is WindowSource;
+            var result = await dialog.ShowAsync();
+            if (!_isLoaded || _isLive || _sessionTransition || result == ContentDialogResult.None) return;
+            if (result == ContentDialogResult.Secondary)
+            {
+                _noteReference = null;
+                _floatingNotes?.Hide();
+                _floatingNotes?.SetReference(null);
+                NoteReferenceButton.Content = "Pilih jendela aplikasi";
+                NoteStatusText.Text = "Catatan teks siap disematkan.";
+                return;
+            }
+            if (picker.SelectedItem is not WindowSource source
+                || WindowCatalogService.GetProcessId(source.Handle) != source.ProcessId)
+            {
+                NoteStatusText.Text = "Jendela sudah ditutup. Buka jendela sumber lalu pilih lagi.";
+                return;
+            }
+            if (!IsSafeMirrorMode && SourceComboBox.SelectedItem is WindowSource output
+                && WindowCatalogService.IsReferenceWindow(output.Handle, source))
+            {
+                NoteStatusText.Text = "Aplikasi ini sedang dipilih sebagai sumber. Pilih sumber rekaman lain terlebih dahulu.";
+                return;
+            }
+            _noteReference = source;
+            NoteReferenceButton.Content = "Ganti jendela aplikasi";
+            RunNoteAction(ShowPinnedNote);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine(exception);
+            NoteStatusText.Text = "Daftar jendela belum bisa dibuka.";
+        }
+        finally { _choosingNoteReference = false; }
+    }
+
     private void PinNotes_Click(object sender, RoutedEventArgs e) => RunNoteAction(() =>
     {
         if (_floatingNotes?.IsRequested == true)
@@ -115,7 +180,12 @@ public sealed partial class MainPage
             _floatingNotes.Hide();
             return;
         }
-        if (string.IsNullOrWhiteSpace(FreeNotesTextBox.Text))
+        ShowPinnedNote();
+    });
+
+    private void ShowPinnedNote()
+    {
+        if (_noteReference is null && string.IsNullOrWhiteSpace(FreeNotesTextBox.Text))
         {
             NoteStatusText.Text = "Ketik catatan atau buka file terlebih dahulu.";
             return;
@@ -125,10 +195,11 @@ public sealed partial class MainPage
             _floatingNotes = new FloatingNoteWindow();
             _floatingNotes.Changed += FloatingNotes_Changed;
         }
+        _floatingNotes.SetReference(_noteReference);
         UpdateNoteDocument(reset: false);
         ApplyNoteAppearance();
-        _floatingNotes.Toggle(PreferredNotesDisplay());
-    });
+        _floatingNotes.Show(PreferredNotesDisplay());
+    }
 
     private void NoteAppearance_Changed(object sender, RoutedEventArgs args)
     {
@@ -166,7 +237,8 @@ public sealed partial class MainPage
         }
         finally { _syncingNotesControls = false; }
         NoteStatusText.Text = _floatingNotes.Status +
-            (_floatingNotes.ShortcutsAvailable ? "" : " Gunakan tombol di bawah catatan untuk membaca.");
+            (_noteReference is not null ? $" Sumber: {_noteReference.ShortTitle}. Untuk mengganti halaman, buka jendela aslinya."
+            : _floatingNotes.ShortcutsAvailable ? "" : " Gunakan tombol di bawah catatan untuk membaca.");
     }
 
     private void FreeNotesTextBox_TextChanged(object sender, RoutedEventArgs args) => QueueNotesUpdate();
@@ -253,6 +325,7 @@ public sealed partial class MainPage
         OpenNotesButton.IsEnabled = enabled && !_importingNotes;
         FreeNotesTextBox.IsReadOnly = !enabled;
         MarkdownNotesCheckBox.IsEnabled = enabled;
+        NoteReferenceButton.IsEnabled = enabled;
     }
 
     private void DisposeFloatingNotes()

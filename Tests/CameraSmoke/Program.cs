@@ -16,6 +16,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Length == 3 && args[0] == "--note-fixture")
+        {
+            ReferenceNotesChecks.RunFixture(args[1], args[2]);
+            return;
+        }
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var reportPath = args.FirstOrDefault(arg => !arg.StartsWith("--"))
             ?? Path.Combine(Path.GetTempPath(), "Clario-CameraSmoke.json");
@@ -31,6 +36,7 @@ internal static class Program
                 else if (args.Contains("--desktop-only")) await DesktopSwitchChecks.RunAsync(reportPath);
                 else if (args.Contains("--markdown-layout")) await MarkdownLayoutChecks.RunAsync(reportPath);
                 else if (args.Contains("--floating-notes")) await FloatingNotesChecks.RunAsync(reportPath);
+                else if (args.Contains("--reference-notes")) await ReferenceNotesChecks.RunAsync(reportPath);
                 else if (args.Contains("--recording-stability")) await AudioChecks.RunStabilityAsync(reportPath);
                 else if (args.Contains("--audio")) await AudioChecks.RunAsync(reportPath);
                 else if (args.Contains("--audio-input-open-only")) await AudioChecks.OpenInputOnlyAsync(reportPath);

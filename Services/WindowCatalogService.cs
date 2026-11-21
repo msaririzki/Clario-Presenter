@@ -7,6 +7,7 @@ namespace Clario_Presenter.Services;
 
 public sealed record WindowSource(nint Handle, string Title, string ProcessName)
 {
+    internal uint ProcessId { get; init; }
     public string DisplayName => $"{Title}  ·  {ProcessName}";
     public string ShortTitle => Title.Length <= 42 ? Title : $"{Title[..39]}…";
 }
@@ -49,7 +50,7 @@ public static class WindowCatalogService
                 if (!processName.Equals("ApplicationFrameHost", StringComparison.OrdinalIgnoreCase)
                     && !title.Equals("Program Manager", StringComparison.OrdinalIgnoreCase))
                 {
-                    windows.Add(new WindowSource(handle, title, processName));
+                    windows.Add(new WindowSource(handle, title, processName) { ProcessId = processId });
                 }
             }
             catch
@@ -123,13 +124,14 @@ public static class WindowCatalogService
             || HasPrivateWindowOnDisplay(display, privateWindows);
     }
 
-    public static IReadOnlyList<nint> GetPublicDesktopWindows(DisplayBounds workArea, IEnumerable<nint> privateWindows)
+    public static IReadOnlyList<nint> GetPublicDesktopWindows(DisplayBounds workArea, IEnumerable<nint> privateWindows,
+        WindowSource? reference = null)
     {
         var candidates = new List<DesktopWindowCandidate>();
         EnumWindows((handle, _) =>
         {
             if (IsWindowCapturable(handle) && !IsShellOverlay(handle)
-                && !IsInWindowFamily(handle, privateWindows)
+                && !IsInWindowFamily(handle, privateWindows) && !IsReferenceWindow(handle, reference)
                 && TryGetCaptureBounds(handle, out var bounds))
                 candidates.Add(new DesktopWindowCandidate(handle, bounds));
             return true;
@@ -162,6 +164,20 @@ public static class WindowCatalogService
     }
 
     public static nint GetRootOwner(nint handle) => GetAncestor(handle, 3);
+
+    internal static uint GetProcessId(nint handle)
+    {
+        GetWindowThreadProcessId(handle, out var processId);
+        return processId;
+    }
+
+    internal static bool IsReferenceWindow(nint handle, WindowSource? reference)
+    {
+        if (reference is null) return false;
+        if (handle == reference.Handle || IsInWindowFamily(handle, [reference.Handle])) return true;
+        var processId = GetProcessId(handle);
+        return processId != 0 && processId == reference.ProcessId;
+    }
 
     public static bool IsInWindowFamily(nint handle, IEnumerable<nint> selectedWindows)
     {

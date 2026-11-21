@@ -342,12 +342,17 @@ public sealed partial class MainPage : Page
 
     private bool TryStartSession()
     {
-        if (_handoff) return false;
+        if (_handoff || _choosingNoteReference) return false;
         _updates.Pause();
         RefreshDisplays();
         var source = SourceComboBox.SelectedItem as WindowSource;
         var monitor = SourceMonitorComboBox.SelectedItem as DisplayTarget;
         var target = IsRecordingOnly ? null : DisplayComboBox.SelectedItem as DisplayTarget;
+        if (!IsSafeMirrorMode && source is not null && WindowCatalogService.IsReferenceWindow(source.Handle, _noteReference))
+        {
+            FooterStatusText.Text = "Aplikasi ini sedang menjadi catatan pribadi. Pilih sumber rekaman lain.";
+            return false;
+        }
         if (IsSafeMirrorMode && monitor is null)
         {
             FooterStatusText.Text = _sourceDisplayNeedsSelection
@@ -612,7 +617,7 @@ public sealed partial class MainPage : Page
                     stream,
                     new RecordingOptions(settings.RecordingFrameRate, settings.RecordingBitrateMbps,
                         PreviewCameraOptions(settings),
-                        new RecordingAudioOptions(settings.ComputerAudioEnabled, settings.PlaybackDeviceId,
+                        new RecordingAudioOptions(settings.ComputerAudioEnabled && _sessionNoteReference is null, settings.PlaybackDeviceId,
                             settings.MicrophoneEnabled, settings.MicrophoneDeviceId, settings.MicrophoneSpeechProfile,
                             settings.WarmNarration, settings.ReduceFanNoise, settings.BoostedMicrophones)));
                 if (!_isLive || _capture is null)
@@ -759,6 +764,7 @@ public sealed partial class MainPage : Page
         _capture.SourceClosed += Capture_SourceClosed;
         _capture.CaptureFailed += Capture_CaptureFailed;
         _isSafeMirrorSession = IsSafeMirrorMode;
+        _sessionNoteReference = _noteReference;
         _isRecordingOnlySession = IsRecordingOnly;
         _presenterDisplay = sourceMonitor ?? _displays.FirstOrDefault(display => display.IsPrimary);
         _clientDisplay = target is not null && target.Handle != _presenterDisplay?.Handle ? target : null;
@@ -781,12 +787,22 @@ public sealed partial class MainPage : Page
             // Begin from a known-safe desktop. Selected private windows are still
             // available from the taskbar and will trigger auto-hold when restored.
             _isAutoHeld = true;
-            WindowCatalogService.MinimizeWindows(_privateWindows);
+            WindowCatalogService.MinimizeWindows(_privateWindows.Where(
+                handle => !WindowCatalogService.IsReferenceWindow(handle, _sessionNoteReference)));
             _lastPrivateViewTick = _privateWindows.Count > 0 ? Environment.TickCount64 : 0;
             _capture.ConfigureDesktop(primaryDisplay.Bounds, primaryDisplay.WorkArea);
             ExcludePresenterFromScreenCapture();
-            _capture.FrameHoldPredicate = () => _isAutoHeld || _isProtectedPublicCapture || HasPrivateView();
-            _capture.StartMonitor(primaryDisplay.Handle, keepLastFrame: true);
+            if (_sessionNoteReference is null)
+            {
+                _capture.FrameHoldPredicate = () => _isAutoHeld || _isProtectedPublicCapture || HasPrivateView();
+                _capture.StartMonitor(primaryDisplay.Handle, keepLastFrame: true);
+            }
+            else
+            {
+                _isProtectedPublicCapture = true;
+                _isAutoHeld = false;
+                UpdateProtectedDesktop();
+            }
             _privacyWatchTimer.Start();
         }
         else
@@ -816,6 +832,7 @@ public sealed partial class MainPage : Page
         _isPrivacy = false;
         _isAutoHeld = false;
         _isSafeMirrorSession = false;
+        _sessionNoteReference = null;
         _isRecordingOnlySession = false;
         _isProtectedPublicCapture = false;
         _lastPublicWindow = nint.Zero;
@@ -867,11 +884,12 @@ public sealed partial class MainPage : Page
     {
         if (!_isSafeMirrorSession || _isFrozen || _capture is null || _presenterDisplay is null) return;
 
-        var protectedViewNeeded = HasPrivateView();
+        var protectedViewNeeded = _sessionNoteReference is not null || HasPrivateView();
         if (!protectedViewNeeded && !_isProtectedPublicCapture && !_isAutoHeld && _privateWindows.Count == 0) return;
         var foregroundWindow = WindowCatalogService.GetForegroundWindowHandle();
         var presenterActive = foregroundWindow == GetPresenterWindowHandle();
-        var privateWindowActive = WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
+        var privateWindowActive = (WindowCatalogService.IsInWindowFamily(foregroundWindow, _privateWindows)
+            || WindowCatalogService.IsReferenceWindow(foregroundWindow, _sessionNoteReference))
             && WindowCatalogService.IsWindowPresentable(foregroundWindow);
         var switcherActive = WindowCatalogService.IsApplicationSwitcherActive();
 
@@ -905,9 +923,10 @@ public sealed partial class MainPage : Page
         try
         {
             if (_lastPublicWindow != nint.Zero
-                && !WindowCatalogService.IsInWindowFamily(_lastPublicWindow, _privateWindows))
+                && !WindowCatalogService.IsInWindowFamily(_lastPublicWindow, _privateWindows)
+                && !WindowCatalogService.IsReferenceWindow(_lastPublicWindow, _sessionNoteReference))
                 WindowCatalogService.PrepareWindowForBackgroundCapture(_lastPublicWindow);
-            var publicWindows = WindowCatalogService.GetPublicDesktopWindows(_presenterDisplay.WorkArea, _privateWindows);
+            var publicWindows = WindowCatalogService.GetPublicDesktopWindows(_presenterDisplay.WorkArea, _privateWindows, _sessionNoteReference);
             _capture.SetProtectedWindows(publicWindows, retainSceneIfEmpty: true);
         }
         catch

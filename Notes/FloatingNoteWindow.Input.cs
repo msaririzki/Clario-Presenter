@@ -15,7 +15,7 @@ internal sealed partial class FloatingNoteWindow
     private bool _resizeRenderPending;
     private bool _trackingPointer;
 
-    private enum PointerAction { None, Move, Resize, Scroll }
+    private enum PointerAction { None, Move, Resize, Scroll, PanReference }
 
     private bool RegisterShortcuts()
     {
@@ -33,6 +33,22 @@ internal sealed partial class FloatingNoteWindow
             return;
         }
         if (!_shown) return;
+
+        if (_reference is not null && id >= 3)
+        {
+            switch (id)
+            {
+                case 3: SetZoom(_zoom - .25f); break;
+                case 4: SetZoom(_zoom + .25f); break;
+                case 5: PanReference(0, -.1f); break;
+                case 6: PanReference(0, .1f); break;
+                case 7: PanReference(0, -.4f); break;
+                case 8: PanReference(0, .4f); break;
+                case 9: PanReference(0, -1); break;
+                case 10: PanReference(0, 1); break;
+            }
+            return;
+        }
 
         switch (id)
         {
@@ -54,12 +70,24 @@ internal sealed partial class FloatingNoteWindow
     private void ScrollPage(int direction) =>
         ScrollTo(ScrollOffset + direction * Math.Max(_fontSize, (float)Geometry.Body.Height * .9f));
 
-    private void ScrollWheel(nint wParam) =>
-        ScrollTo(ScrollOffset - (short)((long)wParam >> 16) / 120f * _fontSize * 3.5f);
+    private void ScrollWheel(nint wParam)
+    {
+        var ticks = (short)((long)wParam >> 16) / 120f;
+        if (_reference is null) ScrollTo(ScrollOffset - ticks * _fontSize * 3.5f);
+        else PanReference(0, -ticks * .12f);
+    }
 
     private void ActivateFooter(Windows.Foundation.Point point)
     {
         var geometry = Geometry;
+        if (_reference is not null)
+        {
+            if (geometry.Previous.Contains(point)) SetZoom(_zoom - .25f);
+            else if (geometry.Next.Contains(point)) SetZoom(_zoom + .25f);
+            else if (geometry.Index.Contains(point)) SetZoom(1);
+            else if (geometry.Mode.Contains(point)) SetClickThrough(!ClickThrough);
+            return;
+        }
         if (geometry.Previous.Contains(point)) ScrollPage(-1);
         else if (geometry.Next.Contains(point)) ScrollPage(1);
         else if (geometry.Index.Contains(point)) ToggleIndex();
@@ -100,6 +128,10 @@ internal sealed partial class FloatingNoteWindow
         {
             StartPointer(window, location, PointerAction.Move);
         }
+        else if (_reference is not null && _zoom > 1 && geometry.Body.Contains(point))
+        {
+            StartPointer(window, location, PointerAction.PanReference);
+        }
     }
 
     private void StartPointer(nint window, Point location, PointerAction action)
@@ -124,6 +156,12 @@ internal sealed partial class FloatingNoteWindow
 
         var dx = _bounds.Left + location.X - _pointerStart.X;
         var dy = _bounds.Top + location.Y - _pointerStart.Y;
+        if (_pointerAction == PointerAction.PanReference)
+        {
+            _pointerStart = new Point { X = _bounds.Left + location.X, Y = _bounds.Top + location.Y };
+            if (dx != 0 || dy != 0) PanReference(-dx / (_bounds.Width * .7f), -dy / (_bounds.Height * .7f));
+            return;
+        }
         if (_pointerAction == PointerAction.Move)
         {
             var next = NoteOverlayPlacement.Clamp(_dragBounds with

@@ -146,6 +146,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         var audience = displays.FirstOrDefault(display => display.DeviceName == _audience?.DeviceName);
         if ((_recorded is not null && recorded is null) || (_audience is not null && audience is null))
         {
+            StopReferenceCapture();
             Status = "Susunan layar berubah. Stop preview atau presentasi sebelum menyematkan kembali.";
             Changed?.Invoke(this, EventArgs.Empty);
             return;
@@ -157,6 +158,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         if (target is null)
         {
             HideWindow();
+            StopReferenceCapture();
             Status = "Catatan disembunyikan. Tidak ada layar yang aman untuk menampilkannya.";
             Changed?.Invoke(this, EventArgs.Empty);
             return;
@@ -171,12 +173,15 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             keepPosition ? _bounds.Top : target.WorkArea.Top + 24, width, height);
         _bounds = NoteOverlayPlacement.Clamp(requested, target.WorkArea);
         _placement = target;
+        if (_reference is not null) StartReferenceCapture();
         Refresh();
         // Check again after updating the layered surface, before showing the window.
         ExcludedFromCapture = TryExclude();
-        if (!NoteOverlayPlacement.IsAllowed(_bounds, ExcludedFromCapture, recorded?.Bounds, audience?.Bounds))
+        if ((_reference is not null && !ExcludedFromCapture)
+            || !NoteOverlayPlacement.IsAllowed(_bounds, ExcludedFromCapture, recorded?.Bounds, audience?.Bounds))
         {
             HideWindow();
+            StopReferenceCapture();
             Status = "Catatan disembunyikan. Pilih layar lain untuk catatan.";
         }
         else
@@ -196,6 +201,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     {
         _requested = false;
         HideWindow();
+        StopReferenceCapture();
         Status = "Catatan mengambang ditutup.";
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -288,12 +294,16 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         if (!KeepVisibleIfProtected()) return;
         var device = CanvasDevice.GetSharedDevice();
         var geometry = Geometry;
-        var documentHeight = _renderer.Measure(device, _steps, (float)geometry.Body.Width, _fontSize, ref _scroll);
-        _scroll = Math.Clamp(_scroll, 0, geometry.ScrollLimit(documentHeight));
-        var sectionTop = _renderer.SectionTop(_step);
-        if (sectionTop < _scroll || sectionTop >= _scroll + geometry.Body.Height)
-            _step = _renderer.SectionAt(_scroll);
-        _contentHeight = _indexOpen ? _steps.Count * NoteOverlayGeometry.IndexRowHeight : documentHeight;
+        _contentHeight = 0;
+        if (_reference is null)
+        {
+            var documentHeight = _renderer.Measure(device, _steps, (float)geometry.Body.Width, _fontSize, ref _scroll);
+            _scroll = Math.Clamp(_scroll, 0, geometry.ScrollLimit(documentHeight));
+            var sectionTop = _renderer.SectionTop(_step);
+            if (sectionTop < _scroll || sectionTop >= _scroll + geometry.Body.Height)
+                _step = _renderer.SectionAt(_scroll);
+            _contentHeight = _indexOpen ? _steps.Count * NoteOverlayGeometry.IndexRowHeight : documentHeight;
+        }
         _maxScroll = geometry.ScrollLimit(_contentHeight);
         if (_indexOpen) _indexScroll = Math.Clamp(_indexScroll, 0, _maxScroll);
 
@@ -305,7 +315,9 @@ internal sealed partial class FloatingNoteWindow : IDisposable
             _renderTarget = new CanvasRenderTarget(device, geometry.Width, geometry.Height, 96 * _scale);
         }
         using (var session = _renderTarget.CreateDrawingSession())
-            _renderer.Draw(session, geometry, _steps, _step, _indexOpen, ClickThrough, ScrollOffset, _contentHeight);
+            _renderer.Draw(session, geometry, _steps, _step, _indexOpen, ClickThrough, ScrollOffset, _contentHeight,
+                _reference is null ? null : DrawReference, _reference?.ShortTitle,
+                _reference is null ? null : $"{_zoom:P0}");
 
         _pixels = _renderTarget.GetPixelBytes();
         _pixelWidth = (int)_renderTarget.SizeInPixels.Width;
@@ -335,6 +347,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
         if (!_shown || !ExcludedFromCapture
             || (GetWindowDisplayAffinity(_window, out var actual) && actual == ExcludeFromCapture)) return true;
         HideWindow();
+        StopReferenceCapture();
         _requested = false;
         ExcludedFromCapture = false;
         Status = "Catatan disembunyikan karena pengecualian rekaman hilang. Sematkan kembali.";
@@ -372,6 +385,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
                     if (_shown)
                     {
                         HideWindow();
+                        StopReferenceCapture();
                         _requested = false;
                         Status = "Susunan layar berubah. Sematkan kembali catatan.";
                         Changed?.Invoke(this, EventArgs.Empty);
@@ -384,6 +398,9 @@ internal sealed partial class FloatingNoteWindow : IDisposable
                     return 0;
                 case 0x113 when wParam == PointerTimer:
                     TrackPointer();
+                    return 0;
+                case 0x113 when wParam == ReferenceTimer:
+                    RefreshReference();
                     return 0;
                 case 0x20 when (!ClickThrough || _indexOpen) && _shown && (short)lParam == 1: // WM_SETCURSOR, HTCLIENT
                     UpdatePointerCursor();
@@ -416,6 +433,7 @@ internal sealed partial class FloatingNoteWindow : IDisposable
     {
         if (_window == 0) return;
         HideWindow();
+        StopReferenceCapture();
         for (var i = 1; i <= ShortcutKeys.Length; i++) UnregisterHotKey(_window, i);
         _renderer.Dispose();
         _renderTarget?.Dispose();

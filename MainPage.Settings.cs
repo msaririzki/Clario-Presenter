@@ -62,6 +62,8 @@ public sealed partial class MainPage
             var monitor = IsSafeMirrorMode ? SourceMonitorComboBox.SelectedItem as DisplayTarget : null;
             var source = IsSafeMirrorMode ? null : SourceComboBox.SelectedItem as WindowSource;
             if (monitor is null && source is null) return null;
+            if (_noteReference is not null && (monitor is not null
+                || WindowCatalogService.IsReferenceWindow(source!.Handle, _noteReference))) return null;
             if (monitor is not null && WindowCatalogService.HasPrivateWindowOnDisplay(monitor.Bounds, _privateWindows))
                 return null;
             if (source is not null && WindowCatalogService.IsInWindowFamily(source.Handle, _privateWindows))

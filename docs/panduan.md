@@ -81,6 +81,15 @@ Klik **Sematkan** agar naskah terlihat di atas aplikasi. Semua bagian tersambung
 
 Clario memeriksa apakah Windows dapat menyembunyikan catatan dari rekamannya. Jika pemeriksaan gagal, Clario mencoba memindahkan panel ke monitor lain yang aman atau menyembunyikannya. Jika Anda menggunakan perekam lain, periksa hasilnya dengan rekaman singkat di aplikasi tersebut.
 
+### Sematkan PDF atau jendela aplikasi
+
+1. Buka PDF, Notepad, atau jendela yang ingin dibaca. Di Clario, pilih **Catatan → Pilih jendela aplikasi → Sematkan**.
+2. Gunakan **− Zoom** dan **+ Zoom** untuk mengatur ukuran isi. Klik persentase untuk kembali ke ukuran awal. Pilih **Atur**, lalu seret isi untuk menggeser bagian yang diperbesar. Seret judul untuk memindahkan panel atau tarik tepi untuk mengubah ukurannya. Gunakan **Atur catatan** untuk memilih layar dan transparansi.
+3. Tekan **Selesai** untuk memakai aplikasi di belakang panel. Untuk menggulir dokumen atau pindah halaman, buka jendela asal. Biarkan jendela tersebut terbuka agar panel mengikuti pembaruan.
+4. Untuk mengganti sumber, akhiri preview, rekaman, atau presentasi. Buka **Ganti jendela aplikasi** dan pilih jendela lain atau **Pakai teks**.
+
+Saat merekam atau presentasi dengan referensi aplikasi, Clario menyembunyikan panel, jendela sumber, dan jendela lain dari proses aplikasi sumber. Jika referensi dibuka di Chrome, jendela Chrome lain dari proses yang sama juga tersembunyi. Untuk mode **Layar**, Clario menyusun tampilan dari jendela publik yang terlihat. Desktop Windows, taskbar, dan pemilih Alt+Tab tidak masuk ke hasil dalam mode ini. Suara komputer dimatikan selama sesi tersebut. Mikrofon masih bisa dipakai.
+
 ## Kamera dan suara
 
 **Untuk menampilkan wajah di video**, sambungkan webcam USB atau gunakan kamera laptop. Buka **Pengaturan**, aktifkan **Sertakan kamera**, pilih kamera, lalu klik **Tes kamera**. Pilih posisi dan ukuran kamera. Untuk menentukan ukuran sendiri, pilih **Kustom** dan masukkan 5–90% dari lebar video. Klik **Simpan**. Jika memakai aplikasi kamera pihak ketiga, aktifkan kamera virtual di aplikasi tersebut, lalu perbarui daftar kamera di Clario.

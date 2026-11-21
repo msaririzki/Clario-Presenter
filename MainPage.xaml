@@ -241,6 +241,8 @@
                                     <Button x:Name="PinNotesButton" Grid.Column="1" Content="Sematkan" Click="PinNotes_Click" HorizontalAlignment="Stretch"
                                             Style="{StaticResource ClarioButtonStyle}" ToolTipService.ToolTip="Tampilkan catatan di atas aplikasi lain" />
                                 </Grid>
+                                <Button x:Name="NoteReferenceButton" Content="Pilih jendela aplikasi" Click="NoteReference_Click"
+                                        Style="{StaticResource ClarioButtonStyle}" HorizontalAlignment="Stretch" />
                                 <Button Content="Atur catatan" Style="{StaticResource ClarioButtonStyle}">
                                     <Button.Flyout>
                                         <Flyout Opening="NoteOptions_Opening">

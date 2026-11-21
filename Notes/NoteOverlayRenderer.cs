@@ -88,7 +88,8 @@ internal sealed class NoteOverlayRenderer : IDisposable
     }
 
     internal void Draw(CanvasDrawingSession session, NoteOverlayGeometry geometry, IReadOnlyList<NoteStep> steps,
-        int index, bool indexOpen, bool clickThrough, float scroll, float contentHeight)
+        int index, bool indexOpen, bool clickThrough, float scroll, float contentHeight,
+        Action<CanvasDrawingSession, Rect>? drawReference = null, string? referenceTitle = null, string? zoomLabel = null)
     {
         var body = geometry.Body;
         session.Clear(Color.FromArgb(255, 17, 22, 31));
@@ -97,7 +98,8 @@ internal sealed class NoteOverlayRenderer : IDisposable
 
         using (session.CreateLayer(1, body))
         {
-            if (indexOpen) DrawIndex(session, body, steps, index, scroll);
+            if (drawReference is not null) drawReference(session, body);
+            else if (indexOpen) DrawIndex(session, body, steps, index, scroll);
             else DrawBody(session, body, scroll);
         }
 
@@ -110,16 +112,26 @@ internal sealed class NoteOverlayRenderer : IDisposable
             session.FillRoundedRectangle((float)thumb.X + 3, (float)thumb.Y, 8, (float)thumb.Height, 4, 4, Muted);
         }
 
-        DrawLine(session, indexOpen ? "Daftar bagian" : "Catatan", new Rect(14, 4, geometry.Width / 2, 27), 15, White);
-        if (steps.Count > 1)
+        DrawLine(session, referenceTitle ?? (indexOpen ? "Daftar bagian" : "Catatan"),
+            new Rect(14, 4, referenceTitle is null ? geometry.Width / 2 : geometry.Width - 28, 27), 15, White);
+        if (referenceTitle is null && steps.Count > 1)
             DrawLine(session, $"Bagian {index + 1}/{steps.Count}", new Rect(geometry.Width / 2, 4, geometry.Width / 2 - 14, 27),
                 12, Muted, alignment: CanvasHorizontalAlignment.Right);
         session.DrawLine(10, geometry.Height - NoteOverlayGeometry.FooterHeight,
             geometry.Width - 10, geometry.Height - NoteOverlayGeometry.FooterHeight, Outline);
-        DrawButton(session, "↑ Naik", geometry.Previous, scroll > 0);
-        DrawButton(session, "↓ Turun", geometry.Next, scroll < maxScroll);
-        if (steps.Count > 1)
-            DrawButton(session, indexOpen ? "Kembali" : "Daftar", geometry.Index, true);
+        if (zoomLabel is not null)
+        {
+            DrawButton(session, "− Zoom", geometry.Previous, true);
+            DrawButton(session, "+ Zoom", geometry.Next, true);
+            DrawButton(session, zoomLabel, geometry.Index, true);
+        }
+        else
+        {
+            DrawButton(session, "↑ Naik", geometry.Previous, scroll > 0);
+            DrawButton(session, "↓ Turun", geometry.Next, scroll < maxScroll);
+            if (steps.Count > 1)
+                DrawButton(session, indexOpen ? "Kembali" : "Daftar", geometry.Index, true);
+        }
         DrawButton(session, clickThrough ? "Atur" : "Selesai", geometry.Mode, true);
 
         if (!clickThrough)

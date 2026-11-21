@@ -124,7 +124,7 @@ public sealed partial class MainPage
             if (playback is not null) await playback.DisposeAsync();
             if (mic is not null) await mic.DisposeAsync();
             if (settings is null || token.IsCancellationRequested) return;
-            if (settings.ComputerAudioEnabled) _studioPlayback = new(settings.PlaybackDeviceId, true);
+            if (settings.ComputerAudioEnabled && _sessionNoteReference is null) _studioPlayback = new(settings.PlaybackDeviceId, true);
             if (settings.MicrophoneEnabled) _studioMic = new(settings.MicrophoneDeviceId, false,
                 settings.MicrophoneSpeechProfile, settings.WarmNarration, settings.ReduceFanNoise, settings.BoostedMicrophones);
             if (settings.CameraEnabled)
@@ -175,7 +175,7 @@ public sealed partial class MainPage
             var reading = _recorder is not null ? _recorder.ReadPreviewLevel(loopback)
                 : (loopback ? _studioPlayback : _studioMic)?.TakeReading();
             var enabled = _recorder is not null ? reading.HasValue
-                : loopback ? settings.ComputerAudioEnabled : settings.MicrophoneEnabled;
+                : loopback ? settings.ComputerAudioEnabled && _sessionNoteReference is null : settings.MicrophoneEnabled;
             var text = !enabled ? "Nonaktif" : !show ? idle : reading?.Error
                 ?? (reading?.IsReady == true ? null : "Menghubungkan…");
             if (text is not null)

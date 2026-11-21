@@ -258,6 +258,24 @@ public sealed class CaptureSessionService : IDisposable, IRecordingFrameSource
         => DrawCore(drawingSession, width, height, scaleMode, adaptiveZoom,
             CanvasImageInterpolation.Linear);
 
+    internal void DrawReference(CanvasDrawingSession drawing, Rect viewport, float zoom, float horizontal, float vertical)
+    {
+        lock (_frameLock)
+        {
+            if (_frontBuffer is not { } bitmap) return;
+            var width = bitmap.SizeInPixels.Width;
+            var height = bitmap.SizeInPixels.Height;
+            var scale = Math.Min(viewport.Width / width, viewport.Height / height) * zoom;
+            var spareX = viewport.Width - width * scale;
+            var spareY = viewport.Height - height * scale;
+            using var layer = drawing.CreateLayer(1, viewport);
+            drawing.DrawImage(bitmap, new Rect(
+                viewport.X + spareX * (spareX < 0 ? horizontal : .5),
+                viewport.Y + spareY * (spareY < 0 ? vertical : .5), width * scale, height * scale),
+                new Rect(0, 0, width, height), 1, CanvasImageInterpolation.HighQualityCubic);
+        }
+    }
+
     private void DrawCore(CanvasDrawingSession drawingSession, float width, float height,
         CaptureScaleMode scaleMode, float adaptiveZoom, CanvasImageInterpolation interpolation)
     {

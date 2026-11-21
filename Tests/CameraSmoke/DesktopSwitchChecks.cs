@@ -143,7 +143,7 @@ internal static class DesktopSwitchChecks
     }
 
     // Encode only the synthetic windows within the monitor capture.
-    private sealed class TestRegion(CaptureSessionService capture, DisplayBounds region, DisplayBounds monitor) : IRecordingFrameSource
+    internal sealed class TestRegion(CaptureSessionService capture, DisplayBounds region, DisplayBounds monitor) : IRecordingFrameSource
     {
         public bool HasFrame => capture.HasFrame;
         public void DrawRecordingFrame(CanvasDrawingSession session, float width, float height,

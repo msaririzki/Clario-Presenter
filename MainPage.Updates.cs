@@ -29,7 +29,7 @@ public sealed partial class MainPage
 
     private UpdateNotes CurrentNotes() => new(FreeNotesTextBox.Text, _notesFileName,
         MarkdownNotesCheckBox.IsChecked == true, NoteReader.Visibility == Visibility.Visible,
-        NotesPanel.Visibility == Visibility.Visible, _floatingNotes?.IsRequested == true,
+        NotesPanel.Visibility == Visibility.Visible, _noteReference is null && _floatingNotes?.IsRequested == true,
         FreeNotesTextBox.SelectionStart, NoteReaderScroll.VerticalOffset, _floatingNotes?.ReadingOffset ?? 0,
         NotesFontSizeSlider.Value, NotesWidthSlider.Value, NotesHeightSlider.Value, NotesOpacitySlider.Value,
         NotesClickThroughToggle.IsOn, PreferredNotesDisplay()?.DeviceName);
